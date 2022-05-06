@@ -1,0 +1,10 @@
+LICENSE.txt
+README.md
+pyproject.toml
+setup.cfg
+src/openwillis/__init__.py
+src/openwillis/testfunction.py
+src/openwillis.egg-info/PKG-INFO
+src/openwillis.egg-info/SOURCES.txt
+src/openwillis.egg-info/dependency_links.txt
+src/openwillis.egg-info/top_level.txt
