@@ -3,10 +3,8 @@
 
 import setuptools
 
-install_requires = [
-    'mediapipe>=0.8.10,<0.8.10.1',
-    'opencv-python>=3.4.18.65',
-]
+with open('requirements.txt') as fp:
+    install_requires = fp.read()
 
 #Long description
 with open("README.md", "r") as fh:

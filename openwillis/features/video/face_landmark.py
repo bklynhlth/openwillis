@@ -102,10 +102,10 @@ def get_landmarks(path):
     """
     try:
         
-        face_mesh = run_facemesh(path)
         df_common = pd.DataFrame([[0,1]], columns=['frame', 'timestamp'])
         df_landmark = pd.DataFrame(columns = get_column())
-
+        face_mesh = run_facemesh(path)
+        
         for face_landmarks in face_mesh.multi_face_landmarks:
             keypoints = protobuf_to_dict(face_landmarks)
             break
