@@ -3,15 +3,15 @@
 
 import setuptools
 
-with open('requirements.txt') as fp:
-    install_requires = fp.read()
-
 #Long description
 with open("README.md", "r") as fh:
     long_description = fh.read()
 
+with open("requirements.txt", "r") as fp:
+    install_requires = fp.read()
+
 setuptools.setup(name='openwillis',
-                 version='0.3',
+                 version='0.2.2',
                  description='digital health measurement',
                  long_description=long_description,
                  long_description_content_type="text/markdown",
