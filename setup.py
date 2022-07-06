@@ -22,10 +22,5 @@ setuptools.setup(name='openwillis',
                  author_email='admin@bklynhlth.com',
                  packages=setuptools.find_packages(),
                  zip_safe=False,
-                 license='Apache',
-                 project_urls={
-                     "Documentation": "",
-                     "Source Code": "https://github.com/bklynhlth/openwillis",
-                     "Bug Tracker": "https://github.com/bklynhlth/openwillis/issues",
-                 }
+                 license='Apache'
                 )
