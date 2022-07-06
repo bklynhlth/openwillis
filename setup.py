@@ -27,11 +27,5 @@ setuptools.setup(name='openwillis',
                      "Documentation": "",
                      "Source Code": "https://github.com/bklynhlth/openwillis",
                      "Bug Tracker": "https://github.com/bklynhlth/openwillis/issues",
-                 },
-                 classifiers=[
-                     'Programming Language :: Python 3',
-                     'Operating System :: OS Independent',
-                     'Intended Audience :: Developers :: Science/Research',
-                     'License :: Apache Software License',
-                     'Topic :: Scientific :: Engineering :: Bio-Informatics']
+                 }
                 )
