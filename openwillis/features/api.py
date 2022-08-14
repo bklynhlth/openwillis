@@ -5,3 +5,6 @@
 from openwillis.features.video import (
     faciallandmarks,
 )
+from openwillis.features.audio import (
+    vocalacoustics,
+)
