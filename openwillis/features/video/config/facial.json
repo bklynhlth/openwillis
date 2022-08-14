@@ -1,0 +1,10 @@
+{
+  "angry": "angry",
+  "disgust": "disgust",
+  "fear": "fear",
+  "happy": "happy",
+  "sad": "sad",
+  "surprise": "surprise",
+  "neutral": "neutral",
+  "comp_exp": "composite_expressivity"
+}

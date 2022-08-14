@@ -1,3 +1,4 @@
 include RELEASE.md
 include requirements.txt
 include openwillis/features/audio/config/acoustic.json
+include openwillis/features/video/config/facial.json
