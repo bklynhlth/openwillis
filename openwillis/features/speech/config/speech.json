@@ -1,0 +1,17 @@
+{
+  "result": "result",
+  "text": "text",
+  "label": "label",
+  "tag": "tag",
+  "tot_words": "tot_words",
+  "speech_verb": "speech_verb",
+  "speech_adj": "speech_adj",
+  "speech_pronoun": "speech_pronoun",
+  "speech_noun": "speech_noun",
+  "speech_mattr": "speech_mattr",
+  "speech_rate": "speech_rate",
+  "speech_pause": "speech_pause",
+  "speech_norm_pause": "speech_norm_pause",
+  "speech_pause_number": "speech_pause_number",
+  "speech_pause_total": "speech_pause_total"
+}

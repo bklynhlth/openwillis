@@ -9,3 +9,7 @@ from openwillis.features.video import (
 from openwillis.features.audio import (
     vocalacoustics,
 )
+from openwillis.features.speech import (
+    transcribe,
+    speech_characteristic,
+)

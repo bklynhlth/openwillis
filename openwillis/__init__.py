@@ -7,7 +7,9 @@ from .usability import sum_num
 from openwillis.features.api import (
     faciallandmarks,
     facialemotions,
-    vocalacoustics
+    vocalacoustics,
+    transcribe,
+    speech_characteristic
 )
 
-__all__ = ["faciallandmarks", "vocalacoustics", "facialemotions"]
+__all__ = ["faciallandmarks", "vocalacoustics", "facialemotions", "transcribe", "speech_characteristic"]

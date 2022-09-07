@@ -7,3 +7,8 @@ protobuf3-to-dict==0.1.5
 praat-parselmouth
 pydub
 deepface==0.0.75
+vosk
+vaderSentiment
+nltk
+lexicalrichness
+librosa
