@@ -12,4 +12,5 @@ from openwillis.features.audio import (
 from openwillis.features.speech import (
     transcribe,
     speech_characteristic,
+    speaker_separation,
 )

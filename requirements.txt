@@ -2,7 +2,7 @@
 mediapipe==0.8.10
 opencv-python==4.6.0.66
 protobuf==3.20.0
-pandas==1.4.0
+pandas==1.4.2
 protobuf3-to-dict==0.1.5
 praat-parselmouth
 pydub
@@ -12,3 +12,7 @@ vaderSentiment
 nltk
 lexicalrichness
 librosa
+piso
+torch
+pyannote.audio==2.0.1
+diart

@@ -9,7 +9,8 @@ from openwillis.features.api import (
     facialemotions,
     vocalacoustics,
     transcribe,
-    speech_characteristic
+    speech_characteristic,
+    speaker_separation
 )
 
-__all__ = ["faciallandmarks", "vocalacoustics", "facialemotions", "transcribe", "speech_characteristic"]
+__all__ = ["faciallandmarks", "vocalacoustics", "facialemotions", "transcribe", "speech_characteristic", "speaker_separation"]
