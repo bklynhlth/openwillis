@@ -3,21 +3,27 @@
 digital measurement of health
 
 # Installation
+1) Create environment:
 
-1) Install `FFmpeg`:
+```shell
+conda create -n openwillis_env python=3.8
+conda activate openwillis_env
+```
+
+2) Install `FFmpeg`:
 
 ```shell
 sudo apt-get install ffmpeg
 ```
 
-2) Install `PortAudio` and `soundfile`:
+3) Install `PortAudio` and `soundfile`:
 
 ```shell
 conda install portaudio
 conda install pysoundfile -c conda-forge
 ```
 
-3) Install openwillis:
+4) Install openwillis:
 
 ```shell
 pip install openwillis
