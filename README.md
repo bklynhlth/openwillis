@@ -1,30 +1,11 @@
-# openwillis
+Openwillis is a python library for digital measurement of health.
 
-digital measurement of health
+It was developed by BklynHlth to establish standardized methods in digital measurement.
 
-# Installation
-1) Create environment:
+It is free for non-commercial use ([see license](https://github.com/bklynhlth/openwillis/blob/main/LICENSE.txt)).
 
-```shell
-conda create -n openwillis_env python=3.8
-conda activate openwillis_env
-```
+* [Getting started](https://github.com/bklynhlth/openwillis/wiki/1.-Getting-started)
+* [List of functions](https://github.com/bklynhlth/openwillis/wiki/2.-List-of-functions)
+* [Research guidelines](https://github.com/bklynhlth/openwillis/wiki/3.-Research-guidelines)
 
-2) Install `FFmpeg`:
-
-```shell
-sudo apt-get install ffmpeg
-```
-
-3) Install `PortAudio` and `soundfile`:
-
-```shell
-conda install portaudio
-conda install pysoundfile -c conda-forge
-```
-
-4) Install openwillis:
-
-```shell
-pip install openwillis
-```
+Please report any issues using the [Issues](https://github.com/bklynhlth/openwillis/issues) tab or get in touch through openwillis@bklynhlth.com.
