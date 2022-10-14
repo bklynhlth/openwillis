@@ -43,9 +43,11 @@ def speaker_separation_stream(filepath, out_dir):
     
     try:
         if os.path.exists(filepath):
+            ut.make_dir(out_dir)
+            
             run_diard(filepath)
-
             rttm_df = ut.read_rttm(dir_name, file_name)
+            
             rttm_df = rttm_df.sort_values(by=['start_time']).reset_index(drop=True)
             rttm_filepath = os.path.join(dir_name,file_name+'.rttm')
 
