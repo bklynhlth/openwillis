@@ -136,7 +136,7 @@ def get_langauge_feature(json_conf, text, language, measures):
         speech_summ = pause
     return tag_df, speech_summ
         
-def speech_characteristics(json_conf, language):
+def speech_characteristics(json_conf, language='en-us'):
     """
     -----------------------------------------------------------------------------------------
     

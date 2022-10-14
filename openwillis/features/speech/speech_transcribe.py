@@ -16,7 +16,7 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger=logging.getLogger()
 
-def speech_transcription(filepath, language):
+def speech_transcription(filepath, language='en-us'):
     """
     -----------------------------------------------------------------------------------------
     
