@@ -52,7 +52,7 @@ def filter_landmarks(col_name, keypoints):
     """
     
     col_list = list(range(0, 468))
-    cols = ['lmk' + str(s).zfill(3) + '_' + col_name for s in col_list] 
+    cols = ['lmk' + str(s+1).zfill(3) + '_' + col_name for s in col_list] 
     
     item = list(map(lambda d: d[col_name], keypoints['landmark']))
     df = pd.DataFrame([item], columns=cols)
@@ -218,11 +218,11 @@ def get_distance(df):
     disp_list = []
     
     for col in range(0, 468):
-        dist= np.sqrt(np.power(df['lmk' + str(col).zfill(3) + '_x'].shift() - df['lmk' + str(col).zfill(3) + '_x'], 2) + 
-                     np.power(df['lmk' + str(col).zfill(3) + '_y'].shift() - df['lmk' + str(col).zfill(3) + '_y'], 2) + 
-                     np.power(df['lmk' + str(col).zfill(3) + '_z'].shift() - df['lmk' + str(col).zfill(3) + '_z'], 2))
+        dist= np.sqrt(np.power(df['lmk' + str(col+1).zfill(3) + '_x'].shift() - df['lmk' + str(col+1).zfill(3) + '_x'], 2) + 
+                     np.power(df['lmk' + str(col+1).zfill(3) + '_y'].shift() - df['lmk' + str(col+1).zfill(3) + '_y'], 2) + 
+                     np.power(df['lmk' + str(col+1).zfill(3) + '_z'].shift() - df['lmk' + str(col+1).zfill(3) + '_z'], 2))
 
-        df_dist = pd.DataFrame(dist, columns=['lmk' + str(col).zfill(3)])
+        df_dist = pd.DataFrame(dist, columns=['lmk' + str(col+1).zfill(3)])
         disp_list.append(df_dist)
         
     displacement_df = pd.concat(disp_list, axis=1).reset_index(drop=True)
