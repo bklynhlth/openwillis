@@ -1,5 +1,5 @@
 from openwillis.features.audio.acoustic import (
-    vocalacoustics,
+    vocal_acoustics,
 )
 
-__all__ = ["vocalacoustics"]
+__all__ = ["vocal_acoustics"]

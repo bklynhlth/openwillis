@@ -1,13 +1,13 @@
 from openwillis.features.speech.speech_transcribe import (
-    transcribe,
+    speech_transcription,
 )
 
 from openwillis.features.speech.speech_attribute import (
-    speech_characteristic,
+    speech_characteristics,
 )
 
 from openwillis.features.speech.speech_separation import (
     speaker_separation,
 )
 
-__all__ = ["transcribe", "speech_characteristic", "speaker_separation"]
+__all__ = ["speech_transcription", "speech_characteristics", "speaker_separation"]

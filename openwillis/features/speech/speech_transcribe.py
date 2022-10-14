@@ -16,7 +16,7 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger=logging.getLogger()
 
-def transcribe(audio_path, lang):
+def speech_transcription(filepath, language):
     """
     -----------------------------------------------------------------------------------------
     
@@ -30,11 +30,16 @@ def transcribe(audio_path, lang):
         
     -----------------------------------------------------------------------------------------
     """
-    measures = get_config()
-    results = get_vosk(audio_path, lang)
+    try:
+        
+        measures = get_config()
+        results = get_vosk(filepath, language)
+
+        json_conf, transcript = filter_speech(measures, results)
+        return json_conf, transcript
     
-    speech_conf, speech_label = filter_speech(measures, results)
-    return speech_conf, speech_label
+    except Exception as e:
+        logger.info('Error in speech Transcription')
 
 def get_vosk(audio_path, lang):
     """

@@ -10,9 +10,6 @@ import json
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer 
 import nltk
 from lexicalrichness import LexicalRichness
-import librosa
-
-from openwillis.features.speech import speech_transcribe
 import logging
 
 logging.basicConfig(level=logging.INFO)
@@ -38,7 +35,7 @@ def download_tagger():
 def get_tag(text, tag_dict, measures):
     tag_list = nltk.pos_tag(text.split())
     
-    tag_df = pd.DataFrame(tag_list, columns=[measures['label'], measures['tag']])
+    tag_df = pd.DataFrame(tag_list, columns=[measures['word'], measures['tag']])
     tag_df = tag_df.replace({measures['tag']: tag_dict})
     return tag_df
 
@@ -61,9 +58,12 @@ def get_sentiment(word, text, measures):
     
     sentiment_dict = sentiment.polarity_scores(text)
     sent_summ = pd.DataFrame([sentiment_dict.values()], columns=sentiment_dict.keys())
-    mattr = get_mattr(word)
     
+    mattr = get_mattr(word)
     sent_summ[measures['speech_mattr']] = mattr
+    
+    sent_summ = sent_summ.rename(columns={"pos": measures['pos'], "neg": measures['neg'], "neu": measures['neu'], 
+                                          "compound": measures['compound']})
     return sent_summ
 
 def get_mattr(word):
@@ -78,31 +78,30 @@ def get_mattr(word):
     return mattr
 
 def get_stats(ros, file_dur, pause_list, measures):
-    mean_pause = np.mean(pause_list)
-    tot_pause = np.sum(pause_list)
+    pause_rate = (len(pause_list)/file_dur)*60
     
-    norm_pause = tot_pause/file_dur
-    num_pause = sum(i > 0 for i in pause_list)
+    pause_meandur = np.mean(pause_list)
+    silence_ratio = np.sum(pause_list)/(file_dur - np.sum(pause_list))
     
-    feature_list = [ros, mean_pause, norm_pause, num_pause, tot_pause]
-    col_list = [measures['speech_rate'], measures['speech_pause'], measures['speech_norm_pause'], 
-                measures['speech_pause_number'], measures['speech_pause_total']]
+    feature_list = [ros, pause_rate, pause_meandur, silence_ratio]
+    col_list = [measures['rate_of_speech'], measures['pause_rate'], measures['pause_meandur'], 
+                measures['silence_ratio']]
     
     df_stats = pd.DataFrame([feature_list], columns=col_list)
     return df_stats
 
-def get_pause_feature(p_intrvl, word, audio_path, measures):
-    file_dur = librosa.get_duration(filename=audio_path)
+def get_pause_feature(json_conf, word, measures):
+    pause_list = []
     df_pause_ftr = pd.DataFrame()
     
-    if file_dur <=0:
+    if len(json_conf) <=0:
         return df_pause_ftr
     
-    pause_list = []
+    file_dur = json_conf[-1]['end'] - json_conf[0]['start']
     ros = (len(word)/ file_dur)*60
     
-    for index in range(1, len(p_intrvl)):
-        pause_dur = p_intrvl[index]['start'] - p_intrvl[index-1]['end']
+    for index in range(1, len(json_conf)):
+        pause_dur = json_conf[index]['start'] - json_conf[index-1]['end']
         
         if pause_dur>=0:
             pause_list.append(pause_dur)
@@ -118,22 +117,53 @@ def get_config():
     file = open(measure_path)
     measures = json.load(file)
     return measures
-        
-def speech_characteristic(audio_path, lang):
-    
-    #Downloading NLTK resources
-    download_punkt()
-    download_tagger()
-    measures = get_config()
-    
-    result, text = speech_transcribe.transcribe(audio_path, lang)
+
+def get_langauge_feature(json_conf, text, language, measures):
     sentences = nltk.tokenize.sent_tokenize(text)
+    
+    tag_df = pd.DataFrame()
     word_list = nltk.tokenize.word_tokenize(text)
+    pause = get_pause_feature(json_conf, word_list, measures)
     
-    tag_df = get_tag(text, tag_dict, measures)
-    tag_summ = get_tag_summ(tag_df, word_list, measures)
-    sent_summ = get_sentiment(word_list, text, measures)
-    pause = get_pause_feature(result, word_list, audio_path, measures)
+    if language == 'en-us':
+        tag_df = get_tag(text, tag_dict, measures)
+        
+        tag_summ = get_tag_summ(tag_df, word_list, measures)
+        sent_summ = get_sentiment(word_list, text, measures)
+        speech_summ = pd.concat([tag_summ, sent_summ, pause], axis=1)
     
-    speech_summ = pd.concat([tag_summ, sent_summ, pause], axis=1)
+    else:
+        speech_summ = pause
+    return tag_df, speech_summ
+        
+def speech_characteristics(json_conf, language):
+    """
+    -----------------------------------------------------------------------------------------
+    
+    Speech Characteristics  
+    
+    Args:
+        json_conf: Transcribed json file
+        language: Language type
+        
+    Returns:
+        results: Speech Characteristics 
+        
+    -----------------------------------------------------------------------------------------
+    """
+    speech_summ = pd.DataFrame()
+    
+    try:
+        #Downloading NLTK resources
+        download_punkt()
+        download_tagger()
+        measures = get_config()
+
+        text_list = [word['word'] for word in json_conf if 'word' in word]
+        text = " ".join(text_list)
+        tag_df, speech_summ = get_langauge_feature(json_conf, text, language, measures)
+
+    except Exception as e:
+        logger.info('Error in speech Characteristics')
+        
     return tag_df, speech_summ

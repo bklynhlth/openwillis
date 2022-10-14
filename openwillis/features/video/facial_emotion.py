@@ -34,9 +34,7 @@ def run_deepface(path, measures):
     frame = 0
     
     try:
-        
         cap = cv2.VideoCapture(path)
-        fps = cap.get(cv2.CAP_PROP_FPS)
 
         while True:
             ret_type, img = cap.read()
@@ -44,7 +42,7 @@ def run_deepface(path, measures):
             if ret_type is not True:
                 break
 
-            df_common = pd.DataFrame([[frame,frame/fps]], columns=['frame', 'timestamp'])
+            df_common = pd.DataFrame([[frame]], columns=['frame'])
             img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
             face_analysis = DeepFace.analyze(img_path = img_rgb, actions = ['emotion'])
@@ -105,19 +103,20 @@ def baseline(df, base_path, measures):
     
     df_emo = df.copy()
     
-    if len(base_path)==0:
+    if not os.path.exists(base_path):
         return df_emo
     
-    df_common = df_emo[['frame', 'timestamp']]
-    df_emo.drop(columns=['frame', 'timestamp'], inplace=True)
+    df_common = df_emo[['frame']]
+    df_emo.drop(columns=['frame'], inplace=True)
     
     base_emo = get_emotion(base_path, 'baseline', measures)
-    base_mean = base_emo.iloc[:,2:].mean() + 1 #update baseline logic (check with Anzar)
+    base_mean = base_emo.iloc[:,1:].mean() + 1 #Normalization
     
     base_df = pd.DataFrame(base_mean).T
     base_df = base_df[~base_df.isin([np.nan, np.inf, -np.inf]).any(1)]
     
     if len(base_df)>0:
+        df_emo = df_emo + 1 #Normalization
         df_emo = df_emo.div(base_df.iloc[0])
     
     df_emotion = pd.concat([df_common, df_emo], axis=1)
@@ -139,10 +138,10 @@ def get_summary(df):
     df_summ = pd.DataFrame()
     if len(df)>0:
         
-        df_summ = df.iloc[:,2:].describe()
-    return df_summ.iloc[1:,:]
+        df_summ = df.iloc[:,1:].describe().iloc[1:3,:]
+    return df_summ
 
-def facialemotions(path, base_path):
+def emotional_expressivity(filepath, baseline_filepath):
     """
     -----------------------------------------------------------------------------------------
     
@@ -153,8 +152,8 @@ def facialemotions(path, base_path):
     the absence of any emotion (neutral). The summary output provides overall measurements for the input.
 
     Parameters
-        filename : str; path to video
-        base_path : str; optional path to baseline video. see openwillis research guidelines on github 
+        filepath : str; path to video
+        baseline_filepath : str; optional path to baseline video. see openwillis research guidelines on github 
                    wiki to read case for baseline video use, particularly in clinical research contexts. 
                    (default is 0, meaning no baseline correction will be conducted).
 
@@ -173,21 +172,30 @@ def facialemotions(path, base_path):
 
     -----------------------------------------------------------------------------------------
     """
+    try:
     
-    #Loading json config
-    dir_name = os.path.dirname(os.path.abspath(__file__))
-    measure_path = os.path.abspath(os.path.join(dir_name, 'config/facial.json'))
+        #Loading json config
+        dir_name = os.path.dirname(os.path.abspath(__file__))
+        measure_path = os.path.abspath(os.path.join(dir_name, 'config/facial.json'))
+
+        file = open(measure_path)
+        measures = json.load(file)
+
+        df_emotion = get_emotion(filepath, 'input', measures)
+        df_norm_emo = baseline(df_emotion, baseline_filepath, measures)
+
+        cols = [measures['angry'], measures['disgust'], measures['fear'], measures['happy'], measures['sad'], 
+                measures['surprise']]
+        comp_exp = df_norm_emo[cols].mean(axis=1)
+        
+        df_norm_emo[measures['comp_exp']] = comp_exp
+        
+        if os.path.exists(baseline_filepath):
+            df_norm_emo = df_norm_emo - 1
+            df_norm_emo['frame'] = df_norm_emo['frame'] + 1
+
+        df_summ = get_summary(df_norm_emo)
+        return df_norm_emo, df_summ
     
-    file = open(measure_path)
-    measures = json.load(file)
-    
-    df_emotion = get_emotion(path, 'input', measures)
-    df_norm_emo = baseline(df_emotion, base_path, measures)
-    
-    cols = [measures['angry'], measures['disgust'], measures['fear'], measures['happy'], measures['sad'], measures['surprise']]
-    comp_exp = df_norm_emo[cols].sum(axis=1)
-    df_norm_emo[measures['comp_exp']] = comp_exp
-    
-    df_summ = get_summary(df_norm_emo)
-    
-    return df_norm_emo, df_summ
+    except Exception as e:
+        logger.info('Error in facial emotion calculation')

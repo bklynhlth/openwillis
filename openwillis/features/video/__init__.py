@@ -1,8 +1,8 @@
 from openwillis.features.video.face_landmark import (
-    faciallandmarks,
+    facial_expressivity,
 )
 from openwillis.features.video.facial_emotion import (
-    facialemotions,
+    emotional_expressivity,
 )
 
-__all__ = ["faciallandmarks", "facialemotions"]
+__all__ = ["facial_expressivity", "emotional_expressivity"]

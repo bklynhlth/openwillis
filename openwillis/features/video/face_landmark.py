@@ -5,6 +5,7 @@
 import numpy as np
 import pandas as pd
 import cv2
+import os
 import math
 
 import mediapipe as mp
@@ -34,7 +35,7 @@ def init_facemesh():
     face_mesh = mp_face_mesh.FaceMesh(min_detection_confidence=0.5)
     return face_mesh
 
-def filter_landamrks(col_name, keypoints):
+def filter_landmarks(col_name, keypoints):
     """
     -----------------------------------------------------------------------------------------
     
@@ -51,7 +52,7 @@ def filter_landamrks(col_name, keypoints):
     """
     
     col_list = list(range(0, 468))
-    cols = [col_name + '_' + str(s) for s in col_list] 
+    cols = ['lmk' + str(s).zfill(3) + '_' + col_name for s in col_list] 
     
     item = list(map(lambda d: d[col_name], keypoints['landmark']))
     df = pd.DataFrame([item], columns=cols)
@@ -104,10 +105,10 @@ def filter_coord(result):
         keypoints = protobuf_to_dict(face_landmarks)
 
     if len(keypoints)>0:
-        df_x = filter_landamrks('x', keypoints)
+        df_x = filter_landmarks('x', keypoints)
 
-        df_y = filter_landamrks('y', keypoints)
-        df_z = filter_landamrks('z', keypoints)
+        df_y = filter_landmarks('y', keypoints)
+        df_z = filter_landmarks('z', keypoints)
         df_coord = pd.concat([df_x, df_y, df_z], axis=1)
 
     return df_coord
@@ -131,7 +132,6 @@ def run_facemesh(path):
     try:
         
         cap = cv2.VideoCapture(path)
-        fps = cap.get(cv2.CAP_PROP_FPS)
         face_mesh = init_facemesh()
 
         while True:
@@ -140,7 +140,7 @@ def run_facemesh(path):
             if ret_type is not True:
                 break
 
-            df_common = pd.DataFrame([[frame,frame/fps]], columns=['frame', 'timestamp'])
+            df_common = pd.DataFrame([[frame]], columns=['frame'])
             img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
             result = face_mesh.process(img_rgb)
@@ -197,19 +197,36 @@ def baseline(df, base_path):
     
     df_landmark = df.copy()
     
-    if len(base_path)==0:
+    if not os.path.exists(base_path):
         return df_landmark
     
     base_landmark = get_landmarks(base_path, 'baseline')
-    base_mean = base_landmark.iloc[:,2:].mean()
+    base_mean = base_landmark.iloc[:,1:].mean()
     
     base_df = pd.DataFrame(base_mean).T
     base_df = base_df[~base_df.isin([np.nan, np.inf, -np.inf]).any(1)]
     
     if len(base_df)>0:
+        base_df = base_df + 1 #Normalization
+        
+        df_landmark = df_landmark + 1 #Normalization
         df_landmark = df_landmark.div(base_df.iloc[0])
     
     return df_landmark
+
+def get_distance(df):
+    disp_list = []
+    
+    for col in range(0, 468):
+        dist= np.sqrt(np.power(df['lmk' + str(col).zfill(3) + '_x'].shift() - df['lmk' + str(col).zfill(3) + '_x'], 2) + 
+                     np.power(df['lmk' + str(col).zfill(3) + '_y'].shift() - df['lmk' + str(col).zfill(3) + '_y'], 2) + 
+                     np.power(df['lmk' + str(col).zfill(3) + '_z'].shift() - df['lmk' + str(col).zfill(3) + '_z'], 2))
+
+        df_dist = pd.DataFrame(dist, columns=['lmk' + str(col).zfill(3)])
+        disp_list.append(df_dist)
+        
+    displacement_df = pd.concat(disp_list, axis=1).reset_index(drop=True)
+    return displacement_df
 
 def get_displacement(lmk_df, base_path):
     """
@@ -231,21 +248,18 @@ def get_displacement(lmk_df, base_path):
     try:
     
         df = baseline(lmk_df, base_path)
-        df_meta = lmk_df[['frame','timestamp']]
+        df_meta = lmk_df[['frame']]
 
         if len(df)>1:
-            for col in range(0, 468):
-
-                dist= np.sqrt(np.power(df['x_' + str(col)].shift() - df['x_' + str(col)], 2) + 
-                             np.power(df['y_' + str(col)].shift() - df['y_' + str(col)], 2) + 
-                             np.power(df['z_' + str(col)].shift() - df['z_' + str(col)], 2))
-
-                df_dist = pd.DataFrame(dist, columns=['disp_' + str(col)])
-                disp_list.append(df_dist)
-
-            displacement_df = pd.concat([df_meta] + disp_list, axis=1).reset_index(drop=True)
-
+            displacement_df = get_distance(df)
+            displacement_df['overall'] = pd.DataFrame(displacement_df.mean(axis=1))
+            
+            if os.path.exists(base_path):
+                displacement_df = displacement_df-1
+                
+            displacement_df = pd.concat([df_meta, displacement_df], axis=1).reset_index(drop=True)
     except Exception as e:
+        
         logger.info('Error in displacement calculation')
     return displacement_df
 
@@ -265,10 +279,10 @@ def get_summary(df):
     df_summ = pd.DataFrame()
     if len(df)>0:
         
-        df_summ = df.describe()
+        df_summ = df.iloc[:,1:].describe().iloc[1:3,:]
     return df_summ
 
-def faciallandmarks(path,baseline):
+def facial_expressivity(filepath, baseline_filepath):
     """
     -----------------------------------------------------------------------------------------
     
@@ -280,8 +294,8 @@ def faciallandmarks(path,baseline):
     as a proxy measure of overall facial expressivity.
 
     Parameters:
-        filename : str; path to video ;
-        baseline : str, optional path to baseline video. see openwillis research 
+        filepath : str; path to video ;
+        baseline_filepath : str, optional path to baseline video. see openwillis research 
                    guidelines on github wiki to read case for baseline video use, 
                    particularly in clinical research contexts. (default is 0, meaning
                    no baseline correction will be conducted).
@@ -317,11 +331,13 @@ def faciallandmarks(path,baseline):
     -----------------------------------------------------------------------------------------
     """
     
+    try:
+        df_landmark = get_landmarks(filepath, 'input')
+        df_disp = get_displacement(df_landmark, baseline_filepath)
+        
+        df_summ = get_summary(df_disp)
+        return df_landmark, df_disp, df_summ
     
-    df_landmark = get_landmarks(path, 'input')
-    df_disp = get_displacement(df_landmark, baseline)
-    df_summ = get_summary(df_disp)
-    
-    return df_landmark, df_disp, df_summ
-    
+    except Exception as e:
+        logger.info('Error in facial landmark calculation')
     

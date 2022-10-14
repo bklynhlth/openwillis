@@ -17,7 +17,7 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger=logging.getLogger()
 
-def vocalacoustics(audio_path):
+def vocal_acoustics(audio_path):
     """
     -----------------------------------------------------------------------------------------
     
@@ -43,11 +43,11 @@ def vocalacoustics(audio_path):
     df_formant = formfreq(sound, measures)
     df_silence = get_voice_silence(audio_path, 500, measures)
     
-    mfo_sig_df = pd.concat([df_pitch, df_loudness, df_hnr, df_formant], axis=1)
-    sfo_sig_df = pd.concat([df_jitter, df_shimmer, df_gne], axis=1)
+    framewise = pd.concat([df_pitch, df_loudness, df_hnr, df_formant], axis=1)
+    sig_df = pd.concat([df_jitter, df_shimmer, df_gne], axis=1)
     
-    df_summary = get_summary(sound, mfo_sig_df, df_silence, measures)
-    return mfo_sig_df, sfo_sig_df, df_silence, df_summary
+    df_summary = get_summary(sound, framewise, sig_df, df_silence, measures)
+    return framewise, df_silence, df_summary
 
 def common_summary(df, col_name):
     mean = df.mean()
@@ -57,42 +57,46 @@ def common_summary(df, col_name):
     range_val = max_val - min_val
     
     values = [mean, std, min_val, max_val, range_val]
-    cols = [col_name + '_mean', col_name + '_std', col_name + '_min', col_name + '_max', 
+    cols = [col_name + '_mean', col_name + '_stddev', col_name + '_min', col_name + '_max', 
             col_name + '_range']
     
     df_summ = pd.DataFrame([values], columns= cols)
     return df_summ
 
-def silence_summary(df):
-    mean = df.mean()
-    num_pause = len(df)
+def silence_summary(sound, df, measure):
+    duration = call(sound, "Get total duration")
     
-    slnc_summ = pd.DataFrame([[mean, num_pause]], columns = ['meanpausedur', 'numpauses'])
-    return slnc_summ
+    df_silence = df[measure['voicesilence']]
+    mean = df_silence.mean()
+    
+    num_pause = (len(df_silence)/duration)*60
+    cols = [measure['pause_meandur'], measure['pause_rate']]
+    
+    silence_summ = pd.DataFrame([[mean, num_pause]], columns = cols)
+    return silence_summ
 
-def get_summary(sound, mfo_df, df_silence, measure):
+def get_summary(sound, framewise, sig_df, df_silence, measure):
     df_list = []
-    col_list = list(mfo_df.columns)
+    col_list = list(framewise.columns)
     
     for col in col_list:
-        com_summ = common_summary(mfo_df[col], col)
-        
+        com_summ = common_summary(framewise[col], col)
         df_list.append(com_summ)
     
-    summ_silence = silence_summary(df_silence[measure['voicesilence']])
-    voice_pct = voice_frame(sound)
+    summ_silence = silence_summary(sound, df_silence, measure)
+    voice_pct = voice_frame(sound, measure)
     
-    df_concat = pd.concat(df_list+ [summ_silence, voice_pct], axis=1)
+    df_concat = pd.concat(df_list+ [sig_df, summ_silence, voice_pct], axis=1)
     return df_concat
 
-def voice_frame(sound):
+def voice_frame(sound, measure):
     pitch = call(sound, "To Pitch", 0.0, 75, 500)
     
     total_frames = pitch.get_number_of_frames()
     voice = pitch.count_voiced_frames()
     voice_pct = 100 - (voice/total_frames)*100
     
-    df = pd.DataFrame([voice_pct], columns=['voicepct'])
+    df = pd.DataFrame([voice_pct], columns=[measure['silence_ratio']])
     return df
 
 def read_audio(path):

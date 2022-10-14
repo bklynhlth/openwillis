@@ -3,14 +3,14 @@
 
 # import the required packages
 from openwillis.features.video import (
-    faciallandmarks,
-    facialemotions,
+    facial_expressivity,
+    emotional_expressivity,
 )
 from openwillis.features.audio import (
-    vocalacoustics,
+    vocal_acoustics,
 )
 from openwillis.features.speech import (
-    transcribe,
-    speech_characteristic,
+    speech_transcription,
+    speech_characteristics,
     speaker_separation,
 )
