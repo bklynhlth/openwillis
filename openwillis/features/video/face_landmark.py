@@ -78,7 +78,7 @@ def get_column():
     lmk_cord = ['x', 'y', 'z']
     
     for col in lmk_cord:
-        cols = [col + '_' + str(s) for s in col_list] 
+        cols = [col + '_' + str(s+1) for s in col_list] 
         col_name.extend(cols)
     
     df = pd.DataFrame([value], columns = col_name)
@@ -181,39 +181,6 @@ def get_landmarks(path, error_info):
     
     return df_landmark
 
-def baseline(df, base_path):
-    """
-    -----------------------------------------------------------------------------------------
-    Normalize raw data
-    
-    Args:
-        df: facial landmark dataframe
-        base_path: baseline input file path
-    
-    Returns:
-        df_landmark: Normalized facial landmark dataframe
-    -----------------------------------------------------------------------------------------
-    """
-    
-    df_landmark = df.copy()
-    
-    if not os.path.exists(base_path):
-        return df_landmark
-    
-    base_landmark = get_landmarks(base_path, 'baseline')
-    base_mean = base_landmark.iloc[:,1:].mean()
-    
-    base_df = pd.DataFrame(base_mean).T
-    base_df = base_df[~base_df.isin([np.nan, np.inf, -np.inf]).any(1)]
-    
-    if len(base_df)>0:
-        base_df = base_df + 1 #Normalization
-        
-        df_landmark = df_landmark + 1 #Normalization
-        df_landmark = df_landmark.div(base_df.iloc[0])
-    
-    return df_landmark
-
 def get_distance(df):
     disp_list = []
     
@@ -227,6 +194,31 @@ def get_distance(df):
         
     displacement_df = pd.concat(disp_list, axis=1).reset_index(drop=True)
     return displacement_df
+
+def baseline(base_path):
+    """
+    -----------------------------------------------------------------------------------------
+    Normalize raw data
+    
+    Args:
+        base_path: baseline input file path
+    
+    Returns:
+        df_landmark: Normalized facial landmark dataframe
+    -----------------------------------------------------------------------------------------
+    """
+    
+    base_landmark = get_landmarks(base_path, 'baseline')
+    disp_base_df = get_distance(base_landmark)
+    
+    disp_base_df['overall'] = pd.DataFrame(disp_base_df.mean(axis=1))
+    base_mean = disp_base_df.mean()
+    
+    base_df = pd.DataFrame(base_mean).T
+    base_df = base_df[~base_df.isin([np.nan, np.inf, -np.inf]).any(1)]
+    
+    base_df = base_df + 1 #Normalization
+    return base_df
 
 def get_displacement(lmk_df, base_path):
     """
@@ -246,18 +238,22 @@ def get_displacement(lmk_df, base_path):
     displacement_df = pd.DataFrame()
     
     try:
-    
-        df = baseline(lmk_df, base_path)
         df_meta = lmk_df[['frame']]
 
-        if len(df)>1:
-            displacement_df = get_distance(df)
-            displacement_df['overall'] = pd.DataFrame(displacement_df.mean(axis=1))
-            
+        if len(lmk_df)>1:
+            disp_actual_df = get_distance(lmk_df)
+            disp_actual_df['overall'] = pd.DataFrame(disp_actual_df.mean(axis=1))
+
             if os.path.exists(base_path):
-                displacement_df = displacement_df-1
-                
-            displacement_df = pd.concat([df_meta, displacement_df], axis=1).reset_index(drop=True)
+                disp_base_df = baseline(base_path)
+
+                if len(disp_base_df)> 0:
+                    disp_actual_df = disp_actual_df + 1
+
+                    disp_actual_df = disp_actual_df/disp_base_df.values
+                    disp_actual_df = disp_actual_df - 1
+
+            displacement_df = pd.concat([df_meta, disp_actual_df], axis=1).reset_index(drop=True)
     except Exception as e:
         
         logger.info('Error in displacement calculation')
@@ -282,7 +278,7 @@ def get_summary(df):
         df_summ = df.iloc[:,1:].describe().iloc[1:3,:]
     return df_summ
 
-def facial_expressivity(filepath, baseline_filepath):
+def facial_expressivity(filepath, baseline_filepath=''):
     """
     -----------------------------------------------------------------------------------------
     
@@ -334,10 +330,10 @@ def facial_expressivity(filepath, baseline_filepath):
     try:
         df_landmark = get_landmarks(filepath, 'input')
         df_disp = get_displacement(df_landmark, baseline_filepath)
-        
+
         df_summ = get_summary(df_disp)
         return df_landmark, df_disp, df_summ
-    
+
     except Exception as e:
         logger.info('Error in facial landmark calculation')
     

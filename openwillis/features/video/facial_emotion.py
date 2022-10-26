@@ -141,7 +141,7 @@ def get_summary(df):
         df_summ = df.iloc[:,1:].describe().iloc[1:3,:]
     return df_summ
 
-def emotional_expressivity(filepath, baseline_filepath):
+def emotional_expressivity(filepath, baseline_filepath=''):
     """
     -----------------------------------------------------------------------------------------
     
