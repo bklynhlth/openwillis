@@ -13,5 +13,4 @@ from openwillis.features.speech import (
     speech_transcription,
     speech_characteristics,
     speaker_separation,
-    speaker_separation_stream,
 )

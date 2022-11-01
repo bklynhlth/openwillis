@@ -96,13 +96,16 @@ def temp_process(out_dir, file_path, audio_path):
     return temp_dir, temp_rttm
 
 def overalp_index(df):
-    com_interval = pd.IntervalIndex.from_arrays(df["start_time"], df["end_time"])
-    df["isOverlap"] = piso.adjacency_matrix(com_interval).any(axis=1).astype(int).values
+    df_combine = df.copy()
     
-    df_n_overlap = df[df['isOverlap']==0]
-    df_overlap = df[(df['isOverlap']==1) & (df['interval']>.5)]
-    
-    df_combine = pd.concat([df_n_overlap, df_overlap]).reset_index(drop=True)
+    if len(df)>1:
+        com_interval = pd.IntervalIndex.from_arrays(df["start_time"], df["end_time"])
+        
+        df["isOverlap"] = piso.adjacency_matrix(com_interval).any(axis=1).astype(int).values
+        df_n_overlap = df[df['isOverlap']==0]
+        df_overlap = df[(df['isOverlap']==1) & (df['interval']>.5)]
+        
+        df_combine = pd.concat([df_n_overlap, df_overlap]).reset_index(drop=True)
     return df_combine
     
 def read_rttm(temp_dir, file_path):
@@ -114,6 +117,7 @@ def read_rttm(temp_dir, file_path):
 
         rttm_df = pd.DataFrame(rttm_info, columns=['start_time', 'interval', 'speaker', 'filename'])
         rttm_df['end_time'] = rttm_df['start_time'] + rttm_df['interval']
+        rttm_df = rttm_df.drop(columns=['filename'])
 
         rttm_df = overalp_index(rttm_df)
     return rttm_df
@@ -143,3 +147,34 @@ def slice_audio(df, audio_path, out_dir):
     for speaker in speaker_list:
         speaker_df = df[df['speaker']==speaker].reset_index(drop=True)
         audio_segment(audio_path, speaker_df, out_dir)
+        
+def prepare_diart_interval(start_time, end_time, speaker_list):
+    df = pd.DataFrame(start_time, columns=['start_time'])
+    
+    df['end_time'] = end_time
+    df['interval'] =df['end_time'] - df['start_time']
+    df['speaker'] = speaker_list
+    
+    df = overalp_index(df)
+    return df
+        
+def get_diart_interval(diarization):
+    start_time = []
+    end_time = []
+    speaker_list = []
+    
+    for turn, _, speaker in diarization.itertracks(yield_label=True):
+        try:
+            
+            speaker_id = str(speaker).split('_')[1]
+            speaker_id = int(speaker_id)
+            start_time.append(turn.start)
+            
+            end_time.append(turn.end)
+            speaker_list.append('speaker'+ str(speaker_id))
+            
+        except Exception as e:
+            logger.info('Error in pyannote filtering')
+            
+    df = prepare_diart_interval(start_time, end_time, speaker_list)
+    return df

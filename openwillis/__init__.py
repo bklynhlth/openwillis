@@ -10,8 +10,7 @@ from openwillis.features.api import (
     vocal_acoustics,
     speech_transcription,
     speech_characteristics,
-    speaker_separation,
-    speaker_separation_stream
+    speaker_separation
 )
 
-__all__ = ["facial_expressivity", "vocal_acoustics", "emotional_expressivity", "speech_transcription", "speech_characteristics", "speaker_separation", "speaker_separation_stream"]
+__all__ = ["facial_expressivity", "vocal_acoustics", "emotional_expressivity", "speech_transcription", "speech_characteristics", "speaker_separation"]

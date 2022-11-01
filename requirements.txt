@@ -13,5 +13,5 @@ nltk
 lexicalrichness
 piso
 torch
-pyannote.audio==2.0.1
-diart
+pyannote.audio==2.1.1
+diart==0.6.0
