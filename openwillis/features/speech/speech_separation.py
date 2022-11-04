@@ -9,12 +9,22 @@ from pyannote.audio import Pipeline
 from openwillis.features.speech import util as ut
 
 import os
+import json
 import shutil
 import pandas as pd
 import logging
 
 logging.basicConfig(level=logging.INFO)
 logger=logging.getLogger()
+
+def get_config():
+    #Loading json config
+    dir_name = os.path.dirname(os.path.abspath(__file__))
+    measure_path = os.path.abspath(os.path.join(dir_name, 'config/speech.json'))
+    
+    file = open(measure_path)
+    measures = json.load(file)
+    return measures
 
 def run_diard(file_path, temp_dir, temp_rttm, hf_token):
     try:
@@ -34,12 +44,16 @@ def run_diard(file_path, temp_dir, temp_rttm, hf_token):
     except Exception as e:
         logger.info('Error in diard processing')
         
-def run_pyannote(file_path, hf_token):
+def run_pyannote(file_path, out_dir, hf_token):
     pipeline = Pipeline.from_pretrained("pyannote/speaker-diarization", use_auth_token=hf_token)
     
     diart = pipeline(file_path, num_speakers=2)
     diart_df = ut.get_diart_interval(diart)
     diart_df = diart_df.sort_values(by=['start_time', 'end_time']).reset_index(drop=True)
+    
+    if len(diart_df)>0:#make output dir
+        ut.make_dir(out_dir) 
+        
     return diart_df
 
 def process_diart(out_dir, file_name, filepath, hf_token):
@@ -52,7 +66,7 @@ def process_diart(out_dir, file_name, filepath, hf_token):
     ut.clean_prexisting(temp_dir, temp_rttm)
     return rttm_df
 
-def speaker_separation(filepath, out_dir, hf_token, model='pyannote'):
+def speaker_separation(filepath, out_dir, hf_token, model='pyannote', c_scale=''):
     """
     -----------------------------------------------------------------------------------------
     
@@ -61,6 +75,8 @@ def speaker_separation(filepath, out_dir, hf_token, model='pyannote'):
     Args:
         filepath: audio file path 
         out_dir: Output directory
+        model: Speech diarization model: pyannote/diart
+        c_scale: clinical scale
         
     Returns:
         results: Speaker separation
@@ -68,6 +84,7 @@ def speaker_separation(filepath, out_dir, hf_token, model='pyannote'):
     -----------------------------------------------------------------------------------------
     """
     file_name, _ = os.path.splitext(os.path.basename(filepath))
+    measures = get_config()
     
     try:
         if os.path.exists(filepath):
@@ -76,9 +93,9 @@ def speaker_separation(filepath, out_dir, hf_token, model='pyannote'):
                 rttm_df = process_diart(out_dir, file_name, filepath, hf_token)
 
             else:
-                rttm_df = run_pyannote(filepath, hf_token)
+                rttm_df = run_pyannote(filepath, out_dir, hf_token)
 
-            ut.slice_audio(rttm_df, filepath, out_dir)
+            ut.slice_audio(rttm_df, filepath, out_dir, measures, c_scale)
             return rttm_df
         
     except Exception as e:

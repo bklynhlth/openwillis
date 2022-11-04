@@ -15,3 +15,5 @@ piso
 torch
 pyannote.audio==2.1.1
 diart==0.6.0
+sentence-transformers==2.2.2
+huggingface-hub==0.10.1

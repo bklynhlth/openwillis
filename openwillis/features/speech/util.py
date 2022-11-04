@@ -8,8 +8,13 @@ import shutil
 import piso
 
 import pandas as pd
+import numpy as np
 from pydub import AudioSegment
 import logging
+
+from sentence_transformers import SentenceTransformer
+from sklearn.metrics.pairwise import cosine_similarity
+from openwillis.features.speech import speech_transcribe as stranscribe
 
 logging.basicConfig(level=logging.INFO)
 logger=logging.getLogger()
@@ -122,32 +127,106 @@ def read_rttm(temp_dir, file_path):
         rttm_df = overalp_index(rttm_df)
     return rttm_df
 
-def audio_segment(audio_path, df_driad, out_dir):
-    file_name, _ = os.path.splitext(os.path.basename(audio_path))
-    
+def concat_audio(df_driad, audio_path):
     aud_list = []
-    speaker = df_driad['speaker'][0]
     
-    sound = AudioSegment.from_wav(audio_path)
     for index, row in df_driad.iterrows():
+        try:
+            
+            sound = AudioSegment.from_wav(audio_path)
+            st_index = row['start_time']*1000
+            end_index = row['end_time']*1000
+
+            split_aud = sound[st_index:end_index+1]
+            aud_list.append(split_aud)
         
-        st_index = row['start_time']*1000
-        end_index = row['end_time']*1000
-        
-        split_aud = sound[st_index:end_index+1]
-        aud_list.append(split_aud)
+        except Exception as e:
+            logger.info('Error in audio concationation...') 
         
     concat_audio = sum(aud_list)
-    out_file = file_name + '_' +speaker +'.wav'
-    concat_audio.export(os.path.join(out_dir, out_file), format="wav")
+    return concat_audio
     
-def slice_audio(df, audio_path, out_dir):
-    speaker_list = list(df['speaker'].unique())[:2]
-    
+def diart_speaker(df, speaker_list, audio_path, out_dir):
+    """
+    """
+    speaker_audio = []
     for speaker in speaker_list:
-        speaker_df = df[df['speaker']==speaker].reset_index(drop=True)
-        audio_segment(audio_path, speaker_df, out_dir)
+        try:
+            
+            file_name, _ = os.path.splitext(os.path.basename(audio_path))
+            speaker_df = df[df['speaker']==speaker].reset_index(drop=True)
+
+            if len(speaker_df)>0:
+                speaker_segment = concat_audio(speaker_df, audio_path)
+
+                out_file = file_name + '_' +speaker +'.wav'
+                speaker_segment.export(os.path.join(out_dir, out_file), format="wav")
+                speaker_audio.append(out_file)
         
+        except Exception as e:
+            logger.info('Error in diart seperation') 
+            
+    return speaker_audio
+
+def get_similarity_prob(sentence_embeddings):
+    pscore = cosine_similarity([sentence_embeddings[0]],[sentence_embeddings[1]])
+    prob = pscore[0][0]
+    return prob
+
+def match_transcript(measures, speech):
+    prob_list = []
+    
+    model = SentenceTransformer('bert-base-nli-mean-tokens')
+    panss_script = measures['panss_string'][1:-1].split(',')#hardcode for PANSS
+    
+    for script in panss_script:
+        sen_list = [script, speech]
+        
+        sentence_embeddings = model.encode(sen_list)
+        prob = get_similarity_prob(sentence_embeddings)
+        prob_list.append(prob)
+        
+    prob_list.sort(reverse=True)
+    match_score = np.mean(prob_list[:5]) #top 5 probability score
+    return match_score
+
+def rename_speech(match_list, speaker_audio, out_dir):
+    if len(match_list)==2:
+        
+        rater_index = np.argmax(match_list)
+        patient_index = np.argmin(match_list)
+
+        rater_filename = speaker_audio[rater_index].replace('speaker0', 'rater').replace('speaker1', 'rater')
+        patient_filename = speaker_audio[patient_index].replace('speaker0', 'patient').replace('speaker1', 'patient')
+
+        #Add threshold in future
+        os.rename(os.path.join(out_dir, speaker_audio[rater_index]), os.path.join(out_dir, rater_filename))
+        os.rename(os.path.join(out_dir, speaker_audio[patient_index]), os.path.join(out_dir, patient_filename))
+
+def annote_speaker(out_dir, measures, speaker_audio):
+    match_list = []
+    
+    for audio in speaker_audio:
+        try:
+            
+            filepath = os.path.join(out_dir, audio)
+            _, speech = stranscribe.speech_transcription(filepath, 'en-us', [0,300]) #hardcode for US-EN
+            
+            match_score = match_transcript(measures, speech)
+            match_list.append(match_score)
+        
+        except Exception as e:
+            logger.info('Error in speaker annotation')
+    
+    rename_speech(match_list, speaker_audio, out_dir)
+
+def slice_audio(df, audio_path, out_dir, measures, c_scale):
+    speaker_list = list(df['speaker'].unique())[:2]
+    speaker_audio = diart_speaker(df, speaker_list, audio_path, out_dir)
+    
+    if str(c_scale).lower() == 'panns' and len(speaker_audio) == 2:
+        annote_speaker(out_dir, measures, speaker_audio)
+
 def prepare_diart_interval(start_time, end_time, speaker_list):
     df = pd.DataFrame(start_time, columns=['start_time'])
     

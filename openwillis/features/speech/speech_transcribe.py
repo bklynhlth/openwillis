@@ -18,7 +18,7 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger=logging.getLogger()
 
-def speech_transcription(filepath, language='en-us'):
+def speech_transcription(filepath, language='en-us', transcribe_interval = []):
     """
     -----------------------------------------------------------------------------------------
     
@@ -37,7 +37,7 @@ def speech_transcription(filepath, language='en-us'):
         if os.path.exists(filepath): 
         
             measures = get_config()
-            mono_filepath = stereo_to_mono(filepath)
+            mono_filepath = stereo_to_mono(filepath, transcribe_interval)
             results = get_vosk(mono_filepath, language)
             
             ut.remove_dir(os.path.dirname(mono_filepath)) #Clean temp directory
@@ -51,10 +51,24 @@ def speech_transcription(filepath, language='en-us'):
         ut.remove_dir(os.path.dirname(mono_filepath))#Clean temp directory
         logger.error('Error in speech Transcription')
         
-def stereo_to_mono(filepath):
+def filter_audio(filepath, t_interval):
+    """
+    Speaker annotation using time interval
+    """
     sound = AudioSegment.from_wav(filepath)
     
+    if len(t_interval)==2: 
+        sound = sound[int(t_interval[0])*1000 : int(t_interval[1])*1000]
+        
+    elif len(t_interval)==1:
+        sound = sound[int(t_interval[0])*1000:]
+     
     sound = sound.set_channels(1)
+    return sound
+        
+def stereo_to_mono(filepath, t_interval):
+    sound = filter_audio(filepath, t_interval)
+    
     filename, _ = os.path.splitext(os.path.basename(filepath))
     dir_name = os.path.join(os.path.dirname(filepath), 'temp_mono_' + filename)
     
@@ -76,7 +90,7 @@ def get_vosk(audio_path, lang):
     results = []
     while True:
         
-        data = wf.readframes(4000)
+        data = wf.readframes(4000) #Future work
         if len(data) == 0:
             break
             
@@ -113,3 +127,4 @@ def get_config():
     file = open(measure_path)
     measures = json.load(file)
     return measures
+    
