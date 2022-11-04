@@ -6,10 +6,12 @@
 import numpy as np
 import pandas as pd
 import os
-
-from vosk import Model, KaldiRecognizer
 import wave
 import json
+
+from vosk import Model, KaldiRecognizer
+from pydub import AudioSegment
+from openwillis.features.speech import util as ut
 
 import logging
 
@@ -31,15 +33,35 @@ def speech_transcription(filepath, language='en-us'):
     -----------------------------------------------------------------------------------------
     """
     try:
+        mono_filepath = ''
+        if os.path.exists(filepath): 
         
-        measures = get_config()
-        results = get_vosk(filepath, language)
-
-        json_conf, transcript = filter_speech(measures, results)
-        return json_conf, transcript
-    
+            measures = get_config()
+            mono_filepath = stereo_to_mono(filepath)
+            results = get_vosk(mono_filepath, language)
+            
+            ut.remove_dir(os.path.dirname(mono_filepath)) #Clean temp directory
+            json_conf, transcript = filter_speech(measures, results)
+            return json_conf, transcript
+        
+        else:
+            logger.info('Audio file not available.')
+            
     except Exception as e:
-        logger.info('Error in speech Transcription')
+        ut.remove_dir(os.path.dirname(mono_filepath))#Clean temp directory
+        logger.error('Error in speech Transcription')
+        
+def stereo_to_mono(filepath):
+    sound = AudioSegment.from_wav(filepath)
+    
+    sound = sound.set_channels(1)
+    filename, _ = os.path.splitext(os.path.basename(filepath))
+    dir_name = os.path.join(os.path.dirname(filepath), 'temp_mono_' + filename)
+    
+    ut.make_dir(dir_name)
+    mono_filepath = os.path.join(dir_name, filename + '.wav')
+    sound.export(mono_filepath, format="wav")
+    return mono_filepath
 
 def get_vosk(audio_path, lang):
     """
