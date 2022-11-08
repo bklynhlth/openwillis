@@ -32,32 +32,46 @@ def run_deepface(path, measures):
     
     df_list = []
     frame = 0
+    cols = [measures['angry'], measures['disgust'], measures['fear'], measures['happy'], measures['sad'], 
+            measures['surprise'], measures['neutral']]
     
     try:
         cap = cv2.VideoCapture(path)
 
         while True:
-            ret_type, img = cap.read()
+            try:
+                
+                ret_type, img = cap.read()
+                if ret_type is not True:
+                    break
 
-            if ret_type is not True:
-                break
+                df_common = pd.DataFrame([[frame]], columns=['frame'])
+                img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
-            df_common = pd.DataFrame([[frame]], columns=['frame'])
-            img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+                face_analysis = DeepFace.analyze(img_path = img_rgb, actions = ['emotion'])
+                df_face = pd.DataFrame([face_analysis['emotion'].values()], columns=cols)/100
 
-            face_analysis = DeepFace.analyze(img_path = img_rgb, actions = ['emotion'])
-            cols = [measures['angry'], measures['disgust'], measures['fear'], measures['happy'], measures['sad'],
-                   measures['surprise'], measures['neutral']]
-            df_face = pd.DataFrame([face_analysis['emotion'].values()], columns=cols)/100
-
-            frame +=1
-            df_emotion = pd.concat([df_common, df_face], axis=1)
-            df_list.append(df_emotion)
+                frame +=1
+                df_emotion = pd.concat([df_common, df_face], axis=1)
+                df_list.append(df_emotion)
+                
+            except Exception as e:
+                df_emotion = get_undected_emotion(frame, cols)
+                df_list.append(df_emotion)
+                frame +=1
 
     except Exception as e:
         logger.info('Face not detected by mediapipe')
         
     return df_list
+
+def get_undected_emotion(frame, cols):
+    df_common = pd.DataFrame([[frame]], columns=['frame'])
+    value = [np.nan] * len(cols)
+    
+    df = pd.DataFrame([value], columns = cols)
+    df_emotion = pd.concat([df_common, df], axis=1)
+    return df_emotion
 
 def get_emotion(path, error_info, measures):
     """

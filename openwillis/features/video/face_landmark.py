@@ -135,25 +135,46 @@ def run_facemesh(path):
         face_mesh = init_facemesh()
 
         while True:
-            ret_type, img = cap.read()
+            try:
+                
+                ret_type, img = cap.read()
+                if ret_type is not True:
+                    break
 
-            if ret_type is not True:
-                break
+                df_common = pd.DataFrame([[frame]], columns=['frame'])
+                img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
-            df_common = pd.DataFrame([[frame]], columns=['frame'])
-            img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+                result = face_mesh.process(img_rgb)
+                df_coord = filter_coord(result)
 
-            result = face_mesh.process(img_rgb)
-            df_coord = filter_coord(result)
-
-            frame +=1
-            df_landmark = pd.concat([df_common, df_coord], axis=1)
-            df_list.append(df_landmark)
+                frame +=1
+                df_landmark = pd.concat([df_common, df_coord], axis=1)
+                df_list.append(df_landmark)
+                
+            except Exception as e:
+                df_landmark = get_undected_markers(frame)
+                df_list.append(df_landmark)
+                frame +=1
 
     except Exception as e:
         logger.info('Face not detected by mediapipe')
         
     return df_list
+
+def get_undected_markers(frame):
+    df_common = pd.DataFrame([[frame]], columns=['frame'])
+    df_coord = get_column()
+    
+    col_list = list(range(0, 468))
+    cols_x = ['lmk' + str(s+1).zfill(3) + '_x' for s in col_list] 
+    cols_y = ['lmk' + str(s+1).zfill(3) + '_y' for s in col_list] 
+    cols_z = ['lmk' + str(s+1).zfill(3) + '_z' for s in col_list] 
+    
+    cols = cols_x + cols_y + cols_z
+    df_coord.columns = cols
+    
+    df_landmark = pd.concat([df_common, df_coord], axis=1)
+    return df_landmark
 
 def get_landmarks(path, error_info):
     """
