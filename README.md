@@ -4,7 +4,8 @@ It was developed by BklynHlth to establish standardized methods in digital measu
 
 It is free for non-commercial use ([see license](https://github.com/bklynhlth/openwillis/blob/main/LICENSE.txt)).
 
-* [Github Wiki](https://github.com/bklynhlth/openwillis/wiki)
+* [Official website](https://www.bklynhlth.com/openwillis)
+* [Documentation](https://github.com/bklynhlth/openwillis/wiki)
 * [Getting started](https://github.com/bklynhlth/openwillis/wiki/1.-Getting-started)
 * [List of functions](https://github.com/bklynhlth/openwillis/wiki/2.-List-of-functions)
 * [Research guidelines](https://github.com/bklynhlth/openwillis/wiki/3.-Research-guidelines)
