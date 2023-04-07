@@ -21,17 +21,28 @@ logger=logging.getLogger()
 
 def run_vosk(filepath, language='en-us', transcribe_interval = []):
     """
-    -----------------------------------------------------------------------------------------
+    ------------------------------------------------------------------------------------------------------
 
-    Speech transcribe
+    Transcribe speech in an audio file using the Vosk model.
 
-    Args:
-        path: audio path
+    Parameters:
+    ............
+    filepath : str
+        The path to the audio file to be transcribed.
+    language : str, optional
+        The language of the audio file (e.g. 'en-us', 'es', 'fr'). Default is 'en-us'.
+    transcribe_interval : list, optional
+        A list of tuples representing the start and end times (in seconds) of segments of the audio file to be transcribed.
+        Default is an empty list.
 
     Returns:
-        results: Speech transcription (list of JSON dictionaries)
+    ............
+    json_response : str
+        The JSON response from the Vosk transcription service.
+    transcript : str
+        The transcript of the audio file.
 
-    -----------------------------------------------------------------------------------------
+    ------------------------------------------------------------------------------------------------------
     """
     json_response = '{}'
     transcript = mono_filepath = ''
@@ -47,18 +58,34 @@ def run_vosk(filepath, language='en-us', transcribe_interval = []):
             json_response, transcript = filter_speech(measures, results)
 
         else:
-            logger.info('Audio file not available.')
+            logger.info(f'Audio file not available. File: {filepath}')
 
     except Exception as e:
         ut.remove_dir(os.path.dirname(mono_filepath))#Clean temp directory
-        logger.error('Error in speech Transcription: {}'.format(e))
+        logger.error(f'Error in speech Transcription: {e} & File: {filepath}')
 
     finally:
         return json_response, transcript
 
 def filter_audio(filepath, t_interval):
     """
-    Speaker annotation using time interval
+    ------------------------------------------------------------------------------------------------------
+
+    Filter an audio file to extract a segment based on the specified time interval.
+
+    Parameters:
+    ............
+    filepath : str
+        The path to the audio file to be filtered.
+    t_interval : list
+        A list of tuples representing the start and end times (in seconds) of the segment to extract.
+
+    Returns:
+    ............
+    sound : AudioSegment
+        The filtered audio segment.
+
+    ------------------------------------------------------------------------------------------------------
     """
     sound = AudioSegment.from_wav(filepath)
 
@@ -72,6 +99,25 @@ def filter_audio(filepath, t_interval):
     return sound
 
 def stereo_to_mono(filepath, t_interval):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    Convert a stereo audio file to a mono audio file.
+
+    Parameters:
+    ............
+    filepath : str
+        The path to the stereo audio file to be converted.
+    t_interval : list
+        A list of tuples representing the start and end times (in seconds) of segments of the audio file to be transcribed.
+
+    Returns:
+    ............
+    mono_filepath : str
+        The path to the mono audio file.
+
+    ------------------------------------------------------------------------------------------------------
+    """
     sound = filter_audio(filepath, t_interval)
 
     filename, _ = os.path.splitext(os.path.basename(filepath))
@@ -84,7 +130,23 @@ def stereo_to_mono(filepath, t_interval):
 
 def get_vosk(audio_path, lang):
     """
-    Recognize speech using vosk model
+    ------------------------------------------------------------------------------------------------------
+
+    Recognize speech using the Vosk model.
+
+    Parameters:
+    ............
+    audio_path : str
+        The path to the audio file to be transcribed.
+    lang : str
+        The language of the audio file (e.g. 'en-us', 'es', 'fr').
+
+    Returns:
+    ............
+    results : list of dict
+        The raw transcription results returned by the Vosk model.
+
+    ------------------------------------------------------------------------------------------------------
     """
     model = Model(lang=lang)
     wf = wave.open(audio_path, "rb")
@@ -108,6 +170,27 @@ def get_vosk(audio_path, lang):
     return results
 
 def filter_speech(measures, results):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    Filter the speech transcription results to extract the transcript.
+
+    Parameters:
+    ...........
+    measures : dict
+        A dictionary containing the configuration settings for the speech transcription.
+    results : list of dict
+        The raw transcription results returned by the transcription service.
+
+    Returns:
+    ...........
+    result_key : list
+        A list containing the framewise transcription of the audio file.
+    transcript : str
+        The transcript of the audio file.
+
+    ------------------------------------------------------------------------------------------------------
+    """
     result_key = []
     text_key = []
     transcript_dict = {}
@@ -125,6 +208,22 @@ def filter_speech(measures, results):
 
 
 def get_config():
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    Load the configuration settings for the speech transcription.
+
+    Parameters:
+    ...........
+    None
+
+    Returns:
+    ...........
+    measures : dict
+        A dictionary containing the configuration settings.
+
+    ------------------------------------------------------------------------------------------------------
+    """
     #Loading json config
     dir_name = os.path.dirname(os.path.abspath(__file__))
     measure_path = os.path.abspath(os.path.join(dir_name, 'config/speech.json'))
@@ -135,24 +234,34 @@ def get_config():
 
 def speech_transcription(filepath, **kwargs):
     """
-    -----------------------------------------------------------------------------------------
+    ------------------------------------------------------------------------------------------------------
 
     Speech transcription function that transcribes an audio file using either Amazon Transcribe or Vosk.
 
-    Args:
-        filepath (str): The path to the audio file to be transcribed.
-        kwargs (dict): Optional keyword arguments that can be used to configure the transcription.
-            model (str): The transcription model to use ('aws' or 'vosk'). Default is 'vosk'.
-            language (str): The language of the audio file (e.g. 'en-us', 'es', 'fr'). Default is 'en-us'.
-            region (str): The AWS region to use (e.g. 'us-east-1'). Only applicable if model is 'aws'. Default is 'us-east-1'.
-            job_name (str): The name of the transcription job. Only applicable if model is 'aws'. Default is 'trns_job'.
-            transcribe_interval (list): A list of tuples representing the start and end times (in seconds) of segments
-            of the audio file to be transcribed. Only applicable if model is 'vosk'. Default is an empty list.
+    Parameters:
+    ...........
+    filepath : str
+        The path to the audio file to be transcribed.
+    model : str, optional
+        The transcription model to use ('aws' or 'vosk'). Default is 'vosk'.
+    language : str, optional
+        The language of the audio file (e.g. 'en-us', 'es', 'fr'). Default is 'en-us'.
+    region : str, optional
+        The AWS region to use (e.g. 'us-east-1'). Only applicable if model is 'aws'. Default is 'us-east-1'.
+    job_name : str, optional
+        The name of the transcription job. Only applicable if model is 'aws'. Default is 'transcribe_job_01'.
+    transcribe_interval : list, optional
+        A list of tuples representing the start and end times (in seconds) of segments of the audio file to be transcribed.
+        Only applicable if model is 'vosk'. Default is an empty list.
 
     Returns:
-        A tuple of two values: the JSON response from the transcription service and the transcript of the audio file.
+    ...........
+    framewise : pandas.DataFrame
+        A DataFrame containing the framewise transcription of the audio file.
+    summary : pandas.DataFrame
+        A DataFrame containing the summary of the transcription results.
 
-    -----------------------------------------------------------------------------------------
+    ------------------------------------------------------------------------------------------------------
     """
     model = kwargs.get('model', 'vosk')
     language = kwargs.get('language', 'en-us')

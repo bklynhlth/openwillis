@@ -14,15 +14,20 @@ logger=logging.getLogger()
 
 def get_config():
     """
-    -----------------------------------------------------------------------------------------
+    ------------------------------------------------------------------------------------------------------
 
-    This function reads the configuration file containing the column names for the output dataframes, and returns the
-    contents of the file as a dictionary.
+    This function reads the configuration file containing the column names for the output dataframes,
+    and returns the contents of the file as a dictionary.
+
+    Parameters:
+    ...........
+    None
 
     Returns:
-        measures: A dictionary containing the names of the columns in the output dataframes.
+    ...........
+    measures: A dictionary containing the names of the columns in the output dataframes.
 
-    -----------------------------------------------------------------------------------------
+    ------------------------------------------------------------------------------------------------------
     """
     dir_name = os.path.dirname(os.path.abspath(__file__))
     measure_path = os.path.abspath(os.path.join(dir_name, 'config/speech.json'))
@@ -33,17 +38,23 @@ def get_config():
 
 def create_empty_dataframes(measures):
     """
-    -----------------------------------------------------------------------------------------
+    ------------------------------------------------------------------------------------------------------
 
     Creating an empty measure dataframe
 
-    Args:
-        measures: config file object
+    Parameters:
+    ...........
+    measures: dict
+        config file object
 
-    Return:
-        empty pandas dataframe
+    Returns:
+    ...........
+    tag_df: pandas dataframe
+        an empty dataframe for the tags
+    summ_df: pandas dataframe
+        an empty dataframe for the summary
 
-    -----------------------------------------------------------------------------------------
+    ------------------------------------------------------------------------------------------------------
     """
     summ_df = pd.DataFrame(columns=[measures['tot_words'], measures['speech_verb'], measures['speech_adj'],
                                     measures['speech_pronoun'], measures['speech_noun'], measures['neg'], measures['neu'],
@@ -56,34 +67,42 @@ def create_empty_dataframes(measures):
 
 def is_amazon_transcribe(json_conf):
     """
-    -----------------------------------------------------------------------------------------
+    ------------------------------------------------------------------------------------------------------
 
     This function checks if the json response object is from Amazon Transcribe.
 
-    Args:
-        json_conf: JSON response object.
+    Parameters:
+    ...........
+    json_conf: dict
+        JSON response object.
 
     Returns:
-        True if the json response object is from Amazon Transcribe, False otherwise.
+    ...........
+    bool: True if the json response object is from Amazon Transcribe, False otherwise.
 
-    -----------------------------------------------------------------------------------------
+    ------------------------------------------------------------------------------------------------------
     """
     return 'jobName' in json_conf and 'results' in json_conf
 
 def filter_transcribe(json_conf):
     """
-    -----------------------------------------------------------------------------------------
+    ------------------------------------------------------------------------------------------------------
 
     This function extracts the text and filters the JSON data for Amazon Transcribe json response objects.
 
-    Args:
-        json_conf: aws transcribe json response.
+    Parameters:
+    ...........
+    json_conf: dict
+        aws transcribe json response.
 
     Returns:
-        text: The text extracted from the JSON object.
-        filter_json: The filtered JSON object containing only the relevant data for processing.
+    ...........
+    text: str
+        The text extracted from the JSON object.
+    filter_json: list
+        The filtered JSON object containing only the relevant data for processing.
 
-    -----------------------------------------------------------------------------------------
+    ------------------------------------------------------------------------------------------------------
     """
     text = json_conf['results']['transcripts'][0].get('transcript', '')
     item_data = json_conf['results']['items']
@@ -92,17 +111,21 @@ def filter_transcribe(json_conf):
 
 def filter_vosk(json_conf):
     """
-    -----------------------------------------------------------------------------------------
+    ------------------------------------------------------------------------------------------------------
 
     This function extracts the text for json_conf objects from sources other than Amazon Transcribe.
 
-    Args:
-        json_conf: The input text in the form of a JSON object.
+    Parameters:
+    ...........
+    json_conf: dict
+        The input text in the form of a JSON object.
 
     Returns:
-        text: The input text extracted from the JSON object.
+    ...........
+    text: str
+        The input text extracted from the JSON object.
 
-    -----------------------------------------------------------------------------------------
+    ------------------------------------------------------------------------------------------------------
     """
     text_list = [word['word'] for word in json_conf if 'word' in word]
     text = " ".join(text_list)
@@ -110,18 +133,25 @@ def filter_vosk(json_conf):
 
 def speech_characteristics(json_conf, language='en-us'):
     """
-    -----------------------------------------------------------------------------------------
+    ------------------------------------------------------------------------------------------------------
 
     Speech Characteristics
 
-    Args:
-        json_conf: Transcribed json file
-        language: Language type
+    Parameters:
+    ...........
+    json_conf: dict
+        Transcribed json file
+    language: str
+        Language type
 
     Returns:
-        results: Speech Characteristics
+    ...........
+    tag_df: pandas dataframe
+        A dataframe containing speech tags
+    summ_df: pandas dataframe
+        A dataframe containing summary information on the speech
 
-    -----------------------------------------------------------------------------------------
+    ------------------------------------------------------------------------------------------------------
     """
     measures = get_config()
     tag_df, summ_df = create_empty_dataframes(measures)
@@ -143,7 +173,7 @@ def speech_characteristics(json_conf, language='en-us'):
                                                                ['start', 'end'])
 
     except Exception as e:
-        logger.info('Error in speech Characteristics {}'.format(e))
+        logger.error(f'Error in speech Characteristics {e}')
 
     finally:
         return tag_df, summ_df
