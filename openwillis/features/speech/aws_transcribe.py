@@ -64,7 +64,9 @@ def transcribe_audio(s3uri, region_name, job_name, language = 'en-US'):
 
         if status['TranscriptionJob']['TranscriptionJobStatus'] == 'COMPLETED':
             read_data = urllib.request.urlopen(status['TranscriptionJob']['Transcript']['TranscriptFileUri'])
+            
             response = json.loads(read_data.read().decode('utf-8'))
+            transcript = response['results']['transcripts'][0]['transcript']
 
     except Exception as e:
         logger.error(f"Transcription job failed with file: {s3uri} exception: {e}")
