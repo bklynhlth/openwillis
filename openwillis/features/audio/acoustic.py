@@ -239,6 +239,8 @@ def formfreq(sound, measures):
 
     cols = [measures['form1freq'], measures['form2freq'], measures['form3freq'], measures['form4freq']]
     df_formant = pd.DataFrame(formant_dict)
+    
+    df_formant.columns = cols
     return df_formant
 
 def loudness(sound, measures):
@@ -463,7 +465,7 @@ def vocal_acoustics(audio_path):
         df_formant = formfreq(sound, measures)
         df_silence = get_voice_silence(audio_path, 500, measures)
 
-        framewise = pd.concat([df_pitch, df_loudness, df_hnr, df_formant], axis=1)
+        framewise = pd.concat([df_pitch, df_formant, df_loudness, df_hnr], axis=1)
         sig_df = pd.concat([df_jitter, df_shimmer, df_gne], axis=1)
 
         df_summary = get_summary(sound, framewise, sig_df, df_silence, measures)
