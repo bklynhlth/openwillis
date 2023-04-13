@@ -271,7 +271,7 @@ def speech_transcription(filepath, **kwargs):
     transcribe_interval = kwargs.get('transcribe_interval', [])
 
     if model.lower() == 'aws':
-        json_response, transcript = aws.transcribe_audio(filepath, region, job_name)
+        json_response, transcript = aws.transcribe_audio(filepath, region, job_name, language)
 
     else:
         json_response, transcript = run_vosk(filepath, language, transcribe_interval)
