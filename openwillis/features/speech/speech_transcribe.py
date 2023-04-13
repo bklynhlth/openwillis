@@ -256,10 +256,10 @@ def speech_transcription(filepath, **kwargs):
 
     Returns:
     ...........
-    framewise : pandas.DataFrame
-        A DataFrame containing the framewise transcription of the audio file.
-    summary : pandas.DataFrame
-        A DataFrame containing the summary of the transcription results.
+    json_response : JSON Object
+        A transcription response object in JSON format
+    transcript : str
+        The transcript of the recording.
 
     ------------------------------------------------------------------------------------------------------
     """
