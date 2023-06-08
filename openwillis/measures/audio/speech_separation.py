@@ -6,7 +6,8 @@ from diart.inference import Benchmark
 from diart.models import SegmentationModel, EmbeddingModel
 from diart import PipelineConfig, OnlineSpeakerDiarization
 from pyannote.audio import Pipeline
-from openwillis.features.speech import util as ut
+from openwillis.measures.audio.util import util as ut
+from openwillis.measures.audio.util import separation_util as sutil
 
 import os
 import json
@@ -110,7 +111,7 @@ def run_pyannote(file_path, out_dir, hf_token):
     pipeline = Pipeline.from_pretrained("pyannote/speaker-diarization", use_auth_token=hf_token)
 
     diart = pipeline(file_path, num_speakers=2)
-    diart_df = ut.get_diart_interval(diart)
+    diart_df = sutil.get_diart_interval(diart)
     diart_df = diart_df.sort_values(by=['start_time', 'end_time']).reset_index(drop=True)
 
     if len(diart_df)>0:#make output dir
@@ -144,13 +145,13 @@ def process_diart(out_dir, file_name, filepath, hf_token):
 
     ------------------------------------------------------------------------------------------------------
     """
-    temp_dir, temp_rttm = ut.temp_process(out_dir, file_name, filepath)
+    temp_dir, temp_rttm = sutil.temp_process(out_dir, file_name, filepath)
 
     run_diard(file_name, temp_dir, temp_rttm, hf_token)
-    rttm_df = ut.read_rttm(temp_dir, file_name)
+    rttm_df = sutil.read_rttm(temp_dir, file_name)
     rttm_df = rttm_df.sort_values(by=['start_time', 'end_time']).reset_index(drop=True)
 
-    ut.clean_prexisting(temp_dir, temp_rttm)
+    sutil.clean_prexisting(temp_dir, temp_rttm)
     return rttm_df
 
 def speaker_separation(filepath, out_dir, hf_token, model='pyannote', c_scale=''):
@@ -191,7 +192,7 @@ def speaker_separation(filepath, out_dir, hf_token, model='pyannote', c_scale=''
             else:
                 rttm_df = run_pyannote(filepath, out_dir, hf_token)
 
-            ut.slice_audio(rttm_df, filepath, out_dir, measures, c_scale)
+            sutil.slice_audio(rttm_df, filepath, out_dir, measures, c_scale)
             return rttm_df
 
     except Exception as e:

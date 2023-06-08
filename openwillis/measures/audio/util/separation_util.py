@@ -12,21 +12,13 @@ import numpy as np
 from pydub import AudioSegment
 import logging
 
-import nltk
-from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
-from lexicalrichness import LexicalRichness
-
 from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
-from openwillis.features.speech import speech_transcribe as stranscribe
+from openwillis.measures.audio import speech_transcribe as stranscribe
+from openwillis.measures.audio.util import util as ut
 
 logging.basicConfig(level=logging.INFO)
 logger=logging.getLogger()
-
-#NLTK Tag list
-tag_dict = {'PRP': 'Pronoun', 'PRP$': 'Pronoun', 'VB': 'Verb', 'VBD': 'Verb', 'VBG': 'Verb' , 'VBN': 'Verb',
-            'VBP': 'Verb', 'VBZ': 'Verb', 'JJ': 'Adjective', 'JJR': 'Adjective', 'JJS': 'Adjective', 'NN': 'Noun',
-            'NNP': 'Noun', 'NNS': 'Noun'}
 
 def filter_rttm_line(line):
     """
@@ -105,66 +97,6 @@ def load_rttm(rttmf):
             turns.append(turn)
     return turns
 
-def make_dir(dir_name):
-    """
-    ------------------------------------------------------------------------------------------------------
-
-    Creates a directory if it doesn't already exist.
-
-    Parameters:
-    ...........
-    dir_name : str
-        The path to the directory
-
-    Returns:
-    ...........
-    None
-
-    ------------------------------------------------------------------------------------------------------
-    """
-    if not os.path.exists(dir_name):
-        os.makedirs(dir_name)
-
-def remove_dir(dir_name):
-    """
-    ------------------------------------------------------------------------------------------------------
-    Deletes a directory if it exists.
-
-    Parameters:
-    ...........
-    dir_name : str
-        The path to the directory
-
-    Returns:
-    ...........
-    None
-    ------------------------------------------------------------------------------------------------------
-    """
-    if os.path.exists(dir_name):
-        shutil.rmtree(dir_name)
-
-def clean_dir(dir_name):
-    """
-    ------------------------------------------------------------------------------------------------------
-
-    Creates a directory if it doesn't exist, or deletes the directory if it does.
-
-    Parameters:
-    ...........
-    dir_name : str
-        The path to the directory
-
-    Returns:
-    ...........
-    None
-
-    ------------------------------------------------------------------------------------------------------
-    """
-    if not os.path.exists(dir_name):
-        os.makedirs(dir_name)
-    else:
-        shutil.rmtree(dir_name)
-
 def clean_prexisting(temp_dir, temp_rttm):
     """
     ------------------------------------------------------------------------------------------------------
@@ -185,8 +117,8 @@ def clean_prexisting(temp_dir, temp_rttm):
     ------------------------------------------------------------------------------------------------------
     """
     #Clean prexisting dir
-    clean_dir(temp_dir)
-    clean_dir(temp_rttm)
+    ut.clean_dir(temp_dir)
+    ut.clean_dir(temp_rttm)
 
 def make_temp_dir(out_dir, temp_dir, temp_rttm):
     """
@@ -210,9 +142,9 @@ def make_temp_dir(out_dir, temp_dir, temp_rttm):
     ------------------------------------------------------------------------------------------------------
     """
     #Make dir
-    make_dir(out_dir)
-    make_dir(temp_dir)
-    make_dir(temp_rttm)
+    ut.make_dir(out_dir)
+    ut.make_dir(temp_dir)
+    ut.make_dir(temp_rttm)
 
 def temp_process(out_dir, file_path, audio_path):
     """
@@ -629,285 +561,163 @@ def get_diart_interval(diarization):
     df = prepare_diart_interval(start_time, end_time, speaker_list)
     return df
 
-def download_nltk_resources():
+def get_patient_rater_label(df, measures, scale, signal):
     """
     ------------------------------------------------------------------------------------------------------
 
-    This function downloads the required NLTK resources for processing text data.
+    This function takes in a pandas dataframe 'df' containing diarization results and returns a dictionary
+    signal_label with the labels assigned to the speakers based on the comparison of their scores.
 
     Parameters:
-    ...........
-    None
+    ----------
+    df : pandas DataFrame
+        A dataframe containing the diarization results
+    measures : dict
+        A dictionary with config values.
+    scale : str
+        A clinical scale.
+    signal : list
+        A list of audio signals.
 
     Returns:
-    ...........
-    None
+    -------
+    signal_label : dict
+        A dictionary with the assigned labels for the speakers.
 
     ------------------------------------------------------------------------------------------------------
     """
-    try:
-        nltk.data.find('tokenizers/punkt')
-    except LookupError:
-        nltk.download('punkt')
+    signal_label = {}
+    if scale.lower() not in measures['scale'].strip("[]").replace(" ", "").split(","):
 
-    try:
-        nltk.data.find('averaged_perceptron_tagger')
-    except LookupError:
-        nltk.download('averaged_perceptron_tagger')
+        signal_label['speaker1'] = signal[0]
+        signal_label['speaker2'] = signal[1]
+        return signal_label
 
-def get_tag(text, tag_dict, measures):
+    spk1_txt = ' '.join(df[df['speaker_label'] == 'spk_0'].reset_index(drop=True)['content'])
+    spk2_txt = ' '.join(df[df['speaker_label'] == 'spk_1'].reset_index(drop=True)['content'])
+
+    spk1_score = match_transcript(measures, spk1_txt)
+    spk2_score = match_transcript(measures, spk2_txt)
+
+    if spk1_score > spk2_score:
+        signal_label['rater'] = signal[0]
+        signal_label['patient'] = signal[1]
+
+    else:
+        signal_label['patient'] = signal[0]
+        signal_label['rater'] = signal[1]
+    return signal_label
+
+def transcribe_response_to_dataframe(response):
     """
     ------------------------------------------------------------------------------------------------------
 
-    This function performs part-of-speech tagging on the input text using NLTK, and returns a
-    dataframe containing the part-of-speech tags.
+    Transcribes a response from a speech-to-text service into a pandas DataFrame.
 
     Parameters:
-    ...........
-    text: str
-        The input text to be analyzed.
-    tag_dict: dict
-        A dictionary mapping the NLTK tags to more readable tags.
-    measures: dict
-        A dictionary containing the names of the columns in the output dataframes.
+    ----------
+    response : dict
+        The response object containing the transcribed data.
 
     Returns:
-    ...........
-    tag_df: pandas dataframe
-        A dataframe containing the part-of-speech tags for the input text.
+    -------
+    df : pandas DataFrame
+        The transcribed data in a DataFrame.
+    speakers: int
+        The number of speakers detected in the transcription.
 
     ------------------------------------------------------------------------------------------------------
     """
-    tag_list = nltk.pos_tag(text.split())
+    speakers = 0
+    df = pd.DataFrame()
 
-    tag_df = pd.DataFrame(tag_list, columns=[measures['word'], measures['tag']])
-    tag_df = tag_df.replace({measures['tag']: tag_dict})
-    return tag_df
+    if response['results']:
+        if 'speaker_labels' in response['results']:
+            if 'speakers' in response['results']['speaker_labels']:
+                speakers = response['results']['speaker_labels']["speakers"]
 
-def get_tag_summ(tag_df, summ_df, word, measures):
+            if 'items' in response['results']:
+                items = response['results']["items"]
+                df = pd.DataFrame(items)
+
+                df["confidence"] = df["alternatives"].apply(lambda x: x[0]["confidence"])
+                df["content"] = df["alternatives"].apply(lambda x: x[0]["content"])
+                df["confidence"] = df["confidence"].astype(float)
+
+                df = df[df["confidence"] > 0].reset_index(drop=True)
+                df = df[["start_time", "end_time", "confidence", "speaker_label", "content"]]
+    return df, speakers
+
+def get_segment_signal(audio_signal, df):
     """
     ------------------------------------------------------------------------------------------------------
 
-    This function calculates the proportions of verbs, pronouns, adjectives, and nouns in the
-    transcribed text, and adds them to the output dataframe summ_df.
+    Extracts speaker-specific segments from an audio signal based on a dataframe.
 
     Parameters:
-    ...........
-    tag_df: pandas dataframe
-        A dataframe containing the part-of-speech tags for the input text.
-    summ_df: pandas dataframe
-        A dataframe containing the speech characteristics of the input text.
-    word: list
-        The input text as a list of words.
-    measures: dict
-        A dictionary containing the names of the columns in the output dataframes.
+    ----------
+    audio_signal : AudioSignal
+        The audio signal.
+    df : pandas DataFrame
+        The dataframe containing speaker information.
 
     Returns:
-    ...........
-    summ_df: pandas dataframe
-        The updated summ_df dataframe.
+    -------
+    spk0_audio: list
+        List of numpy arrays representing the audio segments of speaker 0.
+    spk1_audio: list
+        List of numpy arrays representing the audio segments of speaker 1.
 
     ------------------------------------------------------------------------------------------------------
     """
-    word_len = len(word) if len(word)>0 else 1
+    spk0_audio = []
+    spk1_audio = []
 
-    verb = len(tag_df[tag_df[measures['tag']] == 'Verb'])/word_len
-    pronoun = len(tag_df[tag_df[measures['tag']] == 'Pronoun'])/word_len
-    adj = len(tag_df[tag_df[measures['tag']] == 'Adjective'])/word_len
-    noun = len(tag_df[tag_df[measures['tag']] == 'Noun'])/word_len
+    for index, row in df.iterrows():
+        start_time = row['start_time']
+        end_time = row['end_time']
+        speaker_label = row['speaker_label']
 
-    tag_object = [len(word), verb, adj, pronoun, noun]
-    cols = [measures['tot_words'], measures['speech_verb'], measures['speech_adj'], measures['speech_pronoun'],
-            measures['speech_noun']]
+        speaker_audio = audio_signal[start_time:end_time]
+        speaker_array = np.array(speaker_audio.get_array_of_samples())
 
-    summ_df.loc[0, cols] = tag_object
-    return summ_df
+        if speaker_label == 'spk_0':
+            spk0_audio.append(speaker_array)
+        elif speaker_label == 'spk_1':
+            spk1_audio.append(speaker_array)
 
-def get_sentiment(summ_df, word, text, measures):
+    return spk0_audio, spk1_audio
+
+def generate_audio_signal(df, audio_signal, scale, measures):
     """
     ------------------------------------------------------------------------------------------------------
 
-    This function calculates the sentiment scores of the input text using VADER, and adds them
-    to the output dataframe summ_df.
+    Generates a labeled audio signal based on the given DataFrame, audio signal, scale, and measures.
 
     Parameters:
-    ...........
-    summ_df: pandas dataframe
-        A dataframe containing the speech characteristics of the transcribed text.
-    word: list
-        The input text as a list of words.
-    text: str
-        The input text to be analyzed.
-    measures: dict
-        A dictionary containing the names of the columns in the output dataframes.
+    ----------
+    df : pandas DataFrame
+        The DataFrame containing the start and end times of segments.
+    audio_signal : AudioSignal
+        The original audio signal.
+    scale : str
+        A clinical scale
+    measures : dict
+        A config dictionary.
 
     Returns:
-    ...........
-    summ_df: pandas dataframe
-        The updated summ_df dataframe.
+    -------
+    signal_label: dict
+        A dictionary with the assigned labels for the speakers and audio signals.
 
     ------------------------------------------------------------------------------------------------------
     """
-    sentiment = SentimentIntensityAnalyzer()
-    sentiment_dict = sentiment.polarity_scores(text)
+    df['start_time'] = df['start_time'].astype(float) *1000
+    df['end_time'] = df['end_time'].astype(float)*1000
+    spk0_audio, spk1_audio = get_segment_signal(audio_signal, df)
 
-    mattr = get_mattr(word)
-    cols = [measures['neg'], measures['neu'], measures['pos'], measures['compound'], measures['speech_mattr']]
-    sent_list = list(sentiment_dict.values()) + [mattr]
+    spk0_audio = np.concatenate(spk0_audio)
+    spk1_audio = np.concatenate(spk1_audio)
 
-    summ_df.loc[0, cols] = sent_list
-    return summ_df
-
-def get_mattr(word):
-    """
-    ------------------------------------------------------------------------------------------------------
-    This function calculates the Moving Average Type-Token Ratio (MATTR) of the input text using the
-    LexicalRichness library.
-
-    Parameters:
-    ...........
-    word : list
-        The input text as a list of words.
-
-    Returns:
-    ...........
-    mattr : float
-        The calculated MATTR value.
-
-    ------------------------------------------------------------------------------------------------------
-    """
-    filter_punc = list(value for value in word if value not in ['.','!','?'])
-    filter_punc = " ".join(str(filter_punc))
-    mattr = np.nan
-
-    lex_richness = LexicalRichness(filter_punc)
-    if lex_richness.words > 0:
-        mattr = lex_richness.mattr(window_size=lex_richness.words)
-
-    return mattr
-
-def get_stats(summ_df, ros, file_dur, pause_list, measures):
-    """
-    ------------------------------------------------------------------------------------------------------
-
-    This function calculates various speech characteristic features of the input text, including pause rate,
-    pause mean duration, and silence ratio, and adds them to the output dataframe summ_df.
-
-    Parameters:
-    ...........
-    summ_df: pandas dataframe
-        A dataframe containing the speech characteristics of the input text.
-    ros: float
-        The rate of speech of the input text.
-    file_dur: float
-        The duration of the input audio file.
-    pause_list: list
-        A list of pause durations in the input audio file.
-    measures: dict
-        A dictionary containing the names of the columns in the output dataframes.
-
-    Returns:
-    ...........
-    summ_df: pandas dataframe
-        The updated summ_df dataframe.
-
-    ------------------------------------------------------------------------------------------------------
-    """
-    pause_rate = (len(pause_list)/file_dur)*60
-
-    pause_meandur = np.mean(pause_list)
-    silence_ratio = np.sum(pause_list)/(file_dur - np.sum(pause_list))
-
-    feature_list = [ros, pause_rate, pause_meandur, silence_ratio]
-    col_list = [measures['rate_of_speech'], measures['pause_rate'], measures['pause_meandur'],
-                measures['silence_ratio']]
-
-    summ_df.loc[0, col_list] = feature_list
-    return summ_df
-
-def get_pause_feature(json_conf, summ_df, word, measures, time_index):
-    """
-    ------------------------------------------------------------------------------------------------------
-
-    This function calculates various pause-related speech characteristic features
-
-    Parameters:
-    ...........
-    json_conf: list
-        JSON response objects.
-    summ_df: pandas dataframe
-        A dataframe containing the speech characteristics of the input text.
-    word: list
-        Transcribed text as a list of words.
-    measures: dict
-        A dictionary containing the names of the columns in the output dataframes.
-    time_index: list
-        A list containing the names of the columns in json that contain the start and end times of each word.
-
-    Returns:
-    ...........
-    df_feature: pandas dataframe
-        The updated pause feature dataframe.
-
-    ------------------------------------------------------------------------------------------------------
-    """
-    # Check if json_conf is empty
-    if len(json_conf) <=0:
-        return summ_df
-
-    # Initialize variables
-    pause_list = []
-    file_dur = float(json_conf[-1][time_index[1]]) - float(json_conf[0][time_index[0]])
-    ros = (len(word)/ file_dur)*60
-
-    # Convert json_conf to a pandas DataFrame
-    df_diff = pd.DataFrame(json_conf)
-
-    # Calculate the pause time between each word and add the results to pause_list
-    df_diff['pause_diff'] = df_diff.apply(lambda row: float(row[time_index[1]]) - float(row[time_index[0]]), axis=1)
-    pause_list = df_diff['pause_diff'].tolist()
-
-    # Calculate speech characteristics related to pause and update summ_df
-    df_feature = get_stats(summ_df, ros, file_dur, pause_list, measures)
-    return df_feature
-
-def process_language_feature(json_conf, df_list, text, language, measures, time_index):
-    """
-    ------------------------------------------------------------------------------------------------------
-
-    This function processes the language features from json response.
-
-    Parameters:
-    ...........
-    json_conf: list
-        JSON response object.
-    df_list: list
-        List of pandas dataframes.
-    text: str
-        Transcribed text.
-    measures: dict
-        A dictionary containing the names of the columns in the output dataframes.
-    time_index: list
-        A list containing the names of the columns in json that contain the start and end times of each word.
-
-    Returns:
-    ...........
-    tag_df: pandas dataframe
-        A dataframe containing the part-of-speech tags for the input text.
-    summ_df: pandas dataframe
-        A dataframe containing the speech characteristics of the input text.
-
-    ------------------------------------------------------------------------------------------------------
-    """
-    sentences = nltk.tokenize.sent_tokenize(text)
-    tag_df, summ_df = df_list
-
-    word_list = nltk.tokenize.word_tokenize(text)
-    summ_df = get_pause_feature(json_conf, summ_df, word_list, measures, time_index)
-
-    if language == 'en-us':
-        tag_df = get_tag(text, tag_dict, measures)
-
-        summ_df = get_tag_summ(tag_df, summ_df, word_list, measures)
-        summ_df = get_sentiment(summ_df, word_list, text, measures)
-    return tag_df, summ_df
+    signal_label = get_patient_rater_label(df, measures, scale, [spk0_audio, spk1_audio])
+    return signal_label

@@ -7,7 +7,7 @@ import json
 import pandas as pd
 
 import logging
-from openwillis.features.speech import util as ut
+from openwillis.measures.text.util import characteristics_util as cutil
 
 logging.basicConfig(level=logging.INFO)
 logger=logging.getLogger()
@@ -30,7 +30,7 @@ def get_config():
     ------------------------------------------------------------------------------------------------------
     """
     dir_name = os.path.dirname(os.path.abspath(__file__))
-    measure_path = os.path.abspath(os.path.join(dir_name, 'config/speech.json'))
+    measure_path = os.path.abspath(os.path.join(dir_name, 'config/text.json'))
 
     file = open(measure_path)
     measures = json.load(file)
@@ -158,18 +158,18 @@ def speech_characteristics(json_conf, language='en-us'):
 
     try:
         if bool(json_conf):
-            ut.download_nltk_resources()
+            cutil.download_nltk_resources()
 
             if is_amazon_transcribe(json_conf):
                 text, filter_json = filter_transcribe(json_conf)
 
                 if len(filter_json) > 0 and len(text) > 0:
-                    tag_df, summ_df = ut.process_language_feature(filter_json, [tag_df, summ_df], text, language,
+                    tag_df, summ_df = cutil.process_language_feature(filter_json, [tag_df, summ_df], text, language,
                                                                measures, ['start_time', 'end_time'])
             else:
                 text = filter_vosk(json_conf)
                 if len(text) > 0:
-                    tag_df, summ_df = ut.process_language_feature(json_conf, [tag_df, summ_df], text, language, measures,
+                    tag_df, summ_df = cutil.process_language_feature(json_conf, [tag_df, summ_df], text, language, measures,
                                                                ['start', 'end'])
 
     except Exception as e:

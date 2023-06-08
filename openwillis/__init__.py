@@ -2,9 +2,8 @@
 # website:   http://www.bklynhlth.com
 
 # import the required packages
-from .usability import sum_num
 
-from openwillis.features.api import (
+from openwillis.measures.api import (
     facial_expressivity,
     emotional_expressivity,
     vocal_acoustics,
