@@ -1,7 +1,7 @@
-from openwillis.features.video.face_landmark import (
+from openwillis.measures.video.face_landmark import (
     facial_expressivity,
 )
-from openwillis.features.video.facial_emotion import (
+from openwillis.measures.video.facial_emotion import (
     emotional_expressivity,
 )
 

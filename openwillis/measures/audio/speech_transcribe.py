@@ -8,13 +8,12 @@ import pandas as pd
 import os
 import wave
 import json
+import logging
 
 from vosk import Model, KaldiRecognizer
 from pydub import AudioSegment
-from openwillis.features.speech import util as ut
-from openwillis.features.speech import aws_transcribe as aws
-
-import logging
+from openwillis.measures.audio.util import util as ut
+from openwillis.measures.audio.util import transcribe_util as tutil
 
 logging.basicConfig(level=logging.INFO)
 logger=logging.getLogger()
@@ -271,7 +270,7 @@ def speech_transcription(filepath, **kwargs):
     transcribe_interval = kwargs.get('transcribe_interval', [])
 
     if model.lower() == 'aws':
-        json_response, transcript = aws.transcribe_audio(filepath, region, job_name, language)
+        json_response, transcript = tutil.transcribe_audio(filepath, region, job_name, language)
 
     else:
         json_response, transcript = run_vosk(filepath, language, transcribe_interval)
