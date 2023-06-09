@@ -254,7 +254,7 @@ def get_pause_feature(json_conf, summ_df, word, measures, time_index):
     df_diff = pd.DataFrame(json_conf)
 
     # Calculate the pause time between each word and add the results to pause_list
-    df_diff['pause_diff'] = df_diff.apply(lambda row: float(row[time_index[1]]) - float(row[time_index[0]]), axis=1)
+    df_diff['pause_diff'] = df_diff[time_index[0]].astype(float) - df_diff[time_index[1]].astype(float).shift(1)
     pause_list = df_diff['pause_diff'].tolist()
 
     # Calculate speech characteristics related to pause and update summ_df
