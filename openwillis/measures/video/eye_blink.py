@@ -47,7 +47,7 @@ def eye_aspect_ratio(eye):
 
     return ear
 
-def eye_blink_counter(video_directory):
+def eye_blink_counter(video_directory, device='laptop'):
     """
     ---------------------------------------------------------------------------------------------------
 
@@ -57,6 +57,8 @@ def eye_blink_counter(video_directory):
     ............
     video_directory : string
         The directory of the video to be analyzed
+    device : string
+        The device used to record the video. It can be either 'laptop' or 'mobile'
 
     Returns:
     ............
@@ -68,8 +70,20 @@ def eye_blink_counter(video_directory):
     summary : list
         The number of eye blinks and blink rate (blinks per minute)
 
+    Raises:
+    ............
+    ValueError
+        If device is not 'laptop' or 'mobile'
+
     ---------------------------------------------------------------------------------------------------
     """
+
+    if device == 'laptop':
+        prominence, width = 0.1, 3
+    elif device == 'mobile':
+        prominence, width = 0.02, 0.1
+    else:
+        raise ValueError("device can be either 'laptop' or 'mobile'")
 
     # Initialize MediaPipe Face Mesh
     print("[INFO] initializing MediaPipe Face Mesh...")
@@ -115,7 +129,7 @@ def eye_blink_counter(video_directory):
     vs.release()
 
     framewise = np.array(framewise)
-    troughs, properties = find_peaks(-framewise[:, 1], prominence=0.1, width=3)
+    troughs, properties = find_peaks(-framewise[:, 1], prominence=prominence, width=width)
     left_ips = properties["left_ips"]
     right_ips = properties["right_ips"]
     left_ips = np.round(left_ips).astype(int)
