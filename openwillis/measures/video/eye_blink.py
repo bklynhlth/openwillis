@@ -9,6 +9,7 @@ import logging
 
 import cv2
 import numpy as np
+import pandas as pd
 from scipy.spatial import distance as dist
 from scipy.signal import find_peaks
 
@@ -144,8 +145,8 @@ def detect_blinks(framewise, prominence, width):
 
     Parameters:
     ............
-    framewise : array
-        Array containing the frame number and the eye aspect ratio (EAR) of each frame
+    framewise : pd.DataFrame
+        Contains the frame number and the eye aspect ratio (EAR) of each frame
     prominence : float
         The prominence of the peaks
     width : float
@@ -162,7 +163,7 @@ def detect_blinks(framewise, prominence, width):
 
     ---------------------------------------------------------------------------------------------------
     """
-    troughs, properties = find_peaks(-framewise[:, 1], prominence=prominence, width=width)
+    troughs, properties = find_peaks(-framewise['EAR'], prominence=prominence, width=width)
     left_ips = properties["left_ips"]
     right_ips = properties["right_ips"]
     left_ips = np.round(left_ips).astype(int)
@@ -189,8 +190,8 @@ def convert_frame_to_time(troughs, left_ips, right_ips, fps):
 
     Returns:
     ............
-    blinks : array
-        Array containing for each blink the frame number and the time (in seconds)
+    blinks : pd.DataFrame
+        Contains for each blink the frame number and the time (in seconds)
          start of the blink and end of the blink
 
     ---------------------------------------------------------------------------------------------------
@@ -198,7 +199,9 @@ def convert_frame_to_time(troughs, left_ips, right_ips, fps):
     troughs_time = troughs/fps
     left_ips_time = left_ips/fps
     right_ips_time = right_ips/fps
-    blinks = np.array([troughs, left_ips, right_ips, troughs_time, left_ips_time, right_ips_time]).T
+
+    blinks = pd.DataFrame({'Blink Peak Frame': troughs, 'Blink Starting Frame': left_ips, 'Blink Ending Frame': right_ips,
+                            'Blink Peak Time': troughs_time, 'Blink Starting Time': left_ips_time, 'Blink Ending Time': right_ips_time})
     return blinks
 
 
@@ -217,12 +220,12 @@ def eye_blink_rate(video_directory, device='laptop'):
 
     Returns:
     ............
-    framewise: np.ndarray
-        An array containing the frame number and the eye aspect ratio (EAR) of each frame
-    blinks : np.ndarray
-        An array containing for each blink the frame number and the time (in seconds)
+    framewise: pd.DataFrame
+        Contains the frame number and the eye aspect ratio (EAR) of each frame
+    blinks : pd.DataFrame
+        Contains for each blink the frame number and the time (in seconds)
          start of the blink and end of the blink
-    summary : list
+    summary : pd.DataFrame
         The number of eye blinks and blink rate (blinks per minute)
 
     Raises:
@@ -264,9 +267,10 @@ def eye_blink_rate(video_directory, device='laptop'):
 
     vs.release()
 
-    framewise = np.array(framewise)
+    framewise = pd.DataFrame(framewise, columns=['frame', 'EAR'])
     troughs, left_ips, right_ips = detect_blinks(framewise, prominence, width)
     blinks = convert_frame_to_time(troughs, left_ips, right_ips, fps)
-    summary = [len(troughs), len(troughs)/(frame_n/fps)*60]
+    summary_list = [len(troughs), len(troughs)/(frame_n/fps)*60]
+    summary = pd.DataFrame(summary_list, index=['blinks', 'blink_rate'], columns=['value'])
 
     return framewise, blinks, summary
