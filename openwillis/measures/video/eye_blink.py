@@ -8,8 +8,12 @@ import cv2
 import numpy as np
 from scipy.spatial import distance as dist
 from scipy.signal import find_peaks
+import logging
 
 import mediapipe as mp
+
+logging.basicConfig(level=logging.INFO)
+logger=logging.getLogger()
 
 # facemesh model left and right eye landmarks indices
 # https://raw.githubusercontent.com/google/mediapipe/a908d668c730da128dfa8d9f6bd25d519d006692/mediapipe/modules/face_geometry/data/canonical_face_model_uv_visualization.png
@@ -47,7 +51,150 @@ def eye_aspect_ratio(eye):
 
     return ear
 
-def eye_blink_counter(video_directory, device='laptop'):
+
+def initialize_facemesh():
+    """
+    ---------------------------------------------------------------------------------------------------
+
+    This function initializes the MediaPipe Face Mesh model.
+
+    Returns:
+    ............
+    face_mesh : object
+        The MediaPipe Face Mesh model
+
+    ---------------------------------------------------------------------------------------------------
+    """
+    logger.info("Initializing MediaPipe Face Mesh...")
+    mp_face_mesh = mp.solutions.face_mesh
+    return mp_face_mesh.FaceMesh()
+
+
+def get_video_capture(video_directory):
+    """
+    ---------------------------------------------------------------------------------------------------
+
+    This function initializes the video capture.
+
+    Parameters:
+    ............
+    video_directory : string
+        The directory of the video to be analyzed
+
+    Returns:
+    ............
+    vs : object
+        The video capture object
+    fps : float
+        The fps of the video
+
+    ---------------------------------------------------------------------------------------------------
+    """
+    logger.info("Starting video stream thread...")
+    vs = cv2.VideoCapture(video_directory)
+    fps = vs.get(cv2.CAP_PROP_FPS)
+    time.sleep(1.0)
+    return vs, fps
+
+
+def process_frame(face_mesh, frame):
+    """
+    ---------------------------------------------------------------------------------------------------
+
+    This function processes a frame with the MediaPipe Face Mesh model.
+
+    Parameters:
+    ............
+    face_mesh : object
+        The MediaPipe Face Mesh model
+    frame : array
+        The frame to be processed
+
+    Returns:
+    ............
+    leftEye : array
+        Array of 6 tuples containing the coordinates of the left eye landmarks
+    rightEye : array
+        Array of 6 tuples containing the coordinates of the right eye landmarks
+
+    ---------------------------------------------------------------------------------------------------
+    """
+    results = face_mesh.process(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+    if results.multi_face_landmarks:
+        face_landmarks = results.multi_face_landmarks[0]
+        leftEye = np.array([(face_landmarks.landmark[lidx].x, face_landmarks.landmark[lidx].y) for lidx in LEFT_EYE_INDICES], dtype=np.float32)
+        rightEye = np.array([(face_landmarks.landmark[ridx].x, face_landmarks.landmark[ridx].y) for ridx in RIGHT_EYE_INDICES], dtype=np.float32)
+        return leftEye, rightEye
+    return None, None
+
+
+def detect_blinks(framewise, prominence, width):
+    """
+    ---------------------------------------------------------------------------------------------------
+
+    This function detects the blinks from a given EAR array.
+
+    Parameters:
+    ............
+    framewise : array
+        Array containing the frame number and the eye aspect ratio (EAR) of each frame
+    prominence : float
+        The prominence of the peaks
+    width : float
+        The width of the peaks
+
+    Returns:
+    ............
+    troughs : array
+        Array containing the frame number of each blink
+    left_ips : array
+        Array containing the frame number of the start of each blink
+    right_ips : array
+        Array containing the frame number of the end of each blink
+
+    ---------------------------------------------------------------------------------------------------
+    """
+    troughs, properties = find_peaks(-framewise[:, 1], prominence=prominence, width=width)
+    left_ips = properties["left_ips"]
+    right_ips = properties["right_ips"]
+    left_ips = np.round(left_ips).astype(int)
+    right_ips = np.round(right_ips).astype(int)
+    return troughs, left_ips, right_ips
+
+
+def convert_frame_to_time(troughs, left_ips, right_ips, fps):
+    """
+    ---------------------------------------------------------------------------------------------------
+
+    This function converts the frame number to time.
+
+    Parameters:
+    ............
+    troughs : array
+        Array containing the frame number of each blink
+    left_ips : array
+        Array containing the frame number of the start of each blink
+    right_ips : array
+        Array containing the frame number of the end of each blink
+    fps : float
+        The fps of the video
+
+    Returns:
+    ............
+    blinks : array
+        Array containing for each blink the frame number and the time (in seconds)
+         start of the blink and end of the blink
+
+    ---------------------------------------------------------------------------------------------------
+    """
+    troughs_time = troughs/fps
+    left_ips_time = left_ips/fps
+    right_ips_time = right_ips/fps
+    blinks = np.array([troughs, left_ips, right_ips, troughs_time, left_ips_time, right_ips_time]).T
+    return blinks
+
+
+def eye_blink_rate(video_directory, device='laptop'):
     """
     ---------------------------------------------------------------------------------------------------
 
@@ -85,18 +232,10 @@ def eye_blink_counter(video_directory, device='laptop'):
     else:
         raise ValueError("device can be either 'laptop' or 'mobile'")
 
-    # Initialize MediaPipe Face Mesh
-    print("[INFO] initializing MediaPipe Face Mesh...")
-    mp_face_mesh = mp.solutions.face_mesh
-    face_mesh = mp_face_mesh.FaceMesh()
-
-    print("[INFO] starting video stream thread...")
-    vs = cv2.VideoCapture(video_directory)
-    fps = vs.get(cv2.CAP_PROP_FPS)
-    time.sleep(1.0)
+    face_mesh = initialize_facemesh()
+    vs, fps = get_video_capture(video_directory)
 
     framewise = []
-    blinks = []
     frame_n = 0
 
     while True:
@@ -107,39 +246,21 @@ def eye_blink_counter(video_directory, device='laptop'):
         frame_n += 1
         frame = cv2.resize(frame, (450, int(frame.shape[0] * (450. / frame.shape[1]))))
 
-        # Convert the BGR image to RGB and process it with MediaPipe Face Mesh.
-        results = face_mesh.process(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
-
-        if results.multi_face_landmarks:
-            face_landmarks = results.multi_face_landmarks[0]
-
-            leftEye = np.array([(face_landmarks.landmark[lidx].x, face_landmarks.landmark[lidx].y) for lidx in LEFT_EYE_INDICES], dtype=np.float32)
-            rightEye = np.array([(face_landmarks.landmark[ridx].x, face_landmarks.landmark[ridx].y) for ridx in RIGHT_EYE_INDICES], dtype=np.float32)
-
-            # Calculate the EAR for each eye
-            leftEAR = eye_aspect_ratio(leftEye)
-            rightEAR = eye_aspect_ratio(rightEye)
-
-            ear = (leftEAR + rightEAR) / 2.0
-        else:
+        leftEye, rightEye = process_frame(face_mesh, frame)
+        if leftEye is None:
             continue
+
+        leftEAR = eye_aspect_ratio(leftEye)
+        rightEAR = eye_aspect_ratio(rightEye)
+        ear = (leftEAR + rightEAR) / 2.0
 
         framewise.append([frame_n, ear])
 
     vs.release()
 
     framewise = np.array(framewise)
-    troughs, properties = find_peaks(-framewise[:, 1], prominence=prominence, width=width)
-    left_ips = properties["left_ips"]
-    right_ips = properties["right_ips"]
-    left_ips = np.round(left_ips).astype(int)
-    right_ips = np.round(right_ips).astype(int)
-
-    # convert the frame number to time
-    troughs_time = troughs/fps
-    left_ips_time = left_ips/fps
-    right_ips_time = right_ips/fps
-    blinks = np.array([troughs, left_ips, right_ips, troughs_time, left_ips_time, right_ips_time]).T
+    troughs, left_ips, right_ips = detect_blinks(framewise, prominence, width)
+    blinks = convert_frame_to_time(troughs, left_ips, right_ips, fps)
     summary = [len(troughs), len(troughs)/(frame_n/fps)*60]
 
     return framewise, blinks, summary
