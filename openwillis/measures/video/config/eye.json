@@ -1,0 +1,12 @@
+{
+    "LEFT_EYE_INDICES": [362, 385, 387, 263, 373, 380],
+    "RIGHT_EYE_INDICES": [33, 160, 158, 133, 153, 144],
+    "PROMINENCE": {
+        "laptop": 0.1,
+        "mobile": 0.02
+    },
+    "WIDTH": {
+        "laptop": 3,
+        "mobile": 0.1
+    }
+}

@@ -3,22 +3,30 @@
 
 # import the required packages
 import time
+import json
+import os
+import logging
 
 import cv2
 import numpy as np
 from scipy.spatial import distance as dist
 from scipy.signal import find_peaks
-import logging
 
 import mediapipe as mp
 
 logging.basicConfig(level=logging.INFO)
 logger=logging.getLogger()
 
+dir_name = os.path.dirname(os.path.abspath(__file__))
+config_path = os.path.abspath(os.path.join(dir_name, 'config/eye.json'))
+
+file = open(config_path)
+CONFIG = json.load(file)
+
 # facemesh model left and right eye landmarks indices
 # https://raw.githubusercontent.com/google/mediapipe/a908d668c730da128dfa8d9f6bd25d519d006692/mediapipe/modules/face_geometry/data/canonical_face_model_uv_visualization.png
-LEFT_EYE_INDICES = [362, 385, 387, 263, 373, 380]
-RIGHT_EYE_INDICES = [33, 160, 158, 133, 153, 144]
+LEFT_EYE_INDICES = CONFIG['LEFT_EYE_INDICES']
+RIGHT_EYE_INDICES = CONFIG['RIGHT_EYE_INDICES']
 
 
 def eye_aspect_ratio(eye):
@@ -225,10 +233,8 @@ def eye_blink_rate(video_directory, device='laptop'):
     ---------------------------------------------------------------------------------------------------
     """
 
-    if device == 'laptop':
-        prominence, width = 0.1, 3
-    elif device == 'mobile':
-        prominence, width = 0.02, 0.1
+    if device == 'laptop' or device == 'mobile':
+        prominence, width = CONFIG['PROMINENCE'][device], CONFIG['WIDTH'][device]
     else:
         raise ValueError("device can be either 'laptop' or 'mobile'")
 
