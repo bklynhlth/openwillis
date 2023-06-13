@@ -242,88 +242,6 @@ def read_rttm(temp_dir, file_path):
         rttm_df = overalp_index(rttm_df)
     return rttm_df
 
-def concat_audio(df_driad, audio_path):
-    """
-    ------------------------------------------------------------------------------------------------------
-
-    Concatenates the audio segments corresponding to a set of turns.
-
-    Parameters:
-    ...........
-    df_driad : pandas dataframe
-        A DataFrame containing the turn information.
-    audio_path : str
-        The path to the audio file.
-
-    Returns:
-    ...........
-    concat_audio : sound object
-        The concatenated audio segment.
-
-    ------------------------------------------------------------------------------------------------------
-    """
-    aud_list = []
-
-    for index, row in df_driad.iterrows():
-        try:
-
-            sound = AudioSegment.from_wav(audio_path)
-            st_index = row['start_time']*1000
-            end_index = row['end_time']*1000
-
-            split_aud = sound[st_index:end_index+1]
-            aud_list.append(split_aud)
-
-        except Exception as e:
-            logger.error(f'Error in audio concationation: {e}')
-
-    concat_audio = sum(aud_list)
-    return concat_audio
-
-def diart_speaker(df, speaker_list, audio_path, out_dir):
-    """
-    ------------------------------------------------------------------------------------------------------
-
-    The function extracts the audio segments of the specified speakers from the audio file and saves them in
-    the specified output directory. The function returns a list of filenames of the saved speaker audio segments.
-
-    Parameters:
-    ...........
-    df : pandas dataframe
-        a dataframe containing the diarization results with columns for start time, end time, and speaker
-    speaker_list : list
-        a list of strings containing the names of the speakers to extract audio segments for
-    audio_path : str
-        a string containing the file path of the audio file to extract audio segments from
-    out_dir : str
-        a string containing the file path of the output directory to save the extracted audio segments
-
-    Returns:
-    ...........
-    speaker_audio : list
-        a list of strings containing the filenames of the saved audio segments for the specified speakers
-
-    ------------------------------------------------------------------------------------------------------
-    """
-    speaker_audio = []
-    for speaker in speaker_list:
-        try:
-
-            file_name, _ = os.path.splitext(os.path.basename(audio_path))
-            speaker_df = df[df['speaker']==speaker].reset_index(drop=True)
-
-            if len(speaker_df)>0:
-                speaker_segment = concat_audio(speaker_df, audio_path)
-
-                out_file = file_name + '_' +speaker +'.wav'
-                speaker_segment.export(os.path.join(out_dir, out_file), format="wav")
-                speaker_audio.append(out_file)
-
-        except Exception as e:
-            logger.error(f'Error in diart seperation: {e}')
-
-    return speaker_audio
-
 def get_similarity_prob(sentence_embeddings):
     """
     ------------------------------------------------------------------------------------------------------
@@ -384,111 +302,6 @@ def match_transcript(measures, speech):
     prob_list.sort(reverse=True)
     match_score = np.mean(prob_list[:5]) #top 5 probability score
     return match_score
-
-def rename_speech(match_list, speaker_audio, out_dir):
-    """
-    ------------------------------------------------------------------------------------------------------
-
-    The function renames the audio segments based on the match scores such that the speaker with the highest
-    match score is renamed as 'rater' and the other speaker is renamed as 'patient'.
-
-    Parameters:
-    ...........
-    match_list : list
-        a list of float values representing the match scores for the saved speaker audio segments
-    speaker_audio : list
-        a list of strings containing the filenames of the saved audio segments for the two speakers
-    out_dir : str
-        a string containing the file path of the output directory where the renamed audio segments are saved
-
-    Returns:
-    ...........
-    None
-
-    ------------------------------------------------------------------------------------------------------
-    """
-    if len(match_list)==2:
-
-        rater_index = np.argmax(match_list)
-        patient_index = np.argmin(match_list)
-
-        rater_filename = speaker_audio[rater_index].replace('speaker0', 'rater').replace('speaker1', 'rater')
-        patient_filename = speaker_audio[patient_index].replace('speaker0', 'patient').replace('speaker1', 'patient')
-
-        #Add threshold in future
-        os.rename(os.path.join(out_dir, speaker_audio[rater_index]), os.path.join(out_dir, rater_filename))
-        os.rename(os.path.join(out_dir, speaker_audio[patient_index]), os.path.join(out_dir, patient_filename))
-
-def annote_speaker(out_dir, measures, speaker_audio):
-    """
-    ------------------------------------------------------------------------------------------------------
-
-    The function extracts speech from the audio segments, matches them with the PANSS script sentences, and
-    renames the audio segments based on the match scores.
-
-    Parameters:
-    ...........
-    out_dir : str
-        a string containing the file path of the output directory where the audio segments are saved
-    measures : dict
-        a dictionary of measures containing the PANSS script sentences
-    speaker_audio : list
-        a list of strings containing the filenames of the saved audio segments for the two speakers
-
-    Returns:
-    ...........
-    None
-
-    ------------------------------------------------------------------------------------------------------
-    """
-    match_list = []
-
-    for audio in speaker_audio:
-        try:
-
-            filepath = os.path.join(out_dir, audio)
-            _, speech = stranscribe.speech_transcription(filepath, 'en-us', [0,300]) #hardcode for US-EN
-
-            match_score = match_transcript(measures, speech)
-            match_list.append(match_score)
-
-        except Exception as e:
-            logger.error(f'Error in speaker annotation: {e}')
-
-    rename_speech(match_list, speaker_audio, out_dir)
-
-def slice_audio(df, audio_path, out_dir, measures, c_scale):
-    """
-    ------------------------------------------------------------------------------------------------------
-
-    The function extracts audio segments for the two speakers in the diarization results, matches the speech
-    with the PANSS script sentences using BERT-based sentence embeddings, and renames the audio segments based
-    on the match scores.
-
-    Parameters:
-    ...........
-    df : pandas dataframe
-        a dataframe containing the diarization results with columns for start time, end time, and speaker
-    audio_path : str
-        a string containing the file path of the audio file to extract audio segments from
-    out_dir : str
-        a string containing the file path of the output directory to save the extracted audio segments in
-    measures : dict
-        a dictionary of measures containing the PANSS script sentences
-    c_scale : str
-        a string specifying the cognitive scale used to analyze the speech
-
-    Returns:
-    ...........
-    None
-
-    ------------------------------------------------------------------------------------------------------
-    """
-    speaker_list = list(df['speaker'].unique())[:2]
-    speaker_audio = diart_speaker(df, speaker_list, audio_path, out_dir)
-
-    if str(c_scale).lower() == 'panns' and len(speaker_audio) == 2:
-        annote_speaker(out_dir, measures, speaker_audio)
 
 def prepare_diart_interval(start_time, end_time, speaker_list):
     """
@@ -601,10 +414,10 @@ def get_patient_rater_label(df, measures, scale, signal):
 
     if spk1_score > spk2_score:
         signal_label['rater'] = signal[0]
-        signal_label['patient'] = signal[1]
+        signal_label['participant'] = signal[1]
 
     else:
-        signal_label['patient'] = signal[0]
+        signal_label['participant'] = signal[0]
         signal_label['rater'] = signal[1]
     return signal_label
 
@@ -681,9 +494,9 @@ def get_segment_signal(audio_signal, df):
         speaker_audio = audio_signal[start_time:end_time]
         speaker_array = np.array(speaker_audio.get_array_of_samples())
 
-        if speaker_label == 'spk_0':
+        if speaker_label in ['spk_0', 'speaker0']:
             spk0_audio.append(speaker_array)
-        elif speaker_label == 'spk_1':
+        elif speaker_label in ['spk_1', 'speaker1']:
             spk1_audio.append(speaker_array)
 
     return spk0_audio, spk1_audio
@@ -721,3 +534,40 @@ def generate_audio_signal(df, audio_signal, scale, measures):
 
     signal_label = get_patient_rater_label(df, measures, scale, [spk0_audio, spk1_audio])
     return signal_label
+
+def get_speaker_identification(df1, df2):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    Identifies speakers from two dataframes based on time intervals.
+
+    Parameters:
+    ----------
+    df1 : pandas DataFrame
+        First dataframe containing speaker information.
+    df2 : pandas.DataFrame
+        Second dataframe containing time interval information.
+
+    Returns:
+    -------
+    grouped_df : pandas.DataFrame
+        A dataframe with aggregated speaker information.
+    speaker_count : int
+        The number of unique speaker labels identified.
+
+    ------------------------------------------------------------------------------------------------------
+    """
+    # Merge the dataframes based on overlapping time intervals
+    merged_df = pd.merge(df1, df2, how='cross')
+
+    # Filter the merged dataframe based on overlapping intervals
+    filtered_df = merged_df[ (merged_df['start'] >= merged_df['start_time']) &
+                            (merged_df['end'] <= merged_df['end_time'])]
+
+    # Groupby and aggregate word and conf
+    grouped_df = filtered_df.groupby(['start_time', 'end_time', 'speaker']).agg({'word': ' '.join, 'conf': 'mean'}).reset_index()
+    grouped_df = grouped_df.rename(columns={'conf': 'confidence', 'speaker': 'speaker_label', 'word': 'content'})
+    grouped_df = grouped_df[["start_time", "end_time", "confidence", "speaker_label", "content"]]
+
+    speaker_count = grouped_df['speaker_label'].nunique()
+    return grouped_df, speaker_count
