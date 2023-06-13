@@ -236,41 +236,48 @@ def eye_blink_rate(video_directory, device='laptop'):
     ---------------------------------------------------------------------------------------------------
     """
 
-    if device == 'laptop' or device == 'mobile':
-        prominence, width = CONFIG['PROMINENCE'][device], CONFIG['WIDTH'][device]
-    else:
-        raise ValueError("device can be either 'laptop' or 'mobile'")
+    framewise, blinks, summary = None, None, None
 
-    face_mesh = initialize_facemesh()
-    vs, fps = get_video_capture(video_directory)
+    try:
+        if device == 'laptop' or device == 'mobile':
+            prominence, width = CONFIG['PROMINENCE'][device], CONFIG['WIDTH'][device]
+        else:
+            raise ValueError("device can be either 'laptop' or 'mobile'")
 
-    framewise = []
-    frame_n = 0
+        face_mesh = initialize_facemesh()
+        vs, fps = get_video_capture(video_directory)
 
-    while True:
-        ret, frame = vs.read()
-        if not ret:
-            break
+        framewise = []
+        frame_n = 0
 
-        frame_n += 1
-        frame = cv2.resize(frame, (450, int(frame.shape[0] * (450. / frame.shape[1]))))
+        while True:
+            ret, frame = vs.read()
+            if not ret:
+                break
 
-        leftEye, rightEye = process_frame(face_mesh, frame)
-        if leftEye is None:
-            continue
+            frame_n += 1
+            frame = cv2.resize(frame, (450, int(frame.shape[0] * (450. / frame.shape[1]))))
 
-        leftEAR = eye_aspect_ratio(leftEye)
-        rightEAR = eye_aspect_ratio(rightEye)
-        ear = (leftEAR + rightEAR) / 2.0
+            leftEye, rightEye = process_frame(face_mesh, frame)
+            if leftEye is None:
+                continue
 
-        framewise.append([frame_n, ear])
+            leftEAR = eye_aspect_ratio(leftEye)
+            rightEAR = eye_aspect_ratio(rightEye)
+            ear = (leftEAR + rightEAR) / 2.0
 
-    vs.release()
+            framewise.append([frame_n, ear])
 
-    framewise = pd.DataFrame(framewise, columns=['frame', 'EAR'])
-    troughs, left_ips, right_ips = detect_blinks(framewise, prominence, width)
-    blinks = convert_frame_to_time(troughs, left_ips, right_ips, fps)
-    summary_list = [len(troughs), len(troughs)/(frame_n/fps)*60]
-    summary = pd.DataFrame(summary_list, index=['blinks', 'blink_rate'], columns=['value'])
+        framewise = pd.DataFrame(framewise, columns=['frame', 'EAR'])
+        troughs, left_ips, right_ips = detect_blinks(framewise, prominence, width)
+        blinks = convert_frame_to_time(troughs, left_ips, right_ips, fps)
+        summary_list = [len(troughs), len(troughs)/(frame_n/fps)*60]
+        summary = pd.DataFrame(summary_list, index=['blinks', 'blink_rate'], columns=['value'])
+    
+    except Exception as e:
+        logger.error(e)
 
-    return framewise, blinks, summary
+    finally:
+        if vs is not None:
+            vs.release()
+        return framewise, blinks, summary
