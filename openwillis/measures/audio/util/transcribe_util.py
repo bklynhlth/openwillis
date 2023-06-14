@@ -114,7 +114,8 @@ def get_clinical_lables(scale, measures, content_dict, json_response):
 
     ------------------------------------------------------------------------------------------------------
     """
-    if content_dict:
+    #Check if content is available for all the speaker
+    if content_dict and content_dict['speaker0'] and content_dict['speaker1']:
         if scale.lower() not in measures['scale'].strip("[]").replace(" ", "").split(","):
             return json_response
 
