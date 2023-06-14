@@ -77,26 +77,16 @@ def extract_content(data):
     content_dict = {}
 
     if 'results' in data:           # Check if 'results' key is present
-        results = data['results']
+        item_data = data['results']['items']
 
-        if 'items' in results:      # Check if 'items' key is present
-            items = results['items']
+        item_spk_0 = [item for item in item_data if item.get('speaker_label', '') == 'speaker0']
+        item_spk_1 = [item for item in item_data if item.get('speaker_label', '') == 'speaker1']
+        
+        spk_0_text = [item['alternatives'][0]['content'] for item in item_spk_0 if 'alternatives' in item]
+        spk_1_text = [item['alternatives'][0]['content'] for item in item_spk_1 if 'alternatives' in item]
 
-            for item in items:
-                speaker_label = item.get('speaker_label')
-
-                if 'alternatives' in item:          # Check if 'alternatives' key is present
-                    alternatives = item['alternatives']
-
-                    if alternatives and alternatives[0].get('content'):     # Check if 'content' key is present
-                        content = alternatives[0]['content']
-
-                        if speaker_label:
-                            content_dict.setdefault(f'speaker{speaker_label[-1]}', []).append(content)
-
-    if content_dict:            # Join the 'content' values as strings with spaces
-        for key, values in content_dict.items():
-            content_dict[key] = ' '.join(values)
+        content_dict['speaker0'] = " ".join(spk_0_text)
+        content_dict['speaker1'] = " ".join(spk_1_text)
 
     return content_dict
 
