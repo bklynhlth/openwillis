@@ -9,7 +9,6 @@ import piso
 
 import pandas as pd
 import numpy as np
-from pydub import AudioSegment
 import logging
 
 from sentence_transformers import SentenceTransformer
@@ -401,24 +400,17 @@ def get_patient_rater_label(df, measures, scale, signal):
     """
     signal_label = {}
     if scale.lower() not in measures['scale'].strip("[]").replace(" ", "").split(","):
+        return signal
 
-        signal_label['speaker1'] = signal[0]
-        signal_label['speaker2'] = signal[1]
-        return signal_label
-
-    spk1_txt = ' '.join(df[df['speaker_label'] == 'spk_0'].reset_index(drop=True)['content'])
-    spk2_txt = ' '.join(df[df['speaker_label'] == 'spk_1'].reset_index(drop=True)['content'])
+    spk1_txt = ' '.join(df[df['speaker_label'] == 'speaker0'].reset_index(drop=True)['content'])
+    spk2_txt = ' '.join(df[df['speaker_label'] == 'speaker1'].reset_index(drop=True)['content'])
 
     spk1_score = match_transcript(measures, spk1_txt)
     spk2_score = match_transcript(measures, spk2_txt)
+    signal_label = {'clinician': signal['speaker1'], 'participant':signal['speaker0']}
 
     if spk1_score > spk2_score:
-        signal_label['rater'] = signal[0]
-        signal_label['participant'] = signal[1]
-
-    else:
-        signal_label['participant'] = signal[0]
-        signal_label['rater'] = signal[1]
+        signal_label = {'clinician': signal['speaker0'], 'participant':signal['speaker1']}
     return signal_label
 
 def transcribe_response_to_dataframe(response):
@@ -446,6 +438,7 @@ def transcribe_response_to_dataframe(response):
 
     if response['results']:
         if 'speaker_labels' in response['results']:
+
             if 'speakers' in response['results']['speaker_labels']:
                 speakers = response['results']['speaker_labels']["speakers"]
 
@@ -483,23 +476,21 @@ def get_segment_signal(audio_signal, df):
 
     ------------------------------------------------------------------------------------------------------
     """
-    spk0_audio = []
-    spk1_audio = []
+    signal_dict = {}
 
     for index, row in df.iterrows():
         start_time = row['start_time']
+
         end_time = row['end_time']
         speaker_label = row['speaker_label']
 
         speaker_audio = audio_signal[start_time:end_time]
         speaker_array = np.array(speaker_audio.get_array_of_samples())
 
-        if speaker_label in ['spk_0', 'speaker0']:
-            spk0_audio.append(speaker_array)
-        elif speaker_label in ['spk_1', 'speaker1']:
-            spk1_audio.append(speaker_array)
+        if speaker_label in ['speaker0', 'speaker1', 'clinician', 'participant']:
+            signal_dict.setdefault(speaker_label, []).append(speaker_array)
 
-    return spk0_audio, spk1_audio
+    return signal_dict
 
 def generate_audio_signal(df, audio_signal, scale, measures):
     """
@@ -527,12 +518,11 @@ def generate_audio_signal(df, audio_signal, scale, measures):
     """
     df['start_time'] = df['start_time'].astype(float) *1000
     df['end_time'] = df['end_time'].astype(float)*1000
-    spk0_audio, spk1_audio = get_segment_signal(audio_signal, df)
 
-    spk0_audio = np.concatenate(spk0_audio)
-    spk1_audio = np.concatenate(spk1_audio)
+    signal_dict = get_segment_signal(audio_signal, df)
+    signal_dict = {key: np.concatenate(value) for key, value in signal_dict.items()}
 
-    signal_label = get_patient_rater_label(df, measures, scale, [spk0_audio, spk1_audio])
+    signal_label = get_patient_rater_label(df, measures, scale, signal_dict)
     return signal_label
 
 def get_speaker_identification(df1, df2):
@@ -567,7 +557,7 @@ def get_speaker_identification(df1, df2):
     # Groupby and aggregate word and conf
     grouped_df = filtered_df.groupby(['start_time', 'end_time', 'speaker']).agg({'word': ' '.join, 'conf': 'mean'}).reset_index()
     grouped_df = grouped_df.rename(columns={'conf': 'confidence', 'speaker': 'speaker_label', 'word': 'content'})
-    grouped_df = grouped_df[["start_time", "end_time", "confidence", "speaker_label", "content"]]
 
+    grouped_df = grouped_df[["start_time", "end_time", "confidence", "speaker_label", "content"]]
     speaker_count = grouped_df['speaker_label'].nunique()
     return grouped_df, speaker_count

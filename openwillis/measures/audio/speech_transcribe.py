@@ -234,7 +234,7 @@ def speech_transcription(filepath, **kwargs):
     """
     ------------------------------------------------------------------------------------------------------
 
-    Speech transcription function that transcribes an audio file using either Amazon Transcribe or Vosk.
+    Speech transcription function that transcribes an audio file using Vosk.
 
     Parameters:
     ...........

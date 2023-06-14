@@ -162,7 +162,8 @@ def read_kwargs(kwargs):
 
     Returns:
     ...........
-    input_param: dict A dictionary containing input parameters with their corresponding values.
+    input_param: dict
+        A dictionary containing input parameters with their corresponding values.
 
     ------------------------------------------------------------------------------------------------------
     """
