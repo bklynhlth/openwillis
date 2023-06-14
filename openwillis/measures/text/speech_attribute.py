@@ -84,16 +84,19 @@ def is_amazon_transcribe(json_conf):
     """
     return 'jobName' in json_conf and 'results' in json_conf
 
-def filter_transcribe(json_conf):
+def filter_transcribe(json_conf, speaker_label=None):
     """
     ------------------------------------------------------------------------------------------------------
 
     This function extracts the text and filters the JSON data for Amazon Transcribe json response objects.
+     Also, it filters the JSON data based on the speaker label if provided.
 
     Parameters:
     ...........
     json_conf: dict
         aws transcribe json response.
+    speaker_label: str
+        Speaker label
 
     Returns:
     ...........
@@ -102,10 +105,27 @@ def filter_transcribe(json_conf):
     filter_json: list
         The filtered JSON object containing only the relevant data for processing.
 
+    Raises:
+    ...........
+    ValueError: If the speaker label is not found in the json response object.
+
     ------------------------------------------------------------------------------------------------------
     """
     text = json_conf['results']['transcripts'][0].get('transcript', '')
     item_data = json_conf['results']['items']
+    if speaker_label is not None:
+        speaker_labels = [item['speaker_label'] for item in item_data if 'speaker_label' in item]
+
+        if speaker_label not in speaker_labels:
+            raise ValueError(f'Speaker label {speaker_label} not found in the json response object.')
+
+        # filter the json data based on the speaker label
+        item_data = [item for item in item_data if item.get('speaker_label', '') == speaker_label]
+
+        # extract the text from the filtered json data
+        text_list = [item['alternatives'][0]['content'] for item in item_data if 'alternatives' in item]
+        text = " ".join(text_list)
+
     filter_json = [item for item in item_data if 'start_time' in item and 'end_time' in item]
     return text, filter_json
 
@@ -131,7 +151,7 @@ def filter_vosk(json_conf):
     text = " ".join(text_list)
     return text
 
-def speech_characteristics(json_conf, language='en-us'):
+def speech_characteristics(json_conf, language='en-us', speaker_label=None):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -143,6 +163,8 @@ def speech_characteristics(json_conf, language='en-us'):
         Transcribed json file
     language: str
         Language type
+    speaker_label: str
+        Speaker label
 
     Returns:
     ...........
@@ -161,7 +183,7 @@ def speech_characteristics(json_conf, language='en-us'):
             cutil.download_nltk_resources()
 
             if is_amazon_transcribe(json_conf):
-                text, filter_json = filter_transcribe(json_conf)
+                text, filter_json = filter_transcribe(json_conf, speaker_label=speaker_label)
 
                 if len(filter_json) > 0 and len(text) > 0:
                     tag_df, summ_df = cutil.process_language_feature(filter_json, [tag_df, summ_df], text, language,
