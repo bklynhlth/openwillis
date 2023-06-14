@@ -13,7 +13,6 @@ import logging
 from vosk import Model, KaldiRecognizer
 from pydub import AudioSegment
 from openwillis.measures.audio.util import util as ut
-from openwillis.measures.audio.util import transcribe_util as tutil
 
 logging.basicConfig(level=logging.INFO)
 logger=logging.getLogger()
@@ -235,20 +234,16 @@ def speech_transcription(filepath, **kwargs):
     """
     ------------------------------------------------------------------------------------------------------
 
-    Speech transcription function that transcribes an audio file using either Amazon Transcribe or Vosk.
+    Speech transcription function that transcribes an audio file using Vosk.
 
     Parameters:
     ...........
     filepath : str
         The path to the audio file to be transcribed.
     model : str, optional
-        The transcription model to use ('aws' or 'vosk'). Default is 'vosk'.
+        The transcription model to use ('vosk'). Default is 'vosk'.
     language : str, optional
         The language of the audio file (e.g. 'en-us', 'es', 'fr'). Default is 'en-us'.
-    region : str, optional
-        The AWS region to use (e.g. 'us-east-1'). Only applicable if model is 'aws'. Default is 'us-east-1'.
-    job_name : str, optional
-        The name of the transcription job. Only applicable if model is 'aws'. Default is 'transcribe_job_01'.
     transcribe_interval : list, optional
         A list of tuples representing the start and end times (in seconds) of segments of the audio file to be transcribed.
         Only applicable if model is 'vosk'. Default is an empty list.
@@ -264,15 +259,7 @@ def speech_transcription(filepath, **kwargs):
     """
     model = kwargs.get('model', 'vosk')
     language = kwargs.get('language', 'en-us')
-
-    region = kwargs.get('region', 'us-east-1')
-    job_name = kwargs.get('job_name', 'transcribe_job_01')
     transcribe_interval = kwargs.get('transcribe_interval', [])
 
-    if model.lower() == 'aws':
-        json_response, transcript = tutil.transcribe_audio(filepath, region, job_name, language)
-
-    else:
-        json_response, transcript = run_vosk(filepath, language, transcribe_interval)
-
+    json_response, transcript = run_vosk(filepath, language, transcribe_interval)
     return json_response, transcript

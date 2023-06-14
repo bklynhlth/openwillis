@@ -8,6 +8,7 @@ from diart import PipelineConfig, OnlineSpeakerDiarization
 from pyannote.audio import Pipeline
 from openwillis.measures.audio.util import util as ut
 from openwillis.measures.audio.util import separation_util as sutil
+from pydub import AudioSegment
 
 import os
 import json
@@ -85,7 +86,7 @@ def run_diard(file_path, temp_dir, temp_rttm, hf_token):
     except Exception as e:
         logger.error(f'Error in diard processing: {e} & File: {file_path}')
 
-def run_pyannote(file_path, out_dir, hf_token):
+def run_pyannote(file_path, hf_token):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -96,8 +97,6 @@ def run_pyannote(file_path, out_dir, hf_token):
     ...........
     file_path : str
         Path to the input audio file.
-    out_dir : str
-        Path to the output directory where the separated audio files and other output files will be saved.
     hf_token : str
         Access token for HuggingFace to access pre-trained models.
 
@@ -113,10 +112,6 @@ def run_pyannote(file_path, out_dir, hf_token):
     diart = pipeline(file_path, num_speakers=2)
     diart_df = sutil.get_diart_interval(diart)
     diart_df = diart_df.sort_values(by=['start_time', 'end_time']).reset_index(drop=True)
-
-    if len(diart_df)>0:#make output dir
-        ut.make_dir(out_dir)
-
     return diart_df
 
 def process_diart(out_dir, file_name, filepath, hf_token):
@@ -129,7 +124,7 @@ def process_diart(out_dir, file_name, filepath, hf_token):
     Parameters:
     ...........
     out_dir : str
-        Path to the output directory where the separated audio files and other output files will be saved.
+        Path to the temp directory where processed rttm file is available.
     file_name : str
         The name of the input audio file.
     filepath : str
@@ -154,7 +149,67 @@ def process_diart(out_dir, file_name, filepath, hf_token):
     sutil.clean_prexisting(temp_dir, temp_rttm)
     return rttm_df
 
-def speaker_separation(filepath, out_dir, hf_token, model='pyannote', c_scale=''):
+def read_kwargs(kwargs):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    Reads keyword arguments and returns a dictionary containing input parameters.
+
+    Parameters:
+    ...........
+    kwargs : dict
+        Keyword arguments to be processed.
+
+    Returns:
+    ...........
+    input_param: dict
+        A dictionary containing input parameters with their corresponding values.
+
+    ------------------------------------------------------------------------------------------------------
+    """
+    input_param = {}
+    input_param['model'] = kwargs.get('model', 'pyannote')
+
+    input_param['hf_token'] = kwargs.get('hf_token', '')
+    input_param['json_response'] = kwargs.get('json_response', '')
+    input_param['c_scale'] = kwargs.get('c_scale', '')
+    return input_param
+
+def get_localdiart(input_param, file_name, filepath):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    Retrieves speaker identification information using the local Diarization model.
+
+    Parameters:
+    ...........
+    input_param : dict
+        A dictionary containing input parameters
+    file_name :str
+        The name of the file.
+    filepath : str
+        The file path.
+
+    Returns:
+    ...........
+    speaker_df :pandas.DataFrame
+        The speaker identification dataframe.
+    speaker_count :int
+        The number of identified speakers.
+
+    ------------------------------------------------------------------------------------------------------
+    """
+    if input_param['model'] == 'pyannote-diart':
+        diart_df = process_diart('temp_dir', file_name, filepath, input_param['hf_token'])
+
+    else:
+        diart_df = run_pyannote(filepath, input_param['hf_token'])
+    transcribe_df = pd.DataFrame(input_param['json_response'])
+
+    speaker_df, speaker_count = sutil.get_speaker_identification(diart_df, transcribe_df)
+    return speaker_df, speaker_count
+
+def speaker_separation(filepath, **kwargs):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -164,10 +219,10 @@ def speaker_separation(filepath, out_dir, hf_token, model='pyannote', c_scale=''
     ...........
     filepath : str
         Path to the input audio file.
-    out_dir : str
-        Path to the output directory where the separated audio files and other output files will be saved.
     hf_token : str
         Access token for HuggingFace to access pre-trained models.
+    json_response : json
+        Speech transcription json response.
     model : str, optional
         Model to use for speech diarization, default is 'pyannote'.
     c_scale : str, optional
@@ -175,25 +230,36 @@ def speaker_separation(filepath, out_dir, hf_token, model='pyannote', c_scale=''
 
     Returns:
     ...........
-    rttm_df : pandas.DataFrame
+    signal_label : pandas.DataFrame
         A pandas dataframe containing the speaker diarization information.
 
     ------------------------------------------------------------------------------------------------------
     """
+    signal_label = {}
+    input_param = read_kwargs(kwargs)
+
     file_name, _ = os.path.splitext(os.path.basename(filepath))
     measures = get_config()
 
     try:
-        if os.path.exists(filepath):
+        if not os.path.exists(filepath) and 'json_response' not in kwargs:
+            return signal_label
 
-            if model == 'pyannote-diart':
-                rttm_df = process_diart(out_dir, file_name, filepath, hf_token)
+        audio_signal = AudioSegment.from_file(file = filepath, format = "wav")
+        if input_param['model'] == 'aws':
 
-            else:
-                rttm_df = run_pyannote(filepath, out_dir, hf_token)
+            input_param['c_scale'] = ''
+            speaker_df, speaker_count = sutil.transcribe_response_to_dataframe(input_param['json_response'])
 
-            sutil.slice_audio(rttm_df, filepath, out_dir, measures, c_scale)
-            return rttm_df
+        else:
+            if 'hf_token' not in kwargs:
+                return signal_label
+
+            speaker_df, speaker_count = get_localdiart(input_param, file_name, filepath)
+        if len(speaker_df)>0 and speaker_count>1:
+            signal_label = sutil.generate_audio_signal(speaker_df , audio_signal, input_param['c_scale'], measures)
 
     except Exception as e:
         logger.error(f'Error in diard processing: {e} & File: {filepath}')
+
+    return signal_label
