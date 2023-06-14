@@ -401,13 +401,13 @@ def get_patient_rater_label(df, measures, scale, signal):
     signal_label = {}
     spk1_txt = ' '.join(df[df['speaker_label'] == 'speaker0'].reset_index(drop=True)['content'])
     spk2_txt = ' '.join(df[df['speaker_label'] == 'speaker1'].reset_index(drop=True)['content'])
-    
+
     if scale.lower() not in measures['scale'].strip("[]").replace(" ", "").split(","):
         return signal
-    
+
     elif spk1_txt and spk2_txt: #Check empty text
         return signal
-        
+
     spk1_score = match_transcript(measures, spk1_txt)
     spk2_score = match_transcript(measures, spk2_txt)
     signal_label = {'clinician': signal['speaker1'], 'participant':signal['speaker0']}
@@ -472,10 +472,9 @@ def get_segment_signal(audio_signal, df):
 
     Returns:
     -------
-    spk0_audio: list
-        List of numpy arrays representing the audio segments of speaker 0.
-    spk1_audio: list
-        List of numpy arrays representing the audio segments of speaker 1.
+    signal_dict: dict
+        A dictionary with key as labled speaker and value as a List of numpy arrays representing the audio segments
+        of that speaker.
 
     ------------------------------------------------------------------------------------------------------
     """

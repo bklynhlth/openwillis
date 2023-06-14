@@ -2,11 +2,7 @@
 # website:   http://www.bklynhlth.com
 
 # import the required packages
-
-import numpy as np
-import pandas as pd
 import os
-import wave
 import json
 import logging
 from openwillis.measures.audio.util import transcribe_util as tutil
@@ -79,7 +75,7 @@ def speech_transcription_cloud(filepath, **kwargs):
     Parameters:
     ...........
     filepath : str
-        The S3 uri to the audio file to be transcribed.
+        The S3 uri for the recording to be transcribed.
     kwargs: Object
         model : str, optional
             The transcription model to use ('aws'). Default is 'aws'.
@@ -116,6 +112,6 @@ def speech_transcription_cloud(filepath, **kwargs):
 
     if input_param['ShowSpeakerLabels'] == True and input_param['c_scale']:
         content_dict = tutil.extract_content(json_response)
-        json_response = tutil.get_clinical_lables(input_param['c_scale'], measures, content_dict, json_response)
+        json_response = tutil.get_clinical_labels(input_param['c_scale'], measures, content_dict, json_response)
 
     return json_response, transcript

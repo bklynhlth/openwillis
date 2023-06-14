@@ -13,7 +13,7 @@ from openwillis.measures.audio.util import separation_util as sutil
 logging.basicConfig(level=logging.INFO)
 logger=logging.getLogger()
 
-def replace_speaker_labels(data, check_lables, speaker_labels):
+def replace_speaker_labels(data, check_labels, speaker_labels):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -21,9 +21,9 @@ def replace_speaker_labels(data, check_lables, speaker_labels):
 
     Parameters:
     ...........
-    data : dict
+    data : dict or list
         The nested dictionary or list containing speaker labels.
-    check_lables: list
+    check_labels: list
         Check on input speaker labels
     speaker_labels: list
         Expected speaker labels
@@ -40,19 +40,19 @@ def replace_speaker_labels(data, check_lables, speaker_labels):
         for key, value in data.items():
 
             if key == 'speaker_label':
-                if value == check_lables[0]:
+                if value == check_labels[0]:
                     data[key] = speaker_labels[0]
 
-                elif value == check_lables[1]:
+                elif value == check_labels[1]:
                     data[key] = speaker_labels[1]
 
                 else:
                     data[key] = value
             else:
-                replace_speaker_labels(value, check_lables, speaker_labels)
+                replace_speaker_labels(value, check_labels, speaker_labels)
     elif isinstance(data, list):
         for item in data:
-            replace_speaker_labels(item, check_lables, speaker_labels)
+            replace_speaker_labels(item, check_labels, speaker_labels)
 
     return data
 
@@ -81,7 +81,7 @@ def extract_content(data):
 
         item_spk_0 = [item for item in item_data if item.get('speaker_label', '') == 'speaker0']
         item_spk_1 = [item for item in item_data if item.get('speaker_label', '') == 'speaker1']
-        
+
         spk_0_text = [item['alternatives'][0]['content'] for item in item_spk_0 if 'alternatives' in item]
         spk_1_text = [item['alternatives'][0]['content'] for item in item_spk_1 if 'alternatives' in item]
 
@@ -90,7 +90,7 @@ def extract_content(data):
 
     return content_dict
 
-def get_clinical_lables(scale, measures, content_dict, json_response):
+def get_clinical_labels(scale, measures, content_dict, json_response):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -138,6 +138,8 @@ def transcribe_audio(s3uri, input_param):
 
     Parameters:
     ...........
+    s3uri : str
+        The S3 uri for the recording to be transcribed.
     input_param: dict
         A dictionary containing input parameters with their corresponding values.
 
@@ -182,7 +184,7 @@ def transcribe_audio(s3uri, input_param):
             response = json.loads(read_data.read().decode('utf-8'))
             transcript = response['results']['transcripts'][0]['transcript']
 
-            if input_param['ShowSpeakerLabels'] == True:
+            if input_param['ShowSpeakerLabels'] == True:#replace speaker labels with standard names
                 response = replace_speaker_labels(response, ['spk_0', 'spk_1'], ['speaker0', 'speaker1'])
 
     except Exception as e:
