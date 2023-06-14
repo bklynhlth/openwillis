@@ -405,7 +405,7 @@ def get_patient_rater_label(df, measures, scale, signal):
     if scale.lower() not in measures['scale'].strip("[]").replace(" ", "").split(","):
         return signal
 
-    elif spk1_txt and spk2_txt: #Check empty text
+    elif spk1_txt == '' and spk2_txt == '': #Check empty text
         return signal
 
     spk1_score = match_transcript(measures, spk1_txt)
