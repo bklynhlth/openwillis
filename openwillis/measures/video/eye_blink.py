@@ -239,10 +239,7 @@ def eye_blink_rate(video_directory, device='laptop'):
     framewise, blinks, summary = None, None, None
 
     try:
-        if device == 'laptop' or device == 'mobile':
-            prominence, width = CONFIG['PROMINENCE'][device], CONFIG['WIDTH'][device]
-        else:
-            raise ValueError("device can be either 'laptop' or 'mobile'")
+        prominence, width = 2, .01
 
         face_mesh = initialize_facemesh()
         vs, fps = get_video_capture(video_directory)
@@ -269,8 +266,13 @@ def eye_blink_rate(video_directory, device='laptop'):
             framewise.append([frame_n, ear])
 
         framewise = pd.DataFrame(framewise, columns=['frame', 'EAR'])
+        # z-score normalization
+        framewise['EAR'] = (framewise['EAR'] - framewise['EAR'].mean()) / framewise['EAR'].std()
+        # detect blinks from EAR array
         troughs, left_ips, right_ips = detect_blinks(framewise, prominence, width)
+        # convert frame number to time and create blinks dataframe
         blinks = convert_frame_to_time(troughs, left_ips, right_ips, fps)
+        # create summary dataframe
         summary_list = [len(troughs), len(troughs)/(frame_n/fps)*60]
         summary = pd.DataFrame(summary_list, index=['blinks', 'blink_rate'], columns=['value'])
     
