@@ -205,7 +205,7 @@ def convert_frame_to_time(troughs, left_ips, right_ips, fps):
     return blinks
 
 
-def eye_blink_rate(video_directory, device='laptop'):
+def eye_blink_rate(video_directory):
     """
     ---------------------------------------------------------------------------------------------------
 
@@ -215,8 +215,6 @@ def eye_blink_rate(video_directory, device='laptop'):
     ............
     video_directory : string
         The directory of the video to be analyzed
-    device : string
-        The device used to record the video. It can be either 'laptop' or 'mobile'
 
     Returns:
     ............
@@ -239,7 +237,7 @@ def eye_blink_rate(video_directory, device='laptop'):
     framewise, blinks, summary = None, None, None
 
     try:
-        prominence, width = 2, .01
+        prominence, width = CONFIG['PROMINENCE'], CONFIG['WIDTH']
 
         face_mesh = initialize_facemesh()
         vs, fps = get_video_capture(video_directory)
