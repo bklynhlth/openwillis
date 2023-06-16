@@ -166,8 +166,10 @@ def detect_blinks(framewise, prominence, width):
     troughs, properties = find_peaks(-framewise['EAR'], prominence=prominence, width=width)
     left_ips = properties["left_ips"]
     right_ips = properties["right_ips"]
-    left_ips = np.round(left_ips).astype(int)
-    right_ips = np.round(right_ips).astype(int)
+    # round to nearest integer and add 1 to match frame number
+    left_ips = np.round(left_ips).astype(int) + 1
+    right_ips = np.round(right_ips).astype(int) + 1
+    troughs = np.round(troughs).astype(int) + 1
     return troughs, left_ips, right_ips
 
 
