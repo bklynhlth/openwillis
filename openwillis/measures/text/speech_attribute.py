@@ -40,7 +40,7 @@ def create_empty_dataframes(measures):
     """
     ------------------------------------------------------------------------------------------------------
 
-    Creating an empty measure dataframe
+    Creating empty measures dataframes
 
     Parameters:
     ...........
@@ -49,21 +49,43 @@ def create_empty_dataframes(measures):
 
     Returns:
     ...........
-    tag_df: pandas dataframe
-        an empty dataframe for the tags
+    word_df: pandas dataframe
+        A dataframe containing word summary information
+    phrase_df: pandas dataframe
+        A dataframe containing phrase summary information
+    utterance_df: pandas dataframe
+        A dataframe containing utterance summary information
     summ_df: pandas dataframe
-        an empty dataframe for the summary
+        A dataframe containing summary information on the speech
 
     ------------------------------------------------------------------------------------------------------
     """
-    summ_df = pd.DataFrame(columns=[measures['tot_words'], measures['speech_verb'], measures['speech_adj'],
-                                    measures['speech_pronoun'], measures['speech_noun'], measures['neg'], measures['neu'],
-                                    measures['pos'], measures['compound'], measures['speech_mattr'], measures['rate_of_speech'],
-                                    measures['pause_rate'], measures['pause_meandur'], measures['silence_ratio']])
+    
+    word_df = pd.DataFrame(columns=["pre_word_pause", "part_of_speech", "sentiment_pos",
+                                    "sentiment_neg", "sentiment_neu", "sentiment_overall"])
 
-    # Create an empty tag dataframe
-    tag_df = pd.DataFrame(columns=[measures['word'], measures['tag']])
-    return tag_df, summ_df
+    phrase_df = pd.DataFrame(columns=["pre_phrase_pause", "phrase_length_minutes", "phrase_length_words",
+                                        "words_per_min", "pauses_per_min", "pause_variability",
+                                        "mean_pause_length", "speech_percentage", "noun_percentage",
+                                        "verb_percentage", "adjective_percentage", "pronoun_percentage",
+                                        "sentiment_pos", "sentiment_neg", "sentiment_neu",
+                                        "sentiment_overall", "mattr"])
+
+    utterance_df = pd.DataFrame(columns=["pre_utterance_pause", "utterance_length_minutes",
+                                            "utterance_length_words", "words_per_min", "pauses_per_min",
+                                            "pause_variability", "mean_pause_length", "speech_percentage",
+                                            "noun_percentage", "verb_percentage", "adjective_percentage",
+                                            "pronoun_percentage", "sentiment_pos", "sentiment_neg",
+                                            "sentiment_neu", "sentiment_overall", "mattr"])
+
+    summ_df = pd.DataFrame(columns=["speech_length_minutes", "speech_length_words", "words_per_min",
+                                        "pauses_per_min", "word_pause_length_mean", "word_pause_variability",
+                                        "phrase_pause_length_mean", "phrase_pause_variability",
+                                        "speech_percentage", "noun_percentage", "verb_percentage",
+                                        "adjective_percentage", "pronoun_percentage", "sentiment_pos",
+                                        "sentiment_neg", "sentiment_neu", "sentiment_overall", "mattr"])
+
+    return word_df, phrase_df, utterance_df, summ_df
 
 def is_amazon_transcribe(json_conf):
     """
@@ -168,15 +190,19 @@ def speech_characteristics(json_conf, language='en-us', speaker_label=None):
 
     Returns:
     ...........
-    tag_df: pandas dataframe
-        A dataframe containing speech tags
+    word_df: pandas dataframe
+        A dataframe containing word summary information
+    phrase_df: pandas dataframe
+        A dataframe containing phrase summary information
+    utterance_df: pandas dataframe
+        A dataframe containing utterance summary information
     summ_df: pandas dataframe
         A dataframe containing summary information on the speech
 
     ------------------------------------------------------------------------------------------------------
     """
     measures = get_config()
-    tag_df, summ_df = create_empty_dataframes(measures)
+    word_df, phrase_df, utterance_df, summ_df = create_empty_dataframes(measures)
 
     try:
         if bool(json_conf):
@@ -186,16 +212,16 @@ def speech_characteristics(json_conf, language='en-us', speaker_label=None):
                 text, filter_json = filter_transcribe(json_conf, speaker_label=speaker_label)
 
                 if len(filter_json) > 0 and len(text) > 0:
-                    tag_df, summ_df = cutil.process_language_feature(filter_json, [tag_df, summ_df], text, language,
+                    word_df, phrase_df, utterance_df, summ_df = cutil.process_language_feature(filter_json, [word_df, phrase_df, utterance_df, summ_df], text, language,
                                                                measures, ['start_time', 'end_time'])
             else:
                 text = filter_vosk(json_conf)
                 if len(text) > 0:
-                    tag_df, summ_df = cutil.process_language_feature(json_conf, [tag_df, summ_df], text, language, measures,
+                    word_df, phrase_df, utterance_df, summ_df = cutil.process_language_feature(json_conf, [word_df, phrase_df, utterance_df, summ_df], text, language, measures,
                                                                ['start', 'end'])
 
     except Exception as e:
         logger.error(f'Error in speech Characteristics {e}')
 
     finally:
-        return tag_df, summ_df
+        return word_df, phrase_df, utterance_df, summ_df
