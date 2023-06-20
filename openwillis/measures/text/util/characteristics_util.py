@@ -215,7 +215,7 @@ def get_stats(summ_df, ros, file_dur, pause_list, measures):
     summ_df.loc[0, col_list] = feature_list
     return summ_df
 
-def get_pause_feature(json_conf, word_df, phrase_df, utterance_df, summ_df, word, measures, time_index, speaker_label):
+def get_pause_feature(json_conf, word_df, phrase_df, utterance_df, summ_df, word, measures, time_index):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -239,8 +239,6 @@ def get_pause_feature(json_conf, word_df, phrase_df, utterance_df, summ_df, word
         A dictionary containing the names of the columns in the output dataframes.
     time_index: list
         A list containing the names of the columns in json that contain the start and end times of each word.
-    speaker_label: str
-        Speaker label.
 
     Returns:
     ...........
@@ -269,7 +267,7 @@ def get_pause_feature(json_conf, word_df, phrase_df, utterance_df, summ_df, word
     df_feature = get_stats(summ_df, ros, file_dur, pause_list, measures)
     return df_feature
 
-def process_language_feature(json_conf, df_list, text_list, text_indices, language, measures, time_index, speaker_label=None):
+def process_language_feature(json_conf, df_list, text_list, text_indices, language, measures, time_index):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -292,8 +290,6 @@ def process_language_feature(json_conf, df_list, text_list, text_indices, langua
         A dictionary containing the names of the columns in the output dataframes.
     time_index: list
         A list containing the names of the columns in json that contain the start and end times of each word.
-    speaker_label: str
-        Speaker label.
 
     Returns:
     ...........
@@ -316,7 +312,7 @@ def process_language_feature(json_conf, df_list, text_list, text_indices, langua
     word_list = nltk.tokenize.word_tokenize(text)
 
     word_df, phrase_df, utterance_df, summ_df = get_pause_feature(
-        json_conf, word_df, phrase_df, utterance_df, summ_df, word_list, measures, time_index, speaker_label
+        json_conf, word_df, phrase_df, utterance_df, summ_df, word_list, measures, time_index
     )
 
     if language == 'en-us':
