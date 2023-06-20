@@ -215,7 +215,7 @@ def get_stats(summ_df, ros, file_dur, pause_list, measures):
     summ_df.loc[0, col_list] = feature_list
     return summ_df
 
-def get_pause_feature(json_conf, summ_df, word, measures, time_index):
+def get_pause_feature(json_conf, word_df, phrase_df, utterance_df, summ_df, word, measures, time_index, speaker_label):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -225,6 +225,12 @@ def get_pause_feature(json_conf, summ_df, word, measures, time_index):
     ...........
     json_conf: list
         JSON response objects.
+    word_df: pandas dataframe
+        A dataframe containing word summary information
+    phrase_df: pandas dataframe
+        A dataframe containing phrase summary information
+    utterance_df: pandas dataframe
+        A dataframe containing utterance summary information
     summ_df: pandas dataframe
         A dataframe containing the speech characteristics of the input text.
     word: list
@@ -233,6 +239,8 @@ def get_pause_feature(json_conf, summ_df, word, measures, time_index):
         A dictionary containing the names of the columns in the output dataframes.
     time_index: list
         A list containing the names of the columns in json that contain the start and end times of each word.
+    speaker_label: str
+        Speaker label.
 
     Returns:
     ...........
@@ -261,7 +269,7 @@ def get_pause_feature(json_conf, summ_df, word, measures, time_index):
     df_feature = get_stats(summ_df, ros, file_dur, pause_list, measures)
     return df_feature
 
-def process_language_feature(json_conf, df_list, text, language, measures, time_index):
+def process_language_feature(json_conf, df_list, text, language, measures, time_index, speaker_label=None):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -279,6 +287,8 @@ def process_language_feature(json_conf, df_list, text, language, measures, time_
         A dictionary containing the names of the columns in the output dataframes.
     time_index: list
         A list containing the names of the columns in json that contain the start and end times of each word.
+    speaker_label: str
+        Speaker label.
 
     Returns:
     ...........
@@ -297,7 +307,9 @@ def process_language_feature(json_conf, df_list, text, language, measures, time_
     word_df, phrase_df, utterance_df, summ_df = df_list
 
     word_list = nltk.tokenize.word_tokenize(text)
-    summ_df = get_pause_feature(json_conf, summ_df, word_list, measures, time_index)
+    word_df, phrase_df, utterance_df, summ_df = get_pause_feature(
+        json_conf, word_df, phrase_df, utterance_df, summ_df, word_list, measures, time_index, speaker_label
+    )
 
     if language == 'en-us':
         tag_df = get_tag(text, tag_dict, measures)
