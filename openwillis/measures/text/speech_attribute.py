@@ -209,7 +209,7 @@ def speech_characteristics(json_conf, language='en-us', speaker_label=None):
 
                 if len(filter_json) > 0 and len(text) > 0:
                     word_df, phrase_df, utterance_df, summ_df = cutil.process_language_feature(filter_json, [word_df, phrase_df, utterance_df, summ_df], text, language,
-                                                               measures, ['start_time', 'end_time'])
+                                                               measures, ['start_time', 'end_time'], speaker_label=speaker_label)
             else:
                 text = filter_vosk(json_conf)
                 if len(text) > 0:
