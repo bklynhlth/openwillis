@@ -256,7 +256,7 @@ def get_pause_feature(json_conf, word_df, phrase_df, utterance_df, summ_df, word
     # Initialize variables
     pause_list = []
     file_dur = float(json_conf[-1][time_index[1]]) - float(json_conf[0][time_index[0]])
-    ros = (len(word)/ file_dur)*60
+    # ros = (len(word)/ file_dur)*60
 
     # Convert json_conf to a pandas DataFrame
     df_diff = pd.DataFrame(json_conf)
@@ -269,7 +269,7 @@ def get_pause_feature(json_conf, word_df, phrase_df, utterance_df, summ_df, word
     df_feature = get_stats(summ_df, ros, file_dur, pause_list, measures)
     return df_feature
 
-def process_language_feature(json_conf, df_list, text, language, measures, time_index, speaker_label=None):
+def process_language_feature(json_conf, df_list, text_list, text_indices, language, measures, time_index, speaker_label=None):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -281,8 +281,13 @@ def process_language_feature(json_conf, df_list, text, language, measures, time_
         JSON response object.
     df_list: list
         List of pandas dataframes.
-    text: str
-        Transcribed text.
+         word_df, phrase_df, utterance_df, summ_df
+    text_list: list
+        List of transcribed text.
+         split into phrases, utterances, and full text.
+    text_indices: list
+        List of indices for text_list.
+         for phrases and utterances.
     measures: dict
         A dictionary containing the names of the columns in the output dataframes.
     time_index: list
@@ -303,10 +308,13 @@ def process_language_feature(json_conf, df_list, text, language, measures, time_
 
     ------------------------------------------------------------------------------------------------------
     """
-    sentences = nltk.tokenize.sent_tokenize(text)
-    word_df, phrase_df, utterance_df, summ_df = df_list
 
+    word_df, phrase_df, utterance_df, summ_df = df_list
+    phrase_list, utterance_list, text = text_list
+    phrase_index, utterance_index = text_indices
+    # create a list of words from the text
     word_list = nltk.tokenize.word_tokenize(text)
+
     word_df, phrase_df, utterance_df, summ_df = get_pause_feature(
         json_conf, word_df, phrase_df, utterance_df, summ_df, word_list, measures, time_index, speaker_label
     )
