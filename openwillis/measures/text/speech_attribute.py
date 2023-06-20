@@ -202,9 +202,9 @@ def filter_transcribe(json_conf, speaker_label=None):
     # calculate time difference between each word
     for i, item in enumerate(filter_json):
         if i > 0:
-            item['time_diff'] = item['start_time'] - filter_json[i - 1]['end_time']
+            item['pause_diff'] = item['start_time'] - filter_json[i - 1]['end_time']
         else:
-            item['time_diff'] = 0
+            item['pause_diff'] = 0
 
     if speaker_label is not None:
         filter_json = [item for item in filter_json if item.get('speaker_label', '') == speaker_label]
