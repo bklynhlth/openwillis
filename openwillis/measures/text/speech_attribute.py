@@ -4,9 +4,11 @@
 # import the required packages
 import os
 import json
+import logging
+
+import nltk
 import pandas as pd
 
-import logging
 from openwillis.measures.text.util import characteristics_util as cutil
 
 logging.basicConfig(level=logging.INFO)
@@ -117,6 +119,14 @@ def filter_transcribe(json_conf, speaker_label=None):
 
     Returns:
     ...........
+    phrases: list
+        A list of phrases extracted from the JSON object.
+    phrases_idxs: list
+        A list of tuples containing the start and end indices of the phrases in the JSON object.
+    utterances: list
+        A list of utterances extracted from the JSON object.
+    utterances_idxs: list
+        A list of tuples containing the start and end indices of the utterances in the JSON object.
     text: str
         The text extracted from the JSON object.
          if speaker_label is not None, then only the text from the speaker label is extracted.
@@ -129,23 +139,77 @@ def filter_transcribe(json_conf, speaker_label=None):
 
     ------------------------------------------------------------------------------------------------------
     """
-    text = json_conf['results']['transcripts'][0].get('transcript', '')
     item_data = json_conf['results']['items']
+
+    # make a dictionary to map old indices to new indices
+    for i, item in enumerate(item_data):
+        item['old_idx'] = i
+    text = " ".join([item['alternatives'][0]['content'] for item in item_data if 'alternatives' in item])
+
+
+    # phrase-split
+    phrases = nltk.tokenize.sent_tokenize(text)
+    phrases_idxs = []
+
+    start_idx = 0
+    for phrase in phrases:
+        end_idx = start_idx + len(phrase.split()) - 1
+        phrases_idxs.append((start_idx, end_idx))
+        start_idx = end_idx + 1
+
+    # utterance-split
+    utterances = []
+    utterances_idxs = []
+
     if speaker_label is not None:
         speaker_labels = [item['speaker_label'] for item in item_data if 'speaker_label' in item]
 
         if speaker_label not in speaker_labels:
             raise ValueError(f'Speaker label {speaker_label} not found in the json response object.')
 
-        # filter the json data based on the speaker label
-        item_data2 = [item for item in item_data if item.get('speaker_label', '') == speaker_label]
+        # phrase-split for the speaker label
+        phrases_idxs2 = []
+        phrases2 = []
+        for i, phrase in enumerate(phrases_idxs):
+            start_idx = phrase[0]
+            if item_data[start_idx].get('speaker_label', '') == speaker_label:
+                phrases_idxs2.append(phrase)
+                phrases2.append(phrases[i])
 
-        # extract the text from the filtered json data
-        text_list = [item['alternatives'][0]['content'] for item in item_data2 if 'alternatives' in item]
-        text = " ".join(text_list)
+        phrases_idxs = phrases_idxs2
+        phrases = phrases2
 
+        # utterance-split for the speaker label
+        start_idx = 0
+        for i, item in enumerate(item_data):
+            if i > 0 and item.get('speaker_label', '') == speaker_label and item_data[i - 1].get('speaker_label', '') != speaker_label:
+                start_idx = i
+            elif i > 0 and item.get('speaker_label', '') != speaker_label and item_data[i - 1].get('speaker_label', '') == speaker_label:
+                utterances_idxs.append((start_idx, i - 1))
+                # create utterances texts
+                utterances.append(" ".join([item['alternatives'][0]['content'] for item in item_data[start_idx:i]]))
+
+        if start_idx not in [item[0] for item in utterances_idxs]:
+            utterances_idxs.append((start_idx, len(item_data) - 1))
+            utterances.append(" ".join([item['alternatives'][0]['content'] for item in item_data[start_idx:]]))
+
+    # entire transcript - by joining all the phrases
+    text = " ".join(phrases)
+
+    # filter json to only include items with start_time and end_time
     filter_json = [item for item in item_data if 'start_time' in item and 'end_time' in item]
-    return text, filter_json
+
+    # calculate time difference between each word
+    for i, item in enumerate(filter_json):
+        if i > 0:
+            item['time_diff'] = item['start_time'] - filter_json[i - 1]['end_time']
+        else:
+            item['time_diff'] = 0
+
+    if speaker_label is not None:
+        filter_json = [item for item in filter_json if item.get('speaker_label', '') == speaker_label]
+
+    return phrases, phrases_idxs, utterances, utterances_idxs, text, filter_json
 
 def filter_vosk(json_conf):
     """
@@ -205,7 +269,7 @@ def speech_characteristics(json_conf, language='en-us', speaker_label=None):
             cutil.download_nltk_resources()
 
             if is_amazon_transcribe(json_conf):
-                text, filter_json = filter_transcribe(json_conf, speaker_label=speaker_label)
+                phrases, phrases_idxs, utterances, utterances_idxs, text, filter_json = filter_transcribe(json_conf, speaker_label=speaker_label)
 
                 if len(filter_json) > 0 and len(text) > 0:
                     word_df, phrase_df, utterance_df, summ_df = cutil.process_language_feature(filter_json, [word_df, phrase_df, utterance_df, summ_df], text, language,
