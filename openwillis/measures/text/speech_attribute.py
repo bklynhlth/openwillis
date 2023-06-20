@@ -119,6 +119,7 @@ def filter_transcribe(json_conf, speaker_label=None):
     ...........
     text: str
         The text extracted from the JSON object.
+         if speaker_label is not None, then only the text from the speaker label is extracted.
     filter_json: list
         The filtered JSON object containing only the relevant data for processing.
 
@@ -137,10 +138,10 @@ def filter_transcribe(json_conf, speaker_label=None):
             raise ValueError(f'Speaker label {speaker_label} not found in the json response object.')
 
         # filter the json data based on the speaker label
-        item_data = [item for item in item_data if item.get('speaker_label', '') == speaker_label]
+        item_data2 = [item for item in item_data if item.get('speaker_label', '') == speaker_label]
 
         # extract the text from the filtered json data
-        text_list = [item['alternatives'][0]['content'] for item in item_data if 'alternatives' in item]
+        text_list = [item['alternatives'][0]['content'] for item in item_data2 if 'alternatives' in item]
         text = " ".join(text_list)
 
     filter_json = [item for item in item_data if 'start_time' in item and 'end_time' in item]
