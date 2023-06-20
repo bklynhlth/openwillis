@@ -282,15 +282,19 @@ def process_language_feature(json_conf, df_list, text, language, measures, time_
 
     Returns:
     ...........
-    tag_df: pandas dataframe
-        A dataframe containing the part-of-speech tags for the input text.
+    word_df: pandas dataframe
+        A dataframe containing word summary information
+    phrase_df: pandas dataframe
+        A dataframe containing phrase summary information
+    utterance_df: pandas dataframe
+        A dataframe containing utterance summary information
     summ_df: pandas dataframe
-        A dataframe containing the speech characteristics of the input text.
+        A dataframe containing summary information on the speech
 
     ------------------------------------------------------------------------------------------------------
     """
     sentences = nltk.tokenize.sent_tokenize(text)
-    tag_df, summ_df = df_list
+    word_df, phrase_df, utterance_df, summ_df = df_list
 
     word_list = nltk.tokenize.word_tokenize(text)
     summ_df = get_pause_feature(json_conf, summ_df, word_list, measures, time_index)
@@ -300,4 +304,4 @@ def process_language_feature(json_conf, df_list, text, language, measures, time_
 
         summ_df = get_tag_summ(tag_df, summ_df, word_list, measures)
         summ_df = get_sentiment(summ_df, word_list, text, measures)
-    return tag_df, summ_df
+    return word_df, phrase_df, utterance_df, summ_df
