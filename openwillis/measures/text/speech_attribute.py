@@ -36,16 +36,11 @@ def get_config():
     measures = json.load(file)
     return measures
 
-def create_empty_dataframes(measures):
+def create_empty_dataframes():
     """
     ------------------------------------------------------------------------------------------------------
 
     Creating empty measures dataframes
-
-    Parameters:
-    ...........
-    measures: dict
-        config file object
 
     Returns:
     ...........
@@ -202,7 +197,7 @@ def speech_characteristics(json_conf, language='en-us', speaker_label=None):
     ------------------------------------------------------------------------------------------------------
     """
     measures = get_config()
-    word_df, phrase_df, utterance_df, summ_df = create_empty_dataframes(measures)
+    word_df, phrase_df, utterance_df, summ_df = create_empty_dataframes()
 
     try:
         if bool(json_conf):
