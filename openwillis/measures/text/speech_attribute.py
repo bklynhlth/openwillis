@@ -224,14 +224,29 @@ def filter_vosk(json_conf):
 
     Returns:
     ...........
+    phrases: list
+        A list of phrases extracted from the JSON object.
+    phrases_idxs: list
+        A list of tuples containing the start and end indices of the phrases in the JSON object.
     text: str
-        The input text extracted from the JSON object.
+        The text extracted from the JSON object.
 
     ------------------------------------------------------------------------------------------------------
     """
     text_list = [word['word'] for word in json_conf if 'word' in word]
     text = " ".join(text_list)
-    return text
+
+    # phrase-split
+    phrases = nltk.tokenize.sent_tokenize(text)
+    phrases_idxs = []
+
+    start_idx = 0
+    for phrase in phrases:
+        end_idx = start_idx + len(phrase.split()) - 1
+        phrases_idxs.append((start_idx, end_idx))
+        start_idx = end_idx + 1
+
+    return phrases, phrases_idxs, text
 
 def speech_characteristics(json_conf, language='en-us', speaker_label=None):
     """
@@ -272,13 +287,15 @@ def speech_characteristics(json_conf, language='en-us', speaker_label=None):
                 phrases, phrases_idxs, utterances, utterances_idxs, text, filter_json = filter_transcribe(json_conf, speaker_label=speaker_label)
 
                 if len(filter_json) > 0 and len(text) > 0:
-                    word_df, phrase_df, utterance_df, summ_df = cutil.process_language_feature(filter_json, [word_df, phrase_df, utterance_df, summ_df], text, language,
-                                                               measures, ['start_time', 'end_time'], speaker_label=speaker_label)
+                    word_df, phrase_df, utterance_df, summ_df = cutil.process_language_feature(filter_json, [word_df, phrase_df, utterance_df, summ_df],
+                                                               [phrases, utterances, text], [phrases_idxs, utterances_idxs], language,
+                                                               measures, ['start_time', 'end_time'])
             else:
-                text = filter_vosk(json_conf)
+                phrases, phrases_idxs, text = filter_vosk(json_conf)
                 if len(text) > 0:
-                    word_df, phrase_df, utterance_df, summ_df = cutil.process_language_feature(json_conf, [word_df, phrase_df, utterance_df, summ_df], text, language, measures,
-                                                               ['start', 'end'])
+                    word_df, phrase_df, utterance_df, summ_df = cutil.process_language_feature(json_conf, [word_df, phrase_df, utterance_df, summ_df],
+                                                               [phrases, [], text], [phrases_idxs, []], language,
+                                                               measures, ['start', 'end'])
 
     except Exception as e:
         logger.error(f'Error in speech Characteristics {e}')
