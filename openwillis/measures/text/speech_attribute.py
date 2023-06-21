@@ -80,7 +80,9 @@ def create_empty_dataframes():
                                         "phrase_pause_length_mean", "phrase_pause_variability",
                                         "speech_percentage", "noun_percentage", "verb_percentage",
                                         "adjective_percentage", "pronoun_percentage", "sentiment_pos",
-                                        "sentiment_neg", "sentiment_neu", "sentiment_overall", "mattr"])
+                                        "sentiment_neg", "sentiment_neu", "sentiment_overall", "mattr",
+                                        "num_utterances", "mean_utterance_length_minutes", "mean_utterance_length_words",
+                                        "mean_pre_utterance_pause", "num_one_word_utterances"])
 
     return word_df, phrase_df, utterance_df, summ_df
 
