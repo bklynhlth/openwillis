@@ -276,7 +276,6 @@ def speech_characteristics(json_conf, language='en-us', speaker_label=None):
 
     ------------------------------------------------------------------------------------------------------
     """
-    measures = get_config()
     word_df, phrase_df, utterance_df, summ_df = create_empty_dataframes()
 
     try:
@@ -289,13 +288,13 @@ def speech_characteristics(json_conf, language='en-us', speaker_label=None):
                 if len(filter_json) > 0 and len(text) > 0:
                     word_df, phrase_df, utterance_df, summ_df = cutil.process_language_feature(filter_json, [word_df, phrase_df, utterance_df, summ_df],
                                                                [phrases, utterances, text], [phrases_idxs, utterances_idxs], language,
-                                                               measures, ['start_time', 'end_time'])
+                                                               ['start_time', 'end_time'])
             else:
                 phrases, phrases_idxs, text = filter_vosk(json_conf)
                 if len(text) > 0:
                     word_df, phrase_df, utterance_df, summ_df = cutil.process_language_feature(json_conf, [word_df, phrase_df, utterance_df, summ_df],
                                                                [phrases, [], text], [phrases_idxs, []], language,
-                                                               measures, ['start', 'end'])
+                                                               ['start', 'end'])
 
     except Exception as e:
         logger.error(f'Error in speech Characteristics {e}')

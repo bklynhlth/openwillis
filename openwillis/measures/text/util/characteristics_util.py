@@ -171,7 +171,7 @@ def get_tag_summ(json_conf, df_list, text_indices):
     
     return df_list
 
-def get_sentiment(df_list, text_list, measures):
+def get_sentiment(df_list, text_list):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -186,8 +186,6 @@ def get_sentiment(df_list, text_list, measures):
     text_list: list
         List of transcribed text.
             split into words, phrases, utterances, and full text.
-    measures: dict
-        A dictionary containing the names of the columns in the output dataframes.
 
     Returns:
     ...........
@@ -202,7 +200,7 @@ def get_sentiment(df_list, text_list, measures):
     sentiment = SentimentIntensityAnalyzer()
 
     # column names
-    cols = [measures['neg'], measures['neu'], measures['pos'], measures['compound'], measures['speech_mattr']]
+    cols = ['sentiment_neg', 'sentiment_neu', 'sentiment_pos', 'sentiment_overall', 'mattr']
 
     # word-level analysis
     for idx, w in enumerate(word_list):
@@ -463,7 +461,7 @@ def get_pause_feature(json_conf, df_list, text_indices, time_index):
 
     return df_feature
 
-def process_language_feature(json_conf, df_list, text_list, text_indices, language, measures, time_index):
+def process_language_feature(json_conf, df_list, text_list, text_indices, language, time_index):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -482,8 +480,6 @@ def process_language_feature(json_conf, df_list, text_list, text_indices, langua
     text_indices: list
         List of indices for text_list.
          for phrases and utterances.
-    measures: dict
-        A dictionary containing the names of the columns in the output dataframes.
     time_index: list
         A list containing the names of the columns in json that contain the start and end times of each word.
 
@@ -516,7 +512,7 @@ def process_language_feature(json_conf, df_list, text_list, text_indices, langua
             word_list = [word['word'] for word in json_conf if 'word' in word]
         text_list = [word_list] + text_list # add word list to text_list
 
-        df_list = get_sentiment(df_list, text_list, measures)
+        df_list = get_sentiment(df_list, text_list)
 
     word_df, phrase_df, utterance_df, summ_df = df_list
     return word_df, phrase_df, utterance_df, summ_df
