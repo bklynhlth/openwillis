@@ -82,11 +82,41 @@ def get_tag(json_conf, tag_dict):
         if tag[1] in tag_dict.keys():
             json_conf[i]['tag'] = tag_dict[tag[1]]
         else:
-            json_conf[i]['tag'] = tag[1]
+            json_conf[i]['tag'] = 'Other'
 
     return json_conf
 
-def get_tag_summ(tag_df, summ_df, word, measures):
+def get_part_of_speech(df, tags, index=0):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    This function calculates the proportions of verbs, pronouns, adjectives, and nouns in the
+     transcribed text, and adds them to the output dataframe df.
+
+    Parameters:
+    ...........
+    df: pandas dataframe
+        A dataframe containing the speech characteristics of the input text.
+    tags: list
+        A list of part-of-speech tags for the input text.
+    index: int
+        The index of the row in the output dataframe df.
+
+    Returns:
+    ...........
+    df: pandas dataframe
+        The updated df dataframe.
+
+    ------------------------------------------------------------------------------------------------------
+    """
+    df.loc[index, 'noun_percentage'] = 100*len(tags[tags == 'Noun']) / len(tags)
+    df.loc[index, 'verb_percentage'] = 100*len(tags[tags == 'Verb']) / len(tags)
+    df.loc[index, 'adjective_percentage'] = 100*len(tags[tags == 'Adjective']) / len(tags)
+    df.loc[index, 'pronoun_percentage'] = 100*len(tags[tags == 'Pronoun']) / len(tags)
+
+    return df
+
+def get_tag_summ(json_conf, df_list, text_indices):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -111,19 +141,35 @@ def get_tag_summ(tag_df, summ_df, word, measures):
 
     ------------------------------------------------------------------------------------------------------
     """
-    word_len = len(word) if len(word)>0 else 1
 
-    verb = len(tag_df[tag_df[measures['tag']] == 'Verb'])/word_len
-    pronoun = len(tag_df[tag_df[measures['tag']] == 'Pronoun'])/word_len
-    adj = len(tag_df[tag_df[measures['tag']] == 'Adjective'])/word_len
-    noun = len(tag_df[tag_df[measures['tag']] == 'Noun'])/word_len
+    word_df, phrase_df, utterance_df, summ_df = df_list
+    phrase_index, utterance_index = text_indices
 
-    tag_object = [len(word), verb, adj, pronoun, noun]
-    cols = [measures['tot_words'], measures['speech_verb'], measures['speech_adj'], measures['speech_pronoun'],
-            measures['speech_noun']]
+    df_conf = pd.DataFrame(json_conf)
 
-    summ_df.loc[0, cols] = tag_object
-    return summ_df
+    # word-level analysis
+    word_df['part_of_speech'] = df_conf['tag']
+
+    # phrase-level analysis
+    for j, pindex in enumerate(phrase_index):
+        prange = range(pindex[0], pindex[1] + 1)
+        phrase_tags = df_conf.loc[df_conf['old_idx'].isin(prange), 'tag']
+
+        phrase_df = get_part_of_speech(phrase_df, phrase_tags, j)
+
+    # utterance-level analysis
+    for j, uindex in enumerate(utterance_index):
+        urange = range(uindex[0], uindex[1] + 1)
+        utterance_tags = df_conf.loc[df_conf['old_idx'].isin(urange), 'tag']
+
+        utterance_df = get_part_of_speech(utterance_df, utterance_tags, j)
+
+    # file-level analysis
+    summ_df = get_part_of_speech(summ_df, df_conf['tag'])
+
+    df_list = [word_df, phrase_df, utterance_df, summ_df]
+    
+    return df_list
 
 def get_sentiment(summ_df, word, text, measures):
     """
@@ -270,7 +316,7 @@ def process_pause_feature(df_diff, df, index_list, time_index, level_name):
 
         df.loc[j, 'pause_variability'] = np.var(pauses)
         df.loc[j, 'mean_pause_length'] = np.mean(pauses)
-        df.loc[j, 'speech_percentage'] = 1 - np.sum(pauses)/(60*df.loc[j, f'{level_name}_length_minutes'])
+        df.loc[j, 'speech_percentage'] = 100*(1 - np.sum(pauses)/(60*df.loc[j, f'{level_name}_length_minutes']))
 
     df['words_per_min'] = df[f'{level_name}_length_words']/df[f'{level_name}_length_minutes']
     df['pauses_per_min'] = df['words_per_min']
@@ -312,7 +358,7 @@ def update_summ_df(df_diff, summ_df, time_index, word_df, phrase_df):
     summ_df['word_pause_variability'] = word_df['pre_word_pause'].var(skipna=True)
     summ_df['phrase_pause_length_mean'] = phrase_df['pre_phrase_pause'].mean(skipna=True)
     summ_df['phrase_pause_variability'] = phrase_df['pre_phrase_pause'].var(skipna=True)
-    summ_df['speech_percentage'] = 1 - df_diff.loc[1:, 'pause_diff'].sum()/(60*summ_df['speech_length_minutes'])
+    summ_df['speech_percentage'] = 100*(1 - df_diff.loc[1:, 'pause_diff'].sum()/(60*summ_df['speech_length_minutes']))
     return summ_df
 
 def get_pause_feature(json_conf, df_list, text_indices, time_index):
@@ -433,6 +479,6 @@ def process_language_feature(json_conf, df_list, text_list, text_indices, langua
     if language == 'en-us':
         json_conf = get_tag(json_conf, TAG_DICT)
 
-        summ_df = get_tag_summ(tag_df, summ_df, word_list, measures)
+        df_list = get_tag_summ(json_conf, df_list, text_indices)
         summ_df = get_sentiment(summ_df, word_list, text, measures)
     return word_df, phrase_df, utterance_df, summ_df
