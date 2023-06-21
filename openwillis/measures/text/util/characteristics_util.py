@@ -171,7 +171,7 @@ def get_tag_summ(json_conf, df_list, text_indices):
     
     return df_list
 
-def get_sentiment(summ_df, word, text, measures):
+def get_sentiment(df_list, text_list, measures):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -180,31 +180,60 @@ def get_sentiment(summ_df, word, text, measures):
 
     Parameters:
     ...........
-    summ_df: pandas dataframe
-        A dataframe containing the speech characteristics of the transcribed text.
-    word: list
-        The input text as a list of words.
-    text: str
-        The input text to be analyzed.
+    df_list: list
+        List of pandas dataframes.
+            word_df, phrase_df, utterance_df, summ_df
+    text_list: list
+        List of transcribed text.
+            split into words, phrases, utterances, and full text.
     measures: dict
         A dictionary containing the names of the columns in the output dataframes.
 
     Returns:
     ...........
-    summ_df: pandas dataframe
-        The updated summ_df dataframe.
+    df_list: list
+        List of updated pandas dataframes.
 
     ------------------------------------------------------------------------------------------------------
     """
+    word_df, phrase_df, utterance_df, summ_df = df_list
+    word_list, phrase_list, utterance_list, full_text = text_list
+
     sentiment = SentimentIntensityAnalyzer()
-    sentiment_dict = sentiment.polarity_scores(text)
 
-    mattr = get_mattr(word)
+    # column names
     cols = [measures['neg'], measures['neu'], measures['pos'], measures['compound'], measures['speech_mattr']]
-    sent_list = list(sentiment_dict.values()) + [mattr]
 
-    summ_df.loc[0, cols] = sent_list
-    return summ_df
+    # word-level analysis
+    for idx, w in enumerate(word_list):
+        sentiment_dict = sentiment.polarity_scores(w)
+        mattr = get_mattr(w)
+
+        word_df.loc[idx, cols] = list(sentiment_dict.values()) + [mattr]
+
+    # phrase-level analysis
+    for idx, p in enumerate(phrase_list):
+        sentiment_dict = sentiment.polarity_scores(p)
+        mattr = get_mattr(p)
+
+        phrase_df.loc[idx, cols] = list(sentiment_dict.values()) + [mattr]
+
+    # utterance-level analysis
+    for idx, u in enumerate(utterance_list):
+        sentiment_dict = sentiment.polarity_scores(u)
+        mattr = get_mattr(u)
+
+        utterance_df.loc[idx, cols] = list(sentiment_dict.values()) + [mattr]
+
+    # file-level analysis
+    sentiment_dict = sentiment.polarity_scores(full_text)
+    mattr = get_mattr(full_text)
+
+    summ_df.loc[0, cols] = list(sentiment_dict.values()) + [mattr]
+
+    df_list = [word_df, phrase_df, utterance_df, summ_df]
+
+    return df_list
 
 def get_mattr(word):
     """
@@ -478,7 +507,16 @@ def process_language_feature(json_conf, df_list, text_list, text_indices, langua
 
     if language == 'en-us':
         json_conf = get_tag(json_conf, TAG_DICT)
-
         df_list = get_tag_summ(json_conf, df_list, text_indices)
-        summ_df = get_sentiment(summ_df, word_list, text, measures)
+
+        # create word list from json_conf
+        if 'alternatives' in json_conf[0].keys():
+            word_list = [item['alternatives'][0]['content'] for item in json_conf]
+        else:
+            word_list = [word['word'] for word in json_conf if 'word' in word]
+        text_list = [word_list] + text_list # add word list to text_list
+
+        df_list = get_sentiment(df_list, text_list, measures)
+
+    word_df, phrase_df, utterance_df, summ_df = df_list
     return word_df, phrase_df, utterance_df, summ_df
