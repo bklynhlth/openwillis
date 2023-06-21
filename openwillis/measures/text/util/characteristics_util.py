@@ -349,19 +349,25 @@ def get_pause_feature(json_conf, df_list, text_indices, time_index):
     word_df['pre_word_pause'] = df_diff['pause_diff'].where(~df_diff['old_idx'].isin(phrase_starts), np.nan)
 
     # phrase-level analysis
-    utterance_starts = [uindex[0] for uindex in utterance_index] # get the start index of each utterance
     df_diff_phrase = df_diff[df_diff['old_idx'].isin(phrase_starts)] # get the rows corresponding to the start of each phrase
-    phrase_df['pre_phrase_pause'] = df_diff_phrase['pause_diff'].where(~df_diff_phrase['old_idx'].isin(utterance_starts), np.nan)
+
+    if len(utterance_index) > 0:
+        utterance_starts = [uindex[0] for uindex in utterance_index] # get the start index of each utterance    
+        phrase_df['pre_phrase_pause'] = df_diff_phrase['pause_diff'].where(~df_diff_phrase['old_idx'].isin(utterance_starts), np.nan)
+    else:
+        phrase_df['pre_phrase_pause'] = df_diff_phrase['pause_diff']
     phrase_df = phrase_df.reset_index(drop=True)
 
     phrase_df = process_pause_feature(df_diff, phrase_df, phrase_index, time_index, 'phrase')
 
     # utterance-level analysis
-    df_diff_utterance = df_diff[df_diff['old_idx'].isin(utterance_starts)] # get the rows corresponding to the start of each utterance
-    utterance_df['pre_utterance_pause'] = df_diff_utterance['pause_diff']
-    utterance_df = utterance_df.reset_index(drop=True)
+    if len(utterance_index) > 0:
+        df_diff_utterance = df_diff[df_diff['old_idx'].isin(utterance_starts)] # get the rows corresponding to the start of each utterance
 
-    utterance_df = process_pause_feature(df_diff, utterance_df, utterance_index, time_index, 'utterance')
+        utterance_df['pre_utterance_pause'] = df_diff_utterance['pause_diff']
+        utterance_df = utterance_df.reset_index(drop=True)
+
+        utterance_df = process_pause_feature(df_diff, utterance_df, utterance_index, time_index, 'utterance')
 
     # file-level analysis
     summ_df = update_summ_df(df_diff, summ_df, time_index, word_df, phrase_df)
