@@ -215,7 +215,95 @@ def get_stats(summ_df, ros, file_dur, pause_list, measures):
     summ_df.loc[0, col_list] = feature_list
     return summ_df
 
-def get_pause_feature(json_conf, word_df, phrase_df, utterance_df, summ_df, word, measures, time_index):
+def process_pause_feature(df_diff, df, index_list, time_index, level_name):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    This function calculates various pause-related speech characteristic features
+     at the phrase or utterance level and adds them to the output dataframe df.
+
+    Parameters:
+    ...........
+    df_diff: pandas dataframe
+        A dataframe containing the word-level information from the JSON response.
+    df: pandas dataframe
+        A dataframe containing phrase or utterance summary information
+    index_list: list
+        A list containing the indices of the first and last word in each phrase or utterance.
+    time_index: list
+        A list containing the names of the columns in json that contain the start and end times of each word.
+    level_name: str
+        The name of the level being analyzed (phrase or utterance).
+
+    Returns:
+    ...........
+    df: pandas dataframe
+        The updated df dataframe.
+
+    ------------------------------------------------------------------------------------------------------
+    """
+
+    if level_name not in ['phrase', 'utterance']:
+        logger.error('level_name must be either phrase or utterance')
+        return df
+
+    for j, index in enumerate(index_list):
+        rng = range(index[0], index[1]+1)
+        level_json = df_diff[df_diff['old_idx'].isin(rng)]
+
+        pauses = level_json['pause_diff'].values[1:] # remove first pause as it is the pre_pause
+
+        df.loc[j, f'{level_name}_length_minutes'] = (float(level_json.iloc[-1][time_index[1]]) - float(level_json.iloc[0][time_index[0]]))/60
+        df.loc[j, f'{level_name}_length_words'] = len(level_json)
+
+        df.loc[j, 'pause_variability'] = np.var(pauses)
+        df.loc[j, 'mean_pause_length'] = np.mean(pauses)
+        df.loc[j, 'speech_percentage'] = 1 - np.sum(pauses)/(60*df.loc[j, f'{level_name}_length_minutes'])
+
+    df['words_per_min'] = df[f'{level_name}_length_words']/df[f'{level_name}_length_minutes']
+    df['pauses_per_min'] = df['words_per_min']
+
+    return df
+
+def update_summ_df(df_diff, summ_df, time_index, word_df, phrase_df):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    This function calculates various pause-related speech characteristic features
+     at the file level and adds them to the output dataframe summ_df.
+
+    Parameters:
+    ...........
+    df_diff: pandas dataframe
+        A dataframe containing the word-level information from the JSON response.
+    summ_df: pandas dataframe
+        A dataframe containing the speech characteristics of the input text.
+    time_index: list
+        A list containing the names of the columns in json that contain the start and end times of each word.
+    word_df: pandas dataframe
+        A dataframe containing word summary information
+    phrase_df: pandas dataframe
+        A dataframe containing phrase summary information
+
+    Returns:
+    ...........
+    summ_df: pandas dataframe
+        The updated summ_df dataframe.
+
+    ------------------------------------------------------------------------------------------------------
+    """
+    summ_df['speech_length_minutes'] = [(float(df_diff.iloc[-1][time_index[1]]) - float(df_diff.iloc[0][time_index[0]]))/60]
+    summ_df['speech_length_words'] = len(df_diff)
+    summ_df['words_per_min'] = summ_df['speech_length_words']/summ_df['speech_length_minutes']
+    summ_df['pauses_per_min'] = summ_df['words_per_min']
+    summ_df['word_pause_length_mean'] = word_df['pre_word_pause'].mean(skipna=True)
+    summ_df['word_pause_variability'] = word_df['pre_word_pause'].var(skipna=True)
+    summ_df['phrase_pause_length_mean'] = phrase_df['pre_phrase_pause'].mean(skipna=True)
+    summ_df['phrase_pause_variability'] = phrase_df['pre_phrase_pause'].var(skipna=True)
+    summ_df['speech_percentage'] = 1 - df_diff.loc[1:, 'pause_diff'].sum()/(60*summ_df['speech_length_minutes'])
+    return summ_df
+
+def get_pause_feature(json_conf, df_list, text_indices, time_index):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -224,47 +312,62 @@ def get_pause_feature(json_conf, word_df, phrase_df, utterance_df, summ_df, word
     Parameters:
     ...........
     json_conf: list
-        JSON response objects.
-    word_df: pandas dataframe
-        A dataframe containing word summary information
-    phrase_df: pandas dataframe
-        A dataframe containing phrase summary information
-    utterance_df: pandas dataframe
-        A dataframe containing utterance summary information
-    summ_df: pandas dataframe
-        A dataframe containing the speech characteristics of the input text.
-    word: list
-        Transcribed text as a list of words.
-    measures: dict
-        A dictionary containing the names of the columns in the output dataframes.
+        JSON response object.
+    df_list: list
+        List of pandas dataframes.
+            word_df, phrase_df, utterance_df, summ_df
+    text_indices: list
+        List of indices for text_list.
+            for phrases and utterances.
     time_index: list
         A list containing the names of the columns in json that contain the start and end times of each word.
 
     Returns:
     ...........
-    df_feature: pandas dataframe
-        The updated pause feature dataframe.
+    df_feature: list
+        List of updated pandas dataframes.
+            word_df, phrase_df, utterance_df, summ_df
 
     ------------------------------------------------------------------------------------------------------
     """
     # Check if json_conf is empty
     if len(json_conf) <=0:
-        return summ_df
+        return df_list
 
-    # Initialize variables
-    pause_list = []
-    file_dur = float(json_conf[-1][time_index[1]]) - float(json_conf[0][time_index[0]])
-    # ros = (len(word)/ file_dur)*60
+    word_df, phrase_df, utterance_df, summ_df = df_list
+    phrase_index, utterance_index = text_indices
 
     # Convert json_conf to a pandas DataFrame
     df_diff = pd.DataFrame(json_conf)
 
     # Calculate the pause time between each word and add the results to pause_list
-    df_diff['pause_diff'] = df_diff[time_index[0]].astype(float) - df_diff[time_index[1]].astype(float).shift(1)
-    pause_list = df_diff['pause_diff'].tolist()[1:] # Remove the first NaN value
+    if 'pause_diff' not in df_diff.columns:
+        df_diff['pause_diff'] = df_diff[time_index[0]].astype(float) - df_diff[time_index[1]].astype(float).shift(1)
 
-    # Calculate speech characteristics related to pause and update summ_df
-    df_feature = get_stats(summ_df, ros, file_dur, pause_list, measures)
+    # word-level analysis
+    phrase_starts = [pindex[0] for pindex in phrase_index]
+    word_df['pre_word_pause'] = df_diff['pause_diff'].where(~df_diff['old_idx'].isin(phrase_starts), np.nan)
+
+    # phrase-level analysis
+    utterance_starts = [uindex[0] for uindex in utterance_index] # get the start index of each utterance
+    df_diff_phrase = df_diff[df_diff['old_idx'].isin(phrase_starts)] # get the rows corresponding to the start of each phrase
+    phrase_df['pre_phrase_pause'] = df_diff_phrase['pause_diff'].where(~df_diff_phrase['old_idx'].isin(utterance_starts), np.nan)
+    phrase_df = phrase_df.reset_index(drop=True)
+
+    phrase_df = process_pause_feature(df_diff, phrase_df, phrase_index, time_index, 'phrase')
+
+    # utterance-level analysis
+    df_diff_utterance = df_diff[df_diff['old_idx'].isin(utterance_starts)] # get the rows corresponding to the start of each utterance
+    utterance_df['pre_utterance_pause'] = df_diff_utterance['pause_diff']
+    utterance_df = utterance_df.reset_index(drop=True)
+
+    utterance_df = process_pause_feature(df_diff, utterance_df, utterance_index, time_index, 'utterance')
+
+    # file-level analysis
+    summ_df = update_summ_df(df_diff, summ_df, time_index, word_df, phrase_df)
+
+    df_feature = [word_df, phrase_df, utterance_df, summ_df]
+
     return df_feature
 
 def process_language_feature(json_conf, df_list, text_list, text_indices, language, measures, time_index):
@@ -309,10 +412,10 @@ def process_language_feature(json_conf, df_list, text_list, text_indices, langua
     phrase_list, utterance_list, text = text_list
     phrase_index, utterance_index = text_indices
     # create a list of words from the text
-    word_list = nltk.tokenize.word_tokenize(text)
+    # word_list = nltk.tokenize.word_tokenize(text)
 
     word_df, phrase_df, utterance_df, summ_df = get_pause_feature(
-        json_conf, word_df, phrase_df, utterance_df, summ_df, word_list, measures, time_index
+        json_conf, df_list, text_indices, time_index
     )
 
     if language == 'en-us':
