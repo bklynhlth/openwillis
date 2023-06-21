@@ -350,7 +350,7 @@ def process_pause_feature(df_diff, df, index_list, time_index, level_name):
 
     return df
 
-def update_summ_df(df_diff, summ_df, time_index, word_df, phrase_df):
+def update_summ_df(df_diff, summ_df, time_index, word_df, phrase_df, utterance_df):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -369,6 +369,8 @@ def update_summ_df(df_diff, summ_df, time_index, word_df, phrase_df):
         A dataframe containing word summary information
     phrase_df: pandas dataframe
         A dataframe containing phrase summary information
+    utterance_df: pandas dataframe
+        A dataframe containing utterance summary information
 
     Returns:
     ...........
@@ -386,6 +388,13 @@ def update_summ_df(df_diff, summ_df, time_index, word_df, phrase_df):
     summ_df['phrase_pause_length_mean'] = phrase_df['pre_phrase_pause'].mean(skipna=True)
     summ_df['phrase_pause_variability'] = phrase_df['pre_phrase_pause'].var(skipna=True)
     summ_df['speech_percentage'] = 100*(1 - df_diff.loc[1:, 'pause_diff'].sum()/(60*summ_df['speech_length_minutes']))
+    if len(utterance_df) > 0:
+        summ_df['num_utterances'] = len(utterance_df)
+        summ_df['mean_utterance_length_minutes'] = utterance_df['utterance_length_minutes'].mean()
+        summ_df['mean_utterance_length_words'] = utterance_df['utterance_length_words'].mean()
+        summ_df['mean_pre_utterance_pause'] = utterance_df['pre_utterance_pause'].mean(skipna=True)
+        summ_df['num_one_word_utterances'] = len(utterance_df[utterance_df['utterance_length_words'] == 1])
+
     return summ_df
 
 def get_pause_feature(json_conf, df_list, text_indices, time_index):
@@ -455,7 +464,7 @@ def get_pause_feature(json_conf, df_list, text_indices, time_index):
         utterance_df = process_pause_feature(df_diff, utterance_df, utterance_index, time_index, 'utterance')
 
     # file-level analysis
-    summ_df = update_summ_df(df_diff, summ_df, time_index, word_df, phrase_df)
+    summ_df = update_summ_df(df_diff, summ_df, time_index, word_df, phrase_df, utterance_df)
 
     df_feature = [word_df, phrase_df, utterance_df, summ_df]
 
