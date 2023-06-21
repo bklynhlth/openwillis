@@ -19,32 +19,6 @@ TAG_DICT = {'PRP': 'Pronoun', 'PRP$': 'Pronoun', 'VB': 'Verb', 'VBD': 'Verb', 'V
             'VBP': 'Verb', 'VBZ': 'Verb', 'JJ': 'Adjective', 'JJR': 'Adjective', 'JJS': 'Adjective', 'NN': 'Noun',
             'NNP': 'Noun', 'NNS': 'Noun'}
 
-def download_nltk_resources():
-    """
-    ------------------------------------------------------------------------------------------------------
-
-    This function downloads the required NLTK resources for processing text data.
-
-    Parameters:
-    ...........
-    None
-
-    Returns:
-    ...........
-    None
-
-    ------------------------------------------------------------------------------------------------------
-    """
-    try:
-        nltk.data.find('tokenizers/punkt')
-    except LookupError:
-        nltk.download('punkt')
-
-    try:
-        nltk.data.find('averaged_perceptron_tagger')
-    except LookupError:
-        nltk.download('averaged_perceptron_tagger')
-
 def get_tag(json_conf, tag_dict):
     """
     ------------------------------------------------------------------------------------------------------
@@ -171,6 +145,34 @@ def get_tag_summ(json_conf, df_list, text_indices):
     
     return df_list
 
+def get_mattr(word):
+    """
+    ------------------------------------------------------------------------------------------------------
+    This function calculates the Moving Average Type-Token Ratio (MATTR) of the input text using the
+    LexicalRichness library.
+
+    Parameters:
+    ...........
+    word : list
+        The input text as a list of words.
+
+    Returns:
+    ...........
+    mattr : float
+        The calculated MATTR value.
+
+    ------------------------------------------------------------------------------------------------------
+    """
+    filter_punc = list(value for value in word if value not in ['.','!','?'])
+    filter_punc = " ".join(str(filter_punc))
+    mattr = np.nan
+
+    lex_richness = LexicalRichness(filter_punc)
+    if lex_richness.words > 0:
+        mattr = lex_richness.mattr(window_size=lex_richness.words)
+
+    return mattr
+
 def get_sentiment(df_list, text_list):
     """
     ------------------------------------------------------------------------------------------------------
@@ -232,73 +234,6 @@ def get_sentiment(df_list, text_list):
     df_list = [word_df, phrase_df, utterance_df, summ_df]
 
     return df_list
-
-def get_mattr(word):
-    """
-    ------------------------------------------------------------------------------------------------------
-    This function calculates the Moving Average Type-Token Ratio (MATTR) of the input text using the
-    LexicalRichness library.
-
-    Parameters:
-    ...........
-    word : list
-        The input text as a list of words.
-
-    Returns:
-    ...........
-    mattr : float
-        The calculated MATTR value.
-
-    ------------------------------------------------------------------------------------------------------
-    """
-    filter_punc = list(value for value in word if value not in ['.','!','?'])
-    filter_punc = " ".join(str(filter_punc))
-    mattr = np.nan
-
-    lex_richness = LexicalRichness(filter_punc)
-    if lex_richness.words > 0:
-        mattr = lex_richness.mattr(window_size=lex_richness.words)
-
-    return mattr
-
-def get_stats(summ_df, ros, file_dur, pause_list, measures):
-    """
-    ------------------------------------------------------------------------------------------------------
-
-    This function calculates various speech characteristic features of the input text, including pause rate,
-    pause mean duration, and silence ratio, and adds them to the output dataframe summ_df.
-
-    Parameters:
-    ...........
-    summ_df: pandas dataframe
-        A dataframe containing the speech characteristics of the input text.
-    ros: float
-        The rate of speech of the input text.
-    file_dur: float
-        The duration of the input audio file.
-    pause_list: list
-        A list of pause durations in the input audio file.
-    measures: dict
-        A dictionary containing the names of the columns in the output dataframes.
-
-    Returns:
-    ...........
-    summ_df: pandas dataframe
-        The updated summ_df dataframe.
-
-    ------------------------------------------------------------------------------------------------------
-    """
-    pause_rate = (len(pause_list)/file_dur)*60
-
-    pause_meandur = np.mean(pause_list)
-    silence_ratio = np.sum(pause_list)/(file_dur - np.sum(pause_list))
-
-    feature_list = [ros, pause_rate, pause_meandur, silence_ratio]
-    col_list = [measures['rate_of_speech'], measures['pause_rate'], measures['pause_meandur'],
-                measures['silence_ratio']]
-
-    summ_df.loc[0, col_list] = feature_list
-    return summ_df
 
 def process_pause_feature(df_diff, df, index_list, time_index, level_name):
     """
