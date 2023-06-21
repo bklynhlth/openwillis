@@ -19,6 +19,32 @@ TAG_DICT = {'PRP': 'Pronoun', 'PRP$': 'Pronoun', 'VB': 'Verb', 'VBD': 'Verb', 'V
             'VBP': 'Verb', 'VBZ': 'Verb', 'JJ': 'Adjective', 'JJR': 'Adjective', 'JJS': 'Adjective', 'NN': 'Noun',
             'NNP': 'Noun', 'NNS': 'Noun'}
 
+def download_nltk_resources():
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    This function downloads the required NLTK resources for processing text data.
+
+    Parameters:
+    ...........
+    None
+
+    Returns:
+    ...........
+    None
+
+    ------------------------------------------------------------------------------------------------------
+    """
+    try:
+        nltk.data.find('tokenizers/punkt')
+    except LookupError:
+        nltk.download('punkt')
+
+    try:
+        nltk.data.find('averaged_perceptron_tagger')
+    except LookupError:
+        nltk.download('averaged_perceptron_tagger')
+
 def get_tag(json_conf, tag_dict):
     """
     ------------------------------------------------------------------------------------------------------
