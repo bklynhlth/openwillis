@@ -426,13 +426,7 @@ def process_language_feature(json_conf, df_list, text_list, text_indices, langua
     ------------------------------------------------------------------------------------------------------
     """
 
-    word_df, phrase_df, utterance_df, summ_df = df_list
-    phrase_list, utterance_list, text = text_list
-    phrase_index, utterance_index = text_indices
-    # create a list of words from the text
-    # word_list = nltk.tokenize.word_tokenize(text)
-
-    word_df, phrase_df, utterance_df, summ_df = get_pause_feature(
+    df_list = get_pause_feature(
         json_conf, df_list, text_indices, time_index
     )
 
