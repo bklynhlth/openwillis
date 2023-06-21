@@ -15,7 +15,7 @@ logging.basicConfig(level=logging.INFO)
 logger=logging.getLogger()
 
 #NLTK Tag list
-tag_dict = {'PRP': 'Pronoun', 'PRP$': 'Pronoun', 'VB': 'Verb', 'VBD': 'Verb', 'VBG': 'Verb' , 'VBN': 'Verb',
+TAG_DICT = {'PRP': 'Pronoun', 'PRP$': 'Pronoun', 'VB': 'Verb', 'VBD': 'Verb', 'VBG': 'Verb' , 'VBN': 'Verb',
             'VBP': 'Verb', 'VBZ': 'Verb', 'JJ': 'Adjective', 'JJR': 'Adjective', 'JJS': 'Adjective', 'NN': 'Noun',
             'NNP': 'Noun', 'NNS': 'Noun'}
 
@@ -45,34 +45,46 @@ def download_nltk_resources():
     except LookupError:
         nltk.download('averaged_perceptron_tagger')
 
-def get_tag(text, tag_dict, measures):
+def get_tag(json_conf, tag_dict):
     """
     ------------------------------------------------------------------------------------------------------
 
-    This function performs part-of-speech tagging on the input text using NLTK, and returns a
-    dataframe containing the part-of-speech tags.
+    This function performs part-of-speech tagging on the input text using NLTK, and returns an updated
+    json_conf list with the part-of-speech tags.
 
     Parameters:
     ...........
-    text: str
-        The input text to be analyzed.
+    json_conf: list
+        JSON response object.
     tag_dict: dict
         A dictionary mapping the NLTK tags to more readable tags.
-    measures: dict
-        A dictionary containing the names of the columns in the output dataframes.
 
     Returns:
     ...........
-    tag_df: pandas dataframe
-        A dataframe containing the part-of-speech tags for the input text.
+    json_conf: list
+        The updated json_conf list.
 
     ------------------------------------------------------------------------------------------------------
     """
-    tag_list = nltk.pos_tag(text.split())
+    if len(json_conf) <=0:
+        return json_conf
+    
+    if 'alternatives' not in json_conf[0].keys():
+        # local vosk transcriber
+        word_list = [word['word'] for word in json_conf if 'word' in word]
+    else:
+        # aws transcriber
+        word_list = [item['alternatives'][0]['content'] for item in json_conf]
 
-    tag_df = pd.DataFrame(tag_list, columns=[measures['word'], measures['tag']])
-    tag_df = tag_df.replace({measures['tag']: tag_dict})
-    return tag_df
+    tag_list = nltk.pos_tag(word_list)
+
+    for i, tag in enumerate(tag_list):
+        if tag[1] in tag_dict.keys():
+            json_conf[i]['tag'] = tag_dict[tag[1]]
+        else:
+            json_conf[i]['tag'] = tag[1]
+
+    return json_conf
 
 def get_tag_summ(tag_df, summ_df, word, measures):
     """
@@ -425,7 +437,7 @@ def process_language_feature(json_conf, df_list, text_list, text_indices, langua
     )
 
     if language == 'en-us':
-        tag_df = get_tag(text, tag_dict, measures)
+        json_conf = get_tag(json_conf, TAG_DICT)
 
         summ_df = get_tag_summ(tag_df, summ_df, word_list, measures)
         summ_df = get_sentiment(summ_df, word_list, text, measures)
