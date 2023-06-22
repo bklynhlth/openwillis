@@ -558,7 +558,7 @@ def process_language_feature(
          word_df, phrase_df, utterance_df, summ_df
     text_list: list
         List of transcribed text.
-         split into phrases, utterances, and full text.
+         split into words, phrases, utterances, and full text.
     text_indices: list
         List of indices for text_list.
          for phrases and utterances.
@@ -585,15 +585,6 @@ def process_language_feature(
     if language == "en-us":
         json_conf = get_tag(json_conf, TAG_DICT)
         df_list = get_tag_summ(json_conf, df_list, text_indices)
-
-        # create word list from json_conf
-        if "alternatives" in json_conf[0].keys():
-            word_list = [
-                item["alternatives"][0]["content"] for item in json_conf
-            ]
-        else:
-            word_list = [word["word"] for word in json_conf if "word" in word]
-        text_list = [word_list] + text_list  # add word list to text_list
 
         df_list = get_sentiment(df_list, text_list)
 
