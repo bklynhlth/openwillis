@@ -301,7 +301,37 @@ def get_sentiment(df_list, text_list):
     return df_list
 
 
-def process_pause_feature(df_diff, df, index_list, time_index, level_name):
+def get_no_of_syllables(text):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    This function calculates the number of syllables in the input text.
+
+    Parameters:
+    ...........
+    text: str
+        The input text.
+
+    Returns:
+    ...........
+    syllable_count: int
+        The number of syllables in the input text.
+
+    ---------------------------------------------------------------------------------------
+    """
+
+    syllable_tokenizer = nltk.tokenize.SyllableTokenizer()
+
+    # remove punctuation
+    punctuation = "!\"#$%&()*+,-./:;<=>?@[\]^_`{|}~"
+    syllables = [syllable_tokenizer.tokenize(token) for token in nltk.word_tokenize(text) if token not in punctuation]
+    # count the number of syllables in each word
+    syllable_count = sum([len(token) for token in syllables])
+
+    return syllable_count
+
+
+def process_pause_feature(df_diff, df, text_level, index_list, time_index, level_name):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -316,6 +346,8 @@ def process_pause_feature(df_diff, df, index_list, time_index, level_name):
          from the JSON response.
     df: pandas dataframe
         A dataframe containing phrase or utterance summary information
+    text_level: list
+        List of transcribed text at the phrase or utterance level.
     index_list: list
         A list containing the indices of the first and last word
          in each phrase or utterance.
@@ -341,9 +373,8 @@ def process_pause_feature(df_diff, df, index_list, time_index, level_name):
         rng = range(index[0], index[1] + 1)
         level_json = df_diff[df_diff["old_idx"].isin(rng)]
 
-        pauses = level_json["pause_diff"].values[
-            1:
-        ]  # remove first pause as it is the pre_pause
+        # remove first pause as it is the pre_pause
+        pauses = level_json["pause_diff"].values[1:]
 
         df.loc[j, f"{level_name}_length_minutes"] = (
             float(level_json.iloc[-1][time_index[1]])
@@ -359,6 +390,11 @@ def process_pause_feature(df_diff, df, index_list, time_index, level_name):
             )
         )
 
+        # articulation rate
+        df.loc[j, "syllables_per_min"] = (
+            get_no_of_syllables(text_level[j]) / df.loc[j, f"{level_name}_length_minutes"]
+        )
+
     df["words_per_min"] = (
         df[f"{level_name}_length_words"] / df[f"{level_name}_length_minutes"]
     )
@@ -368,7 +404,7 @@ def process_pause_feature(df_diff, df, index_list, time_index, level_name):
 
 
 def update_summ_df(
-    df_diff, summ_df, time_index, word_df, phrase_df, utterance_df
+    df_diff, summ_df, full_text, time_index, word_df, phrase_df, utterance_df
 ):
     """
     ------------------------------------------------------------------------------------------------------
@@ -410,6 +446,9 @@ def update_summ_df(
     summ_df["words_per_min"] = (
         summ_df["speech_length_words"] / summ_df["speech_length_minutes"]
     )
+    summ_df["syllables_per_min"] = (
+        get_no_of_syllables(full_text) / summ_df["speech_length_minutes"]
+    )
     summ_df["pauses_per_min"] = summ_df["words_per_min"]
     summ_df["word_pause_length_mean"] = word_df["pre_word_pause"].mean(
         skipna=True
@@ -446,7 +485,7 @@ def update_summ_df(
     return summ_df
 
 
-def get_pause_feature(json_conf, df_list, text_indices, time_index):
+def get_pause_feature(json_conf, df_list, text_list, text_indices, time_index):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -460,6 +499,9 @@ def get_pause_feature(json_conf, df_list, text_indices, time_index):
     df_list: list
         List of pandas dataframes.
             word_df, phrase_df, utterance_df, summ_df
+    text_list: list
+        List of transcribed text.
+            split into words, phrases, utterances, and full text.
     text_indices: list
         List of indices for text_list.
             for phrases and utterances.
@@ -480,6 +522,7 @@ def get_pause_feature(json_conf, df_list, text_indices, time_index):
         return df_list
 
     word_df, phrase_df, utterance_df, summ_df = df_list
+    word_list, phrase_list, utterance_list, full_text = text_list
     phrase_index, utterance_index = text_indices
 
     # Convert json_conf to a pandas DataFrame
@@ -497,6 +540,10 @@ def get_pause_feature(json_conf, df_list, text_indices, time_index):
     word_df["pre_word_pause"] = df_diff["pause_diff"].where(
         ~df_diff["old_idx"].isin(phrase_starts), np.nan
     )
+    # calculate the number of syllables in each word from the word list
+    word_df["no_syllables"] = [
+        get_no_of_syllables(word) for word in word_list
+    ]
 
     # phrase-level analysis
     df_diff_phrase = df_diff[
@@ -515,7 +562,7 @@ def get_pause_feature(json_conf, df_list, text_indices, time_index):
     phrase_df = phrase_df.reset_index(drop=True)
 
     phrase_df = process_pause_feature(
-        df_diff, phrase_df, phrase_index, time_index, "phrase"
+        df_diff, phrase_df, phrase_list, phrase_index, time_index, "phrase"
     )
 
     # utterance-level analysis
@@ -528,12 +575,12 @@ def get_pause_feature(json_conf, df_list, text_indices, time_index):
         utterance_df = utterance_df.reset_index(drop=True)
 
         utterance_df = process_pause_feature(
-            df_diff, utterance_df, utterance_index, time_index, "utterance"
+            df_diff, utterance_df, utterance_list, utterance_index, time_index, "utterance"
         )
 
     # file-level analysis
     summ_df = update_summ_df(
-        df_diff, summ_df, time_index, word_df, phrase_df, utterance_df
+        df_diff, summ_df, full_text, time_index, word_df, phrase_df, utterance_df
     )
 
     df_feature = [word_df, phrase_df, utterance_df, summ_df]
