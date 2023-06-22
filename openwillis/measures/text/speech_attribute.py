@@ -66,6 +66,7 @@ def create_empty_dataframes():
     word_df = pd.DataFrame(
         columns=[
             "pre_word_pause",
+            "no_syllables",
             "part_of_speech",
             "sentiment_pos",
             "sentiment_neg",
@@ -80,6 +81,7 @@ def create_empty_dataframes():
             "phrase_length_minutes",
             "phrase_length_words",
             "words_per_min",
+            "syllables_per_min",
             "pauses_per_min",
             "pause_variability",
             "mean_pause_length",
@@ -102,6 +104,7 @@ def create_empty_dataframes():
             "utterance_length_minutes",
             "utterance_length_words",
             "words_per_min",
+            "syllables_per_min",
             "pauses_per_min",
             "pause_variability",
             "mean_pause_length",
@@ -123,6 +126,7 @@ def create_empty_dataframes():
             "speech_length_minutes",
             "speech_length_words",
             "words_per_min",
+            "syllables_per_min",
             "pauses_per_min",
             "word_pause_length_mean",
             "word_pause_variability",
