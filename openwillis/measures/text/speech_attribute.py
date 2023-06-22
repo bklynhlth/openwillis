@@ -7,6 +7,7 @@ import json
 import logging
 
 import nltk
+import numpy as np
 import pandas as pd
 
 from openwillis.measures.text.util import characteristics_util as cutil
@@ -313,7 +314,7 @@ def filter_transcribe(json_conf, speaker_label=None):
                 filter_json[i - 1]["end_time"]
             )
         else:
-            item["pause_diff"] = 0
+            item["pause_diff"] = np.nan
 
     if speaker_label is not None:
         filter_json = [
