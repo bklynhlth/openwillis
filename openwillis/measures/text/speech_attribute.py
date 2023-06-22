@@ -367,6 +367,10 @@ def filter_vosk(json_conf):
     words = [word["word"] for word in json_conf if "word" in word]
     text = " ".join(words)
 
+    # make a dictionary to map old indices to new indices
+    for i, item in enumerate(json_conf):
+        item["old_idx"] = i
+
     # phrase-split
     phrases = nltk.tokenize.sent_tokenize(text)
     phrases_idxs = []
