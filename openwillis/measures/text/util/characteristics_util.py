@@ -627,7 +627,7 @@ def process_language_feature(
     ------------------------------------------------------------------------------------------------------
     """
 
-    df_list = get_pause_feature(json_conf, df_list, text_indices, time_index)
+    df_list = get_pause_feature(json_conf, df_list, text_list, text_indices, time_index)
 
     if language == "en-us":
         json_conf = get_tag(json_conf, TAG_DICT)
