@@ -301,7 +301,7 @@ def get_sentiment(df_list, text_list):
     return df_list
 
 
-def get_no_of_syllables(text):
+def get_num_of_syllables(text):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -392,7 +392,7 @@ def process_pause_feature(df_diff, df, text_level, index_list, time_index, level
 
         # articulation rate
         df.loc[j, "syllables_per_min"] = (
-            get_no_of_syllables(text_level[j]) / df.loc[j, f"{level_name}_length_minutes"]
+            get_num_of_syllables(text_level[j]) / df.loc[j, f"{level_name}_length_minutes"]
         )
 
     df["words_per_min"] = (
@@ -447,7 +447,7 @@ def update_summ_df(
         summ_df["speech_length_words"] / summ_df["speech_length_minutes"]
     )
     summ_df["syllables_per_min"] = (
-        get_no_of_syllables(full_text) / summ_df["speech_length_minutes"]
+        get_num_of_syllables(full_text) / summ_df["speech_length_minutes"]
     )
     summ_df["pauses_per_min"] = summ_df["words_per_min"]
     summ_df["word_pause_length_mean"] = word_df["pre_word_pause"].mean(
@@ -541,8 +541,8 @@ def get_pause_feature(json_conf, df_list, text_list, text_indices, time_index):
         ~df_diff["old_idx"].isin(phrase_starts), np.nan
     )
     # calculate the number of syllables in each word from the word list
-    word_df["no_syllables"] = [
-        get_no_of_syllables(word) for word in word_list
+    word_df["num_syllables"] = [
+        get_num_of_syllables(word) for word in word_list
     ]
 
     # phrase-level analysis

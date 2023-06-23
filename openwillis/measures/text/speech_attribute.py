@@ -66,7 +66,7 @@ def create_empty_dataframes():
     word_df = pd.DataFrame(
         columns=[
             "pre_word_pause",
-            "no_syllables",
+            "num_syllables",
             "part_of_speech",
             "sentiment_pos",
             "sentiment_neg",
