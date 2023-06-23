@@ -459,7 +459,10 @@ def speech_characteristics(json_conf, language="en-us", speaker_label=None):
                         language,
                         ["start", "end"],
                     )
-
+            
+            # if utterance_df is empty, then add a row of NaNs
+            if utterance_df.empty:
+                utterance_df.loc[0] = np.nan
     except Exception as e:
         logger.error(f"Error in speech Characteristics {e}")
 
