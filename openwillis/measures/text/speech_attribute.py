@@ -354,11 +354,6 @@ def filter_vosk(json_conf):
     ...........
     words: list
         A list of words extracted from the JSON object.
-    phrases: list
-        A list of phrases extracted from the JSON object.
-    phrases_idxs: list
-        A list of tuples containing
-         the start and end indices of the phrases in the JSON object.
     text: str
         The text extracted from the JSON object.
 
@@ -371,17 +366,7 @@ def filter_vosk(json_conf):
     for i, item in enumerate(json_conf):
         item["old_idx"] = i
 
-    # phrase-split
-    phrases = nltk.tokenize.sent_tokenize(text)
-    phrases_idxs = []
-
-    start_idx = 0
-    for phrase in phrases:
-        end_idx = start_idx + len(phrase.split()) - 1
-        phrases_idxs.append((start_idx, end_idx))
-        start_idx = end_idx + 1
-
-    return words, phrases, phrases_idxs, text
+    return words, text
 
 
 def speech_characteristics(json_conf, language="en-us", speaker_label=None):
@@ -444,7 +429,7 @@ def speech_characteristics(json_conf, language="en-us", speaker_label=None):
                         ["start_time", "end_time"],
                     )
             else:
-                words, phrases, phrases_idxs, text = filter_vosk(json_conf)
+                words, text = filter_vosk(json_conf)
                 if len(text) > 0:
                     (
                         word_df,
@@ -454,12 +439,15 @@ def speech_characteristics(json_conf, language="en-us", speaker_label=None):
                     ) = cutil.process_language_feature(
                         json_conf,
                         [word_df, phrase_df, utterance_df, summ_df],
-                        [words, phrases, [], text],
-                        [phrases_idxs, []],
+                        [words, [], [], text],
+                        [[], []],
                         language,
                         ["start", "end"],
                     )
             
+            # if phrase_df is empty, then add a row of NaNs
+            if phrase_df.empty:
+                phrase_df.loc[0] = np.nan
             # if utterance_df is empty, then add a row of NaNs
             if utterance_df.empty:
                 utterance_df.loc[0] = np.nan
