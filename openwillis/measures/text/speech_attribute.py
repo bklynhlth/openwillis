@@ -118,6 +118,7 @@ def create_empty_dataframes():
             "sentiment_neu",
             "sentiment_overall",
             "mattr",
+            "interrupt_flag",
         ]
     )
 
@@ -147,6 +148,7 @@ def create_empty_dataframes():
             "mean_utterance_length_words",
             "mean_pre_utterance_pause",
             "num_one_word_utterances",
+            "num_interrupts",
         ]
     )
 
