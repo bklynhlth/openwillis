@@ -481,6 +481,7 @@ def update_summ_df(
         summ_df["num_one_word_turns"] = len(
             turn_df[turn_df["turn_length_words"] == 1]
         )
+        summ_df["num_interrupts"] = sum(turn_df["interrupt_flag"])
 
     return summ_df
 
@@ -572,6 +573,13 @@ def get_pause_feature(json_conf, df_list, text_list, text_indices, time_index):
         ]  # get the rows corresponding to the start of each turn
 
         turn_df["pre_turn_pause"] = df_diff_turn["pause_diff"]
+        turn_df["interrupt_flag"] = False
+        # set pre_turn_pause to 0 if negative (due to overlapping turns)
+        # and set interrupt_flag to True
+        negative_pause = turn_df["pre_turn_pause"] < 0
+        turn_df.loc[negative_pause, "pre_turn_pause"] = 0
+        turn_df.loc[negative_pause, "interrupt_flag"] = True
+
         turn_df = turn_df.reset_index(drop=True)
 
         turn_df = process_pause_feature(
