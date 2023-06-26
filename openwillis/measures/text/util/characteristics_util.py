@@ -172,8 +172,8 @@ def get_tag_summ(json_conf, df_list, text_indices):
     ------------------------------------------------------------------------------------------------------
     """
 
-    word_df, phrase_df, utterance_df, summ_df = df_list
-    phrase_index, utterance_index = text_indices
+    word_df, phrase_df, turn_df, summ_df = df_list
+    phrase_index, turn_index = text_indices
 
     df_conf = pd.DataFrame(json_conf)
 
@@ -187,17 +187,17 @@ def get_tag_summ(json_conf, df_list, text_indices):
 
         phrase_df = get_part_of_speech(phrase_df, phrase_tags, j)
 
-    # utterance-level analysis
-    for j, uindex in enumerate(utterance_index):
+    # turn-level analysis
+    for j, uindex in enumerate(turn_index):
         urange = range(uindex[0], uindex[1] + 1)
-        utterance_tags = df_conf.loc[df_conf["old_idx"].isin(urange), "tag"]
+        turn_tags = df_conf.loc[df_conf["old_idx"].isin(urange), "tag"]
 
-        utterance_df = get_part_of_speech(utterance_df, utterance_tags, j)
+        turn_df = get_part_of_speech(turn_df, turn_tags, j)
 
     # file-level analysis
     summ_df = get_part_of_speech(summ_df, df_conf["tag"])
 
-    df_list = [word_df, phrase_df, utterance_df, summ_df]
+    df_list = [word_df, phrase_df, turn_df, summ_df]
 
     return df_list
 
@@ -243,10 +243,10 @@ def get_sentiment(df_list, text_list):
     ...........
     df_list: list
         List of pandas dataframes.
-            word_df, phrase_df, utterance_df, summ_df
+            word_df, phrase_df, turn_df, summ_df
     text_list: list
         List of transcribed text.
-            split into words, phrases, utterances, and full text.
+            split into words, phrases, turns, and full text.
 
     Returns:
     ...........
@@ -255,8 +255,8 @@ def get_sentiment(df_list, text_list):
 
     ------------------------------------------------------------------------------------------------------
     """
-    word_df, phrase_df, utterance_df, summ_df = df_list
-    word_list, phrase_list, utterance_list, full_text = text_list
+    word_df, phrase_df, turn_df, summ_df = df_list
+    word_list, phrase_list, turn_list, full_text = text_list
 
     sentiment = SentimentIntensityAnalyzer()
 
@@ -283,12 +283,12 @@ def get_sentiment(df_list, text_list):
 
         phrase_df.loc[idx, cols] = list(sentiment_dict.values()) + [mattr]
 
-    # utterance-level analysis
-    for idx, u in enumerate(utterance_list):
+    # turn-level analysis
+    for idx, u in enumerate(turn_list):
         sentiment_dict = sentiment.polarity_scores(u)
         mattr = get_mattr(u)
 
-        utterance_df.loc[idx, cols] = list(sentiment_dict.values()) + [mattr]
+        turn_df.loc[idx, cols] = list(sentiment_dict.values()) + [mattr]
 
     # file-level analysis
     sentiment_dict = sentiment.polarity_scores(full_text)
@@ -296,7 +296,7 @@ def get_sentiment(df_list, text_list):
 
     summ_df.loc[0, cols] = list(sentiment_dict.values()) + [mattr]
 
-    df_list = [word_df, phrase_df, utterance_df, summ_df]
+    df_list = [word_df, phrase_df, turn_df, summ_df]
 
     return df_list
 
@@ -336,7 +336,7 @@ def process_pause_feature(df_diff, df, text_level, index_list, time_index, level
     ------------------------------------------------------------------------------------------------------
 
     This function calculates various pause-related speech
-     characteristic features at the phrase or utterance
+     characteristic features at the phrase or turn
      level and adds them to the output dataframe df.
 
     Parameters:
@@ -345,17 +345,17 @@ def process_pause_feature(df_diff, df, text_level, index_list, time_index, level
         A dataframe containing the word-level information
          from the JSON response.
     df: pandas dataframe
-        A dataframe containing phrase or utterance summary information
+        A dataframe containing phrase or turn summary information
     text_level: list
-        List of transcribed text at the phrase or utterance level.
+        List of transcribed text at the phrase or turn level.
     index_list: list
         A list containing the indices of the first and last word
-         in each phrase or utterance.
+         in each phrase or turn.
     time_index: list
         A list containing the names of the columns in json that contain
          the start and end times of each word.
     level_name: str
-        The name of the level being analyzed (phrase or utterance).
+        The name of the level being analyzed (phrase or turn).
 
     Returns:
     ...........
@@ -365,8 +365,8 @@ def process_pause_feature(df_diff, df, text_level, index_list, time_index, level
     ------------------------------------------------------------------------------------------------------
     """
 
-    if level_name not in ["phrase", "utterance"]:
-        logger.error("level_name must be either phrase or utterance")
+    if level_name not in ["phrase", "turn"]:
+        logger.error("level_name must be either phrase or turn")
         return df
 
     for j, index in enumerate(index_list):
@@ -404,7 +404,7 @@ def process_pause_feature(df_diff, df, text_level, index_list, time_index, level
 
 
 def update_summ_df(
-    df_diff, summ_df, full_text, time_index, word_df, phrase_df, utterance_df
+    df_diff, summ_df, full_text, time_index, word_df, phrase_df, turn_df
 ):
     """
     ------------------------------------------------------------------------------------------------------
@@ -426,8 +426,8 @@ def update_summ_df(
         A dataframe containing word summary information
     phrase_df: pandas dataframe
         A dataframe containing phrase summary information
-    utterance_df: pandas dataframe
-        A dataframe containing utterance summary information
+    turn_df: pandas dataframe
+        A dataframe containing turn summary information
 
     Returns:
     ...........
@@ -467,19 +467,19 @@ def update_summ_df(
         - df_diff.loc[1:, "pause_diff"].sum()
         / (60 * summ_df["speech_length_minutes"])
     )
-    if len(utterance_df) > 0:
-        summ_df["num_utterances"] = len(utterance_df)
-        summ_df["mean_utterance_length_minutes"] = utterance_df[
-            "utterance_length_minutes"
+    if len(turn_df) > 0:
+        summ_df["num_turns"] = len(turn_df)
+        summ_df["mean_turn_length_minutes"] = turn_df[
+            "turn_length_minutes"
         ].mean()
-        summ_df["mean_utterance_length_words"] = utterance_df[
-            "utterance_length_words"
+        summ_df["mean_turn_length_words"] = turn_df[
+            "turn_length_words"
         ].mean()
-        summ_df["mean_pre_utterance_pause"] = utterance_df[
-            "pre_utterance_pause"
+        summ_df["mean_pre_turn_pause"] = turn_df[
+            "pre_turn_pause"
         ].mean(skipna=True)
-        summ_df["num_one_word_utterances"] = len(
-            utterance_df[utterance_df["utterance_length_words"] == 1]
+        summ_df["num_one_word_turns"] = len(
+            turn_df[turn_df["turn_length_words"] == 1]
         )
 
     return summ_df
@@ -498,13 +498,13 @@ def get_pause_feature(json_conf, df_list, text_list, text_indices, time_index):
         JSON response object.
     df_list: list
         List of pandas dataframes.
-            word_df, phrase_df, utterance_df, summ_df
+            word_df, phrase_df, turn_df, summ_df
     text_list: list
         List of transcribed text.
-            split into words, phrases, utterances, and full text.
+            split into words, phrases, turns, and full text.
     text_indices: list
         List of indices for text_list.
-            for phrases and utterances.
+            for phrases and turns.
     time_index: list
         A list containing the names of the columns
          in json that contain the start and end times of each word.
@@ -513,7 +513,7 @@ def get_pause_feature(json_conf, df_list, text_list, text_indices, time_index):
     ...........
     df_feature: list
         List of updated pandas dataframes.
-            word_df, phrase_df, utterance_df, summ_df
+            word_df, phrase_df, turn_df, summ_df
 
     ------------------------------------------------------------------------------------------------------
     """
@@ -521,9 +521,9 @@ def get_pause_feature(json_conf, df_list, text_list, text_indices, time_index):
     if len(json_conf) <= 0:
         return df_list
 
-    word_df, phrase_df, utterance_df, summ_df = df_list
-    word_list, phrase_list, utterance_list, full_text = text_list
-    phrase_index, utterance_index = text_indices
+    word_df, phrase_df, turn_df, summ_df = df_list
+    word_list, phrase_list, turn_list, full_text = text_list
+    phrase_index, turn_index = text_indices
 
     # Convert json_conf to a pandas DataFrame
     df_diff = pd.DataFrame(json_conf)
@@ -550,12 +550,12 @@ def get_pause_feature(json_conf, df_list, text_list, text_indices, time_index):
         df_diff["old_idx"].isin(phrase_starts)
     ]  # get the rows corresponding to the start of each phrase
 
-    if len(utterance_index) > 0:
-        utterance_starts = [
-            uindex[0] for uindex in utterance_index
-        ]  # get the start index of each utterance
+    if len(turn_index) > 0:
+        turn_starts = [
+            uindex[0] for uindex in turn_index
+        ]  # get the start index of each turn
         phrase_df["pre_phrase_pause"] = df_diff_phrase["pause_diff"].where(
-            ~df_diff_phrase["old_idx"].isin(utterance_starts), np.nan
+            ~df_diff_phrase["old_idx"].isin(turn_starts), np.nan
         )
     else:
         phrase_df["pre_phrase_pause"] = df_diff_phrase["pause_diff"]
@@ -565,25 +565,25 @@ def get_pause_feature(json_conf, df_list, text_list, text_indices, time_index):
         df_diff, phrase_df, phrase_list, phrase_index, time_index, "phrase"
     )
 
-    # utterance-level analysis
-    if len(utterance_index) > 0:
-        df_diff_utterance = df_diff[
-            df_diff["old_idx"].isin(utterance_starts)
-        ]  # get the rows corresponding to the start of each utterance
+    # turn-level analysis
+    if len(turn_index) > 0:
+        df_diff_turn = df_diff[
+            df_diff["old_idx"].isin(turn_starts)
+        ]  # get the rows corresponding to the start of each turn
 
-        utterance_df["pre_utterance_pause"] = df_diff_utterance["pause_diff"]
-        utterance_df = utterance_df.reset_index(drop=True)
+        turn_df["pre_turn_pause"] = df_diff_turn["pause_diff"]
+        turn_df = turn_df.reset_index(drop=True)
 
-        utterance_df = process_pause_feature(
-            df_diff, utterance_df, utterance_list, utterance_index, time_index, "utterance"
+        turn_df = process_pause_feature(
+            df_diff, turn_df, turn_list, turn_index, time_index, "turn"
         )
 
     # file-level analysis
     summ_df = update_summ_df(
-        df_diff, summ_df, full_text, time_index, word_df, phrase_df, utterance_df
+        df_diff, summ_df, full_text, time_index, word_df, phrase_df, turn_df
     )
 
-    df_feature = [word_df, phrase_df, utterance_df, summ_df]
+    df_feature = [word_df, phrase_df, turn_df, summ_df]
 
     return df_feature
 
@@ -602,13 +602,13 @@ def process_language_feature(
         JSON response object.
     df_list: list
         List of pandas dataframes.
-         word_df, phrase_df, utterance_df, summ_df
+         word_df, phrase_df, turn_df, summ_df
     text_list: list
         List of transcribed text.
-         split into words, phrases, utterances, and full text.
+         split into words, phrases, turns, and full text.
     text_indices: list
         List of indices for text_list.
-         for phrases and utterances.
+         for phrases and turns.
     time_index: list
         A list containing the names of the columns in json that contain the
          start and end times of each word.
@@ -619,8 +619,8 @@ def process_language_feature(
         A dataframe containing word summary information
     phrase_df: pandas dataframe
         A dataframe containing phrase summary information
-    utterance_df: pandas dataframe
-        A dataframe containing utterance summary information
+    turn_df: pandas dataframe
+        A dataframe containing turn summary information
     summ_df: pandas dataframe
         A dataframe containing summary information on the speech
 
@@ -635,5 +635,5 @@ def process_language_feature(
 
         df_list = get_sentiment(df_list, text_list)
 
-    word_df, phrase_df, utterance_df, summ_df = df_list
-    return word_df, phrase_df, utterance_df, summ_df
+    word_df, phrase_df, turn_df, summ_df = df_list
+    return word_df, phrase_df, turn_df, summ_df

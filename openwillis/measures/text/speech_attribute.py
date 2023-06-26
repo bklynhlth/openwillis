@@ -55,8 +55,8 @@ def create_empty_dataframes():
         A dataframe containing word summary information
     phrase_df: pandas dataframe
         A dataframe containing phrase summary information
-    utterance_df: pandas dataframe
-        A dataframe containing utterance summary information
+    turn_df: pandas dataframe
+        A dataframe containing turn summary information
     summ_df: pandas dataframe
         A dataframe containing summary information on the speech
 
@@ -98,11 +98,11 @@ def create_empty_dataframes():
         ]
     )
 
-    utterance_df = pd.DataFrame(
+    turn_df = pd.DataFrame(
         columns=[
-            "pre_utterance_pause",
-            "utterance_length_minutes",
-            "utterance_length_words",
+            "pre_turn_pause",
+            "turn_length_minutes",
+            "turn_length_words",
             "words_per_min",
             "syllables_per_min",
             "pauses_per_min",
@@ -143,16 +143,16 @@ def create_empty_dataframes():
             "sentiment_neu",
             "sentiment_overall",
             "mattr",
-            "num_utterances",
-            "mean_utterance_length_minutes",
-            "mean_utterance_length_words",
-            "mean_pre_utterance_pause",
-            "num_one_word_utterances",
+            "num_turns",
+            "mean_turn_length_minutes",
+            "mean_turn_length_words",
+            "mean_pre_turn_pause",
+            "num_one_word_turns",
             "num_interrupts",
         ]
     )
 
-    return word_df, phrase_df, utterance_df, summ_df
+    return word_df, phrase_df, turn_df, summ_df
 
 
 def is_amazon_transcribe(json_conf):
@@ -200,11 +200,11 @@ def filter_transcribe(json_conf, speaker_label=None):
     phrases_idxs: list
         A list of tuples containing
          the start and end indices of the phrases in the JSON object.
-    utterances: list
-        A list of utterances extracted from the JSON object.
-    utterances_idxs: list
+    turns: list
+        A list of turns extracted from the JSON object.
+    turns_idxs: list
         A list of tuples containing
-         the start and end indices of the utterances in the JSON object.
+         the start and end indices of the turns in the JSON object.
     text: str
         The text extracted from the JSON object.
          if speaker_label is not None,
@@ -242,9 +242,9 @@ def filter_transcribe(json_conf, speaker_label=None):
         phrases_idxs.append((start_idx, end_idx))
         start_idx = end_idx + 1
 
-    # utterance-split
-    utterances = []
-    utterances_idxs = []
+    # turn-split
+    turns = []
+    turns_idxs = []
 
     if speaker_label is not None:
         speaker_labels = [
@@ -270,7 +270,7 @@ def filter_transcribe(json_conf, speaker_label=None):
         phrases_idxs = phrases_idxs2
         phrases = phrases2
 
-        # utterance-split for the speaker label
+        # turn-split for the speaker label
         start_idx = 0
         for i, item in enumerate(item_data):
             if (
@@ -284,9 +284,9 @@ def filter_transcribe(json_conf, speaker_label=None):
                 and item.get("speaker_label", "") != speaker_label
                 and item_data[i - 1].get("speaker_label", "") == speaker_label
             ):
-                utterances_idxs.append((start_idx, i - 1))
-                # create utterances texts
-                utterances.append(
+                turns_idxs.append((start_idx, i - 1))
+                # create turns texts
+                turns.append(
                     " ".join(
                         [
                             item["alternatives"][0]["content"]
@@ -295,9 +295,9 @@ def filter_transcribe(json_conf, speaker_label=None):
                     )
                 )
 
-        if start_idx not in [item[0] for item in utterances_idxs]:
-            utterances_idxs.append((start_idx, len(item_data) - 1))
-            utterances.append(
+        if start_idx not in [item[0] for item in turns_idxs]:
+            turns_idxs.append((start_idx, len(item_data) - 1))
+            turns.append(
                 " ".join(
                     [
                         item["alternatives"][0]["content"]
@@ -335,8 +335,8 @@ def filter_transcribe(json_conf, speaker_label=None):
     words = [word["alternatives"][0]["content"] for word in filter_json]
 
     return (
-        words, phrases, phrases_idxs, utterances,
-        utterances_idxs, text, filter_json
+        words, phrases, phrases_idxs, turns,
+        turns_idxs, text, filter_json
     )
 
 
@@ -392,14 +392,14 @@ def speech_characteristics(json_conf, language="en-us", speaker_label=None):
         A dataframe containing word summary information
     phrase_df: pandas dataframe
         A dataframe containing phrase summary information
-    utterance_df: pandas dataframe
-        A dataframe containing utterance summary information
+    turn_df: pandas dataframe
+        A dataframe containing turn summary information
     summ_df: pandas dataframe
         A dataframe containing summary information on the speech
 
     ------------------------------------------------------------------------------------------------------
     """
-    word_df, phrase_df, utterance_df, summ_df = create_empty_dataframes()
+    word_df, phrase_df, turn_df, summ_df = create_empty_dataframes()
 
     try:
         if bool(json_conf):
@@ -410,8 +410,8 @@ def speech_characteristics(json_conf, language="en-us", speaker_label=None):
                     words,
                     phrases,
                     phrases_idxs,
-                    utterances,
-                    utterances_idxs,
+                    turns,
+                    turns_idxs,
                     text,
                     filter_json,
                 ) = filter_transcribe(json_conf, speaker_label=speaker_label)
@@ -420,13 +420,13 @@ def speech_characteristics(json_conf, language="en-us", speaker_label=None):
                     (
                         word_df,
                         phrase_df,
-                        utterance_df,
+                        turn_df,
                         summ_df,
                     ) = cutil.process_language_feature(
                         filter_json,
-                        [word_df, phrase_df, utterance_df, summ_df],
-                        [words, phrases, utterances, text],
-                        [phrases_idxs, utterances_idxs],
+                        [word_df, phrase_df, turn_df, summ_df],
+                        [words, phrases, turns, text],
+                        [phrases_idxs, turns_idxs],
                         language,
                         ["start_time", "end_time"],
                     )
@@ -436,11 +436,11 @@ def speech_characteristics(json_conf, language="en-us", speaker_label=None):
                     (
                         word_df,
                         phrase_df,
-                        utterance_df,
+                        turn_df,
                         summ_df,
                     ) = cutil.process_language_feature(
                         json_conf,
-                        [word_df, phrase_df, utterance_df, summ_df],
+                        [word_df, phrase_df, turn_df, summ_df],
                         [words, [], [], text],
                         [[], []],
                         language,
@@ -450,11 +450,11 @@ def speech_characteristics(json_conf, language="en-us", speaker_label=None):
             # if phrase_df is empty, then add a row of NaNs
             if phrase_df.empty:
                 phrase_df.loc[0] = np.nan
-            # if utterance_df is empty, then add a row of NaNs
-            if utterance_df.empty:
-                utterance_df.loc[0] = np.nan
+            # if turn_df is empty, then add a row of NaNs
+            if turn_df.empty:
+                turn_df.loc[0] = np.nan
     except Exception as e:
         logger.error(f"Error in speech Characteristics {e}")
 
     finally:
-        return word_df, phrase_df, utterance_df, summ_df
+        return word_df, phrase_df, turn_df, summ_df
