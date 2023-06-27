@@ -30,7 +30,7 @@ LEFT_EYE_INDICES = CONFIG['LEFT_EYE_INDICES']
 RIGHT_EYE_INDICES = CONFIG['RIGHT_EYE_INDICES']
 
 
-def eye_aspect_ratio(eye):
+def eye_aspect_ratio(eye_landmarks):
     """
     ---------------------------------------------------------------------------------------------------
 
@@ -41,7 +41,7 @@ def eye_aspect_ratio(eye):
 
     Parameters:
     ............
-    eye : array
+    eye_landmarks : array
         Array of 6 tuples containing the coordinates of the eye landmarks
 
     Returns:
@@ -52,9 +52,9 @@ def eye_aspect_ratio(eye):
     ---------------------------------------------------------------------------------------------------
     """
 
-    A = dist.euclidean(eye[1], eye[5])
-    B = dist.euclidean(eye[2], eye[4])
-    C = dist.euclidean(eye[0], eye[3])
+    A = dist.euclidean(eye_landmarks[1], eye_landmarks[5])
+    B = dist.euclidean(eye_landmarks[2], eye_landmarks[4])
+    C = dist.euclidean(eye_landmarks[0], eye_landmarks[3])
 
     ear = (A + B) / (2.0 * C)
 
