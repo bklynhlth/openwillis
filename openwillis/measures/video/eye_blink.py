@@ -19,15 +19,7 @@ logging.basicConfig(level=logging.INFO)
 logger=logging.getLogger()
 
 dir_name = os.path.dirname(os.path.abspath(__file__))
-config_path = os.path.abspath(os.path.join(dir_name, 'config/eye.json'))
-
-file = open(config_path)
-CONFIG = json.load(file)
-
-# facemesh model left and right eye landmarks indices
-# https://raw.githubusercontent.com/google/mediapipe/a908d668c730da128dfa8d9f6bd25d519d006692/mediapipe/modules/face_geometry/data/canonical_face_model_uv_visualization.png
-LEFT_EYE_INDICES = CONFIG['LEFT_EYE_INDICES']
-RIGHT_EYE_INDICES = CONFIG['RIGHT_EYE_INDICES']
+CONFIG_PATH = os.path.abspath(os.path.join(dir_name, 'config/eye.json'))
 
 
 def eye_aspect_ratio(eye_landmarks):
@@ -239,7 +231,16 @@ def eye_blink_rate(video_directory):
     framewise, blinks, summary = None, None, None
 
     try:
-        prominence, width = CONFIG['PROMINENCE'], CONFIG['WIDTH']
+        file = open(CONFIG_PATH)
+        config = json.load(file)
+
+        # facemesh model left and right eye landmarks indices
+        # https://raw.githubusercontent.com/google/mediapipe/a908d668c730da128dfa8d9f6bd25d519d006692/mediapipe/modules/face_geometry/data/canonical_face_model_uv_visualization.png
+        global LEFT_EYE_INDICES, RIGHT_EYE_INDICES
+        LEFT_EYE_INDICES = config['LEFT_EYE_INDICES']
+        RIGHT_EYE_INDICES = config['RIGHT_EYE_INDICES']
+
+        prominence, width = config['PROMINENCE'], config['WIDTH']
 
         face_mesh = initialize_facemesh()
         vs, fps = get_video_capture(video_directory)
