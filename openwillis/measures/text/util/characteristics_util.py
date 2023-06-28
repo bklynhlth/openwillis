@@ -499,6 +499,165 @@ def update_summ_df(
     return summ_df
 
 
+def get_pause_feature_word(word_df, df_diff, word_list, phrase_index, measures):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    This function calculates various pause-related speech characteristic
+        features at the word level and adds them to the output dataframe word_df.
+
+    Parameters:
+    ...........
+    word_df: pandas dataframe
+        A dataframe containing word summary information
+    df_diff: pandas dataframe
+        A dataframe containing the word-level information
+            from the JSON response.
+    word_list: list
+        List of transcribed text at the word level.
+    phrase_index: list
+        A list containing the indices of the first and last word
+            in each phrase or turn.
+    measures: dict
+        A dictionary containing the names of the columns in the output dataframes.
+
+    Returns:
+    ...........
+    word_df: pandas dataframe
+        The updated word_df dataframe.
+
+    ------------------------------------------------------------------------------------------------------
+    """
+    phrase_starts = [pindex[0] for pindex in phrase_index]
+
+    word_df[measures["word_pause"]] = df_diff[measures["pause"]].where(
+        ~df_diff[measures["old_index"]].isin(phrase_starts), np.nan
+    )
+
+    # calculate the number of syllables in each word from the word list
+    word_df[measures["num_syllables"]] = [
+        get_num_of_syllables(word) for word in word_list
+    ]
+    return word_df
+
+
+def get_pause_feature_phrase(phrase_df, df_diff, phrase_list, phrase_index, turn_index, time_index, measures):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    This function calculates various pause-related speech characteristic
+        features at the phrase level and adds them to the output dataframe phrase_df.
+
+    Parameters:
+    ...........
+    phrase_df: pandas dataframe
+        A dataframe containing phrase summary information
+    df_diff: pandas dataframe
+        A dataframe containing the word-level information
+            from the JSON response.
+    phrase_list: list
+        List of transcribed text at the phrase level.
+    phrase_index: list
+        A list containing the indices of the first and last word
+            in each phrase
+    turn_index: list
+        A list containing the indices of the first and last word
+            in each turn.
+    time_index: list
+        A list containing the names of the columns in json that contain
+            the start and end times of each word.
+    measures: dict
+        A dictionary containing the names of the columns in the output dataframes.
+
+    Returns:
+    ...........
+    phrase_df: pandas dataframe
+        The updated phrase_df dataframe.
+
+    ------------------------------------------------------------------------------------------------------
+    """
+    phrase_starts = [pindex[0] for pindex in phrase_index]
+
+    df_diff_phrase = df_diff[
+        df_diff[measures["old_index"]].isin(phrase_starts)
+    ]  # get the rows corresponding to the start of each phrase
+
+    if len(turn_index) > 0:
+        turn_starts = [
+            uindex[0] for uindex in turn_index
+        ]  # get the start index of each turn
+        phrase_df[measures["phrase_pause"]] = df_diff_phrase[measures["pause"]].where(
+            ~df_diff_phrase[measures["old_index"]].isin(turn_starts), np.nan
+        )
+    else:
+        phrase_df[measures["phrase_pause"]] = df_diff_phrase[measures["pause"]]
+
+    phrase_df = phrase_df.reset_index(drop=True)
+
+    phrase_df = process_pause_feature(
+        df_diff, phrase_df, phrase_list, phrase_index, time_index, measures["phrase"], measures
+    )
+
+    return phrase_df
+
+
+def get_pause_feature_turn(turn_df, df_diff, turn_list, turn_index, time_index, measures):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    This function calculates various pause-related speech characteristic
+        features at the turn level and adds them to the output dataframe turn_df.
+
+    Parameters:
+    ...........
+    turn_df: pandas dataframe
+        A dataframe containing turn summary information
+    df_diff: pandas dataframe
+        A dataframe containing the word-level information
+            from the JSON response.
+    turn_list: list
+        List of transcribed text at the turn level.
+    turn_index: list
+        A list containing the indices of the first and last word
+            in each turn.
+    time_index: list
+        A list containing the names of the columns in json that contain
+            the start and end times of each word.
+    measures: dict
+        A dictionary containing the names of the columns in the output dataframes.
+
+    Returns:
+    ...........
+    turn_df: pandas dataframe
+        The updated turn_df dataframe.
+
+    ------------------------------------------------------------------------------------------------------
+    """
+
+    turn_starts = [uindex[0] for uindex in turn_index]
+
+    # get the rows corresponding to the start of each turn
+    df_diff_turn = df_diff[
+        df_diff[measures["old_index"]].isin(turn_starts)
+    ]
+
+    turn_df[measures["turn_pause"]] = df_diff_turn[measures["pause"]]
+    turn_df[measures["interrupt_flag"]] = False
+    # set pre_turn_pause to 0 if negative (due to overlapping turns)
+    # and set interrupt_flag to True
+    negative_pause = turn_df[measures["turn_pause"]] < 0
+    turn_df.loc[negative_pause, measures["turn_pause"]] = 0
+    turn_df.loc[negative_pause, measures["interrupt_flag"]] = True
+
+    turn_df = turn_df.reset_index(drop=True)
+
+    turn_df = process_pause_feature(
+        df_diff, turn_df, turn_list, turn_index, time_index, measures["turn"], measures
+    )
+
+    return turn_df
+
+
 def get_pause_feature(json_conf, df_list, text_list, text_indices, time_index, measures):
     """
     ------------------------------------------------------------------------------------------------------
@@ -552,53 +711,17 @@ def get_pause_feature(json_conf, df_list, text_list, text_indices, time_index, m
         ].astype(float).shift(1)
 
     # word-level analysis
-    phrase_starts = [pindex[0] for pindex in phrase_index]
-    word_df[measures["word_pause"]] = df_diff[measures["pause"]].where(
-        ~df_diff[measures["old_index"]].isin(phrase_starts), np.nan
-    )
-    # calculate the number of syllables in each word from the word list
-    word_df[measures["num_syllables"]] = [
-        get_num_of_syllables(word) for word in word_list
-    ]
+    word_df = get_pause_feature_word(word_df, df_diff, word_list, phrase_index, measures)
 
     # phrase-level analysis
-    df_diff_phrase = df_diff[
-        df_diff[measures["old_index"]].isin(phrase_starts)
-    ]  # get the rows corresponding to the start of each phrase
-
-    if len(turn_index) > 0:
-        turn_starts = [
-            uindex[0] for uindex in turn_index
-        ]  # get the start index of each turn
-        phrase_df[measures["phrase_pause"]] = df_diff_phrase[measures["pause"]].where(
-            ~df_diff_phrase[measures["old_index"]].isin(turn_starts), np.nan
-        )
-    else:
-        phrase_df[measures["phrase_pause"]] = df_diff_phrase[measures["pause"]]
-    phrase_df = phrase_df.reset_index(drop=True)
-
-    phrase_df = process_pause_feature(
-        df_diff, phrase_df, phrase_list, phrase_index, time_index, measures["phrase"], measures
+    phrase_df = get_pause_feature_phrase(
+        phrase_df, df_diff, phrase_list, phrase_index, turn_index, time_index, measures
     )
 
     # turn-level analysis
     if len(turn_index) > 0:
-        df_diff_turn = df_diff[
-            df_diff[measures["old_index"]].isin(turn_starts)
-        ]  # get the rows corresponding to the start of each turn
-
-        turn_df[measures["turn_pause"]] = df_diff_turn[measures["pause"]]
-        turn_df[measures["interrupt_flag"]] = False
-        # set pre_turn_pause to 0 if negative (due to overlapping turns)
-        # and set interrupt_flag to True
-        negative_pause = turn_df[measures["turn_pause"]] < 0
-        turn_df.loc[negative_pause, measures["turn_pause"]] = 0
-        turn_df.loc[negative_pause, measures["interrupt_flag"]] = True
-
-        turn_df = turn_df.reset_index(drop=True)
-
-        turn_df = process_pause_feature(
-            df_diff, turn_df, turn_list, turn_index, time_index, measures["turn"], measures
+        turn_df = get_pause_feature_turn(
+            turn_df, df_diff, turn_list, turn_index, time_index, measures
         )
 
     # file-level analysis
