@@ -14,12 +14,10 @@ from scipy.spatial import distance as dist
 from scipy.signal import find_peaks
 
 import mediapipe as mp
+from openwillis.measures.commons import get_config
 
 logging.basicConfig(level=logging.INFO)
 logger=logging.getLogger()
-
-dir_name = os.path.dirname(os.path.abspath(__file__))
-CONFIG_PATH = os.path.abspath(os.path.join(dir_name, 'config/eye.json'))
 
 
 def eye_aspect_ratio(eye_landmarks):
@@ -97,7 +95,7 @@ def get_video_capture(video_directory):
     return vs, fps
 
 
-def process_frame(face_mesh, frame):
+def process_frame(face_mesh, frame, config):
     """
     ---------------------------------------------------------------------------------------------------
 
@@ -109,6 +107,8 @@ def process_frame(face_mesh, frame):
         The MediaPipe Face Mesh model
     frame : array
         The frame to be processed
+    config : dict
+        The configuration dictionary
 
     Returns:
     ............
@@ -124,8 +124,13 @@ def process_frame(face_mesh, frame):
     if results.multi_face_landmarks:
         face_landmarks = results.multi_face_landmarks[0]
 
-        leftEye = np.array([(face_landmarks.landmark[lidx].x, face_landmarks.landmark[lidx].y) for lidx in LEFT_EYE_INDICES], dtype=np.float32)
-        rightEye = np.array([(face_landmarks.landmark[ridx].x, face_landmarks.landmark[ridx].y) for ridx in RIGHT_EYE_INDICES], dtype=np.float32)
+        # facemesh model left and right eye landmarks indices
+        # https://raw.githubusercontent.com/google/mediapipe/a908d668c730da128dfa8d9f6bd25d519d006692/mediapipe/modules/face_geometry/data/canonical_face_model_uv_visualization.png
+        left_eye_indices = config['left_eye_indices']
+        right_eye_indices = config['right_eye_indices']
+
+        leftEye = np.array([(face_landmarks.landmark[lidx].x, face_landmarks.landmark[lidx].y) for lidx in left_eye_indices], dtype=np.float32)
+        rightEye = np.array([(face_landmarks.landmark[ridx].x, face_landmarks.landmark[ridx].y) for ridx in right_eye_indices], dtype=np.float32)
         return leftEye, rightEye
 
     return None, None
@@ -246,7 +251,7 @@ def calculate_framewise(vs, face_mesh, config):
         frame_n += 1
         frame = cv2.resize(frame, (450, int(frame.shape[0] * (450. / frame.shape[1]))))
 
-        leftEye, rightEye = process_frame(face_mesh, frame)
+        leftEye, rightEye = process_frame(face_mesh, frame, config)
         if leftEye is None:
             continue
 
@@ -296,26 +301,19 @@ def eye_blink_rate(video_directory):
     """
 
     framewise, blinks, summary = None, None, None
+    
+    config = get_config(os.path.abspath(__file__), "eye.json")
 
     try:
-        file = open(CONFIG_PATH)
-        config = json.load(file)
-
-        # facemesh model left and right eye landmarks indices
-        # https://raw.githubusercontent.com/google/mediapipe/a908d668c730da128dfa8d9f6bd25d519d006692/mediapipe/modules/face_geometry/data/canonical_face_model_uv_visualization.png
-        global LEFT_EYE_INDICES, RIGHT_EYE_INDICES
-        LEFT_EYE_INDICES = config['LEFT_EYE_INDICES']
-        RIGHT_EYE_INDICES = config['RIGHT_EYE_INDICES']
-
-        prominence, width = config['PROMINENCE'], config['WIDTH']
-
-        face_mesh = initialize_facemesh()
-
         # validate video directory exists and is a video file
         if not os.path.isfile(video_directory):
             raise ValueError(f"{video_directory} does not exist")
         if not video_directory.endswith(('.mp4', '.avi', '.mov')):
             raise ValueError(f"{video_directory} is not a video file")
+
+        prominence, width = config['prominence'], config['width']
+
+        face_mesh = initialize_facemesh()
 
         vs, fps = get_video_capture(video_directory)
 
@@ -340,7 +338,8 @@ def eye_blink_rate(video_directory):
         logger.error(e)
 
     finally:
-        if vs is not None:
-            vs.release()
+        if 'vs' in locals():
+            if vs is not None:
+                vs.release()
 
         return framewise, blinks, summary

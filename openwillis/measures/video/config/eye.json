@@ -1,8 +1,8 @@
 {
-    "LEFT_EYE_INDICES": [362, 385, 387, 263, 373, 380],
-    "RIGHT_EYE_INDICES": [33, 160, 158, 133, 153, 144],
-    "PROMINENCE": 2,
-    "WIDTH": 0.01,
+    "left_eye_indices": [362, 385, 387, 263, 373, 380],
+    "right_eye_indices": [33, 160, 158, 133, 153, 144],
+    "prominence": 2,
+    "width": 0.01,
     "peak_frame": "Blink Peak Frame",
     "start_frame": "Blink Starting Frame",
     "end_frame": "Blink Ending Frame",

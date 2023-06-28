@@ -2,6 +2,7 @@
 # website:   http://www.bklynhlth.com
 
 # import the required packages
+import json
 import os
 from pydub import AudioSegment
 
@@ -52,3 +53,30 @@ def to_audio(filepath, speaker_label, out_dir):
 
         output_file = os.path.join(out_dir, file_name + '_' + key + '.wav')
         spk_signal.export(output_file, format="wav")
+
+def get_config(filepath, json_file):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    This function reads the configuration file containing the column names for the output dataframes,
+    and returns the contents of the file as a dictionary.
+
+    Parameters:
+    ...........
+    filepath : str
+        The path to the configuration file.
+    json_file : str
+        The name of the configuration file.
+
+    Returns:
+    ...........
+    measures: A dictionary containing the names of the columns in the output dataframes.
+
+    ------------------------------------------------------------------------------------------------------
+    """
+    dir_name = os.path.dirname(filepath)
+    measure_path = os.path.abspath(os.path.join(dir_name, f"config/{json_file}"))
+
+    file = open(measure_path)
+    measures = json.load(file)
+    return measures

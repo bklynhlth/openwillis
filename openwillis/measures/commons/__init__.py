@@ -1,5 +1,5 @@
 from openwillis.measures.commons.common import (
-    to_audio
+    to_audio, get_config
 )
 
-__all__ = ["to_audio"]
+__all__ = ["to_audio", "get_config"]
