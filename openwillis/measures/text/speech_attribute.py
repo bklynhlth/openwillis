@@ -43,11 +43,16 @@ def get_config():
     return measures
 
 
-def create_empty_dataframes():
+def create_empty_dataframes(measures):
     """
     ------------------------------------------------------------------------------------------------------
 
     Creating empty measures dataframes
+
+    Parameters:
+    ...........
+    measures: dict
+        A dictionary containing the names of the columns in the output dataframes.
 
     Returns:
     ...........
@@ -65,90 +70,90 @@ def create_empty_dataframes():
 
     word_df = pd.DataFrame(
         columns=[
-            "pre_word_pause",
-            "num_syllables",
-            "part_of_speech",
-            "sentiment_pos",
-            "sentiment_neg",
-            "sentiment_neu",
-            "sentiment_overall",
+            measures["word_pause"],
+            measures["num_syllables"],
+            measures["part_of_speech"],
+            measures["pos"],
+            measures["neg"],
+            measures["neu"],
+            measures["compound"],
         ]
     )
 
     phrase_df = pd.DataFrame(
         columns=[
-            "pre_phrase_pause",
-            "phrase_length_minutes",
-            "phrase_length_words",
-            "words_per_min",
-            "syllables_per_min",
-            "pauses_per_min",
-            "pause_variability",
-            "mean_pause_length",
-            "speech_percentage",
-            "noun_percentage",
-            "verb_percentage",
-            "adjective_percentage",
-            "pronoun_percentage",
-            "sentiment_pos",
-            "sentiment_neg",
-            "sentiment_neu",
-            "sentiment_overall",
-            "mattr",
+            measures["phrase_pause"],
+            measures["phrase_minutes"],
+            measures["phrase_words"],
+            measures["word_rate"],
+            measures["syllable_rate"],
+            measures["pause_rate"],
+            measures["pause_var"],
+            measures["pause_meandur"],
+            measures["speech_percentage"],
+            measures["speech_noun"],
+            measures["speech_verb"],
+            measures["speech_adj"],
+            measures["speech_pronoun"],
+            measures["pos"],
+            measures["neg"],
+            measures["neu"],
+            measures["compound"],
+            measures["speech_mattr"],
         ]
     )
 
     turn_df = pd.DataFrame(
         columns=[
-            "pre_turn_pause",
-            "turn_length_minutes",
-            "turn_length_words",
-            "words_per_min",
-            "syllables_per_min",
-            "pauses_per_min",
-            "pause_variability",
-            "mean_pause_length",
-            "speech_percentage",
-            "noun_percentage",
-            "verb_percentage",
-            "adjective_percentage",
-            "pronoun_percentage",
-            "sentiment_pos",
-            "sentiment_neg",
-            "sentiment_neu",
-            "sentiment_overall",
-            "mattr",
-            "interrupt_flag",
+            measures["turn_pause"],
+            measures["turn_minutes"],
+            measures["turn_words"],
+            measures["word_rate"],
+            measures["syllable_rate"],
+            measures["pause_rate"],
+            measures["pause_var"],
+            measures["pause_meandur"],
+            measures["speech_percentage"],
+            measures["speech_noun"],
+            measures["speech_verb"],
+            measures["speech_adj"],
+            measures["speech_pronoun"],
+            measures["pos"],
+            measures["neg"],
+            measures["neu"],
+            measures["compound"],
+            measures["speech_mattr"],
+            measures["interrupt_flag"],
         ]
     )
 
     summ_df = pd.DataFrame(
         columns=[
-            "speech_length_minutes",
-            "speech_length_words",
-            "words_per_min",
-            "syllables_per_min",
-            "pauses_per_min",
-            "word_pause_length_mean",
-            "word_pause_variability",
-            "phrase_pause_length_mean",
-            "phrase_pause_variability",
-            "speech_percentage",
-            "noun_percentage",
-            "verb_percentage",
-            "adjective_percentage",
-            "pronoun_percentage",
-            "sentiment_pos",
-            "sentiment_neg",
-            "sentiment_neu",
-            "sentiment_overall",
-            "mattr",
-            "num_turns",
-            "mean_turn_length_minutes",
-            "mean_turn_length_words",
-            "mean_pre_turn_pause",
-            "num_one_word_turns",
-            "num_interrupts",
+            measures["speech_minutes"],
+            measures["speech_words"],
+            measures["word_rate"],
+            measures["syllable_rate"],
+            measures["pause_rate"],
+            measures["word_pause_mean"],
+            measures["word_pause_var"],
+            measures["phrase_pause_mean"],
+            measures["phrase_pause_var"],
+            measures["speech_percentage"],
+            measures["speech_noun"],
+            measures["speech_verb"],
+            measures["speech_adj"],
+            measures["speech_pronoun"],
+            measures["pos"],
+            measures["neg"],
+            measures["neu"],
+            measures["compound"],
+            measures["speech_mattr"],
+            measures["num_turns"],
+            measures["turn_minutes_mean"],
+            measures["turn_words_mean"],
+            measures["turn_pause_mean"],
+            measures["num_one_word_turns"],
+            measures["num_interrupts"],
         ]
     )
 
@@ -176,7 +181,7 @@ def is_amazon_transcribe(json_conf):
     return "jobName" in json_conf and "results" in json_conf
 
 
-def filter_transcribe(json_conf, speaker_label=None):
+def filter_transcribe(json_conf, measures, speaker_label=None):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -188,6 +193,8 @@ def filter_transcribe(json_conf, speaker_label=None):
     ...........
     json_conf: dict
         aws transcribe json response.
+    measures: dict
+        A dictionary containing the names of the columns in the output dataframes.
     speaker_label: str
         Speaker label
 
@@ -223,7 +230,7 @@ def filter_transcribe(json_conf, speaker_label=None):
 
     # make a dictionary to map old indices to new indices
     for i, item in enumerate(item_data):
-        item["old_idx"] = i
+        item[measures["old_index"]] = i
     text = " ".join(
         [
             item["alternatives"][0]["content"]
@@ -318,11 +325,11 @@ def filter_transcribe(json_conf, speaker_label=None):
     # calculate time difference between each word
     for i, item in enumerate(filter_json):
         if i > 0:
-            item["pause_diff"] = float(item["start_time"]) - float(
+            item[measures["pause"]] = float(item["start_time"]) - float(
                 filter_json[i - 1]["end_time"]
             )
         else:
-            item["pause_diff"] = np.nan
+            item[measures["pause"]] = np.nan
 
     if speaker_label is not None:
         filter_json = [
@@ -340,7 +347,7 @@ def filter_transcribe(json_conf, speaker_label=None):
     )
 
 
-def filter_vosk(json_conf):
+def filter_vosk(json_conf, measures):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -351,6 +358,8 @@ def filter_vosk(json_conf):
     ...........
     json_conf: dict
         The input text in the form of a JSON object.
+    measures: dict
+        A dictionary containing the names of the columns in the output dataframes.
 
     Returns:
     ...........
@@ -366,7 +375,7 @@ def filter_vosk(json_conf):
 
     # make a dictionary to map old indices to new indices
     for i, item in enumerate(json_conf):
-        item["old_idx"] = i
+        item[measures["old_index"]] = i
 
     return words, text
 
@@ -399,7 +408,8 @@ def speech_characteristics(json_conf, language="en-us", speaker_label=None):
 
     ------------------------------------------------------------------------------------------------------
     """
-    word_df, phrase_df, turn_df, summ_df = create_empty_dataframes()
+    measures = get_config()
+    word_df, phrase_df, turn_df, summ_df = create_empty_dataframes(measures)
 
     try:
         if bool(json_conf):
@@ -414,7 +424,7 @@ def speech_characteristics(json_conf, language="en-us", speaker_label=None):
                     turns_idxs,
                     text,
                     filter_json,
-                ) = filter_transcribe(json_conf, speaker_label=speaker_label)
+                ) = filter_transcribe(json_conf, measures, speaker_label=speaker_label)
 
                 if len(filter_json) > 0 and len(text) > 0:
                     (
@@ -429,9 +439,10 @@ def speech_characteristics(json_conf, language="en-us", speaker_label=None):
                         [phrases_idxs, turns_idxs],
                         language,
                         ["start_time", "end_time"],
+                        measures,
                     )
             else:
-                words, text = filter_vosk(json_conf)
+                words, text = filter_vosk(json_conf, measures)
                 if len(text) > 0:
                     (
                         word_df,
@@ -445,6 +456,7 @@ def speech_characteristics(json_conf, language="en-us", speaker_label=None):
                         [[], []],
                         language,
                         ["start", "end"],
+                        measures,
                     )
             
             # if phrase_df is empty, then add a row of NaNs

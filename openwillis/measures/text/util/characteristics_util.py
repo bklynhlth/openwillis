@@ -61,7 +61,7 @@ def download_nltk_resources():
         nltk.download("averaged_perceptron_tagger")
 
 
-def get_tag(json_conf, tag_dict):
+def get_tag(json_conf, tag_dict, measures):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -75,6 +75,8 @@ def get_tag(json_conf, tag_dict):
         JSON response object.
     tag_dict: dict
         A dictionary mapping the NLTK tags to more readable tags.
+    measures: dict
+        A dictionary containing the names of the columns in the output dataframes.
 
     Returns:
     ...........
@@ -97,14 +99,14 @@ def get_tag(json_conf, tag_dict):
 
     for i, tag in enumerate(tag_list):
         if tag[1] in tag_dict.keys():
-            json_conf[i]["tag"] = tag_dict[tag[1]]
+            json_conf[i][measures["tag"]] = tag_dict[tag[1]]
         else:
-            json_conf[i]["tag"] = "Other"
+            json_conf[i][measures["tag"]] = "Other"
 
     return json_conf
 
 
-def get_part_of_speech(df, tags, index=0):
+def get_part_of_speech(df, tags, measures, index=0):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -118,6 +120,8 @@ def get_part_of_speech(df, tags, index=0):
         A dataframe containing the speech characteristics of the input text.
     tags: list
         A list of part-of-speech tags for the input text.
+    measures: dict
+        A dictionary containing the names of the columns in the output dataframes.
     index: int
         The index of the row in the output dataframe df.
 
@@ -128,23 +132,23 @@ def get_part_of_speech(df, tags, index=0):
 
     ------------------------------------------------------------------------------------------------------
     """
-    df.loc[index, "noun_percentage"] = (
+    df.loc[index, measures["speech_noun"]] = (
         100 * len(tags[tags == "Noun"]) / len(tags)
     )
-    df.loc[index, "verb_percentage"] = (
+    df.loc[index, measures["speech_verb"]] = (
         100 * len(tags[tags == "Verb"]) / len(tags)
     )
-    df.loc[index, "adjective_percentage"] = (
+    df.loc[index, measures["speech_adj"]] = (
         100 * len(tags[tags == "Adjective"]) / len(tags)
     )
-    df.loc[index, "pronoun_percentage"] = (
+    df.loc[index, measures["speech_pronoun"]] = (
         100 * len(tags[tags == "Pronoun"]) / len(tags)
     )
 
     return df
 
 
-def get_tag_summ(json_conf, df_list, text_indices):
+def get_tag_summ(json_conf, df_list, text_indices, measures):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -154,20 +158,21 @@ def get_tag_summ(json_conf, df_list, text_indices):
 
     Parameters:
     ...........
-    tag_df: pandas dataframe
-        A dataframe containing the part-of-speech tags for the input text.
-    summ_df: pandas dataframe
-        A dataframe containing the speech characteristics of the input text.
-    word: list
-        The input text as a list of words.
+    json_conf: list
+        JSON response object.
+    df_list: list
+        List of pandas dataframes.
+            word_df, phrase_df, turn_df, summ_df
+    text_indices: list
+        List of indices for text_list.
+            for phrases and turns.
     measures: dict
-        A dictionary containing the names
-         of the columns in the output dataframes.
+        A dictionary containing the names of the columns in the output dataframes.
 
     Returns:
     ...........
-    summ_df: pandas dataframe
-        The updated summ_df dataframe.
+    df_list: list
+        List of updated pandas dataframes.
 
     ------------------------------------------------------------------------------------------------------
     """
@@ -178,24 +183,24 @@ def get_tag_summ(json_conf, df_list, text_indices):
     df_conf = pd.DataFrame(json_conf)
 
     # word-level analysis
-    word_df["part_of_speech"] = df_conf["tag"]
+    word_df[measures["part_of_speech"]] = df_conf[measures["tag"]]
 
     # phrase-level analysis
     for j, pindex in enumerate(phrase_index):
         prange = range(pindex[0], pindex[1] + 1)
-        phrase_tags = df_conf.loc[df_conf["old_idx"].isin(prange), "tag"]
+        phrase_tags = df_conf.loc[df_conf[measures["old_index"]].isin(prange), measures["tag"]]
 
-        phrase_df = get_part_of_speech(phrase_df, phrase_tags, j)
+        phrase_df = get_part_of_speech(phrase_df, phrase_tags, measures, j)
 
     # turn-level analysis
     for j, uindex in enumerate(turn_index):
         urange = range(uindex[0], uindex[1] + 1)
-        turn_tags = df_conf.loc[df_conf["old_idx"].isin(urange), "tag"]
+        turn_tags = df_conf.loc[df_conf[measures["old_index"]].isin(urange), measures["tag"]]
 
-        turn_df = get_part_of_speech(turn_df, turn_tags, j)
+        turn_df = get_part_of_speech(turn_df, turn_tags, measures, j)
 
     # file-level analysis
-    summ_df = get_part_of_speech(summ_df, df_conf["tag"])
+    summ_df = get_part_of_speech(summ_df, df_conf[measures["tag"]], measures)
 
     df_list = [word_df, phrase_df, turn_df, summ_df]
 
@@ -232,7 +237,7 @@ def get_mattr(word):
     return mattr
 
 
-def get_sentiment(df_list, text_list):
+def get_sentiment(df_list, text_list, measures):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -247,6 +252,8 @@ def get_sentiment(df_list, text_list):
     text_list: list
         List of transcribed text.
             split into words, phrases, turns, and full text.
+    measures: dict
+        A dictionary containing the names of the columns in the output dataframes.
 
     Returns:
     ...........
@@ -262,11 +269,11 @@ def get_sentiment(df_list, text_list):
 
     # column names
     cols = [
-        "sentiment_neg",
-        "sentiment_neu",
-        "sentiment_pos",
-        "sentiment_overall",
-        "mattr",
+        measures["neg"],
+        measures["neu"],
+        measures["pos"],
+        measures["compound"],
+        measures["speech_mattr"],
     ]
 
     # word-level analysis
@@ -331,7 +338,7 @@ def get_num_of_syllables(text):
     return syllable_count
 
 
-def process_pause_feature(df_diff, df, text_level, index_list, time_index, level_name):
+def process_pause_feature(df_diff, df, text_level, index_list, time_index, level_name, measures):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -356,6 +363,8 @@ def process_pause_feature(df_diff, df, text_level, index_list, time_index, level
          the start and end times of each word.
     level_name: str
         The name of the level being analyzed (phrase or turn).
+    measures: dict
+        A dictionary containing the names of the columns in the output dataframes.
 
     Returns:
     ...........
@@ -365,46 +374,48 @@ def process_pause_feature(df_diff, df, text_level, index_list, time_index, level
     ------------------------------------------------------------------------------------------------------
     """
 
-    if level_name not in ["phrase", "turn"]:
-        logger.error("level_name must be either phrase or turn")
+    if level_name not in [measures["phrase"], measures["turn"]]:
+        logger.error(
+            f"level_name must be either {measures['phrase']} or {measures['turn']}"
+        )
         return df
 
     for j, index in enumerate(index_list):
         rng = range(index[0], index[1] + 1)
-        level_json = df_diff[df_diff["old_idx"].isin(rng)]
+        level_json = df_diff[df_diff[measures["old_index"]].isin(rng)]
 
         # remove first pause as it is the pre_pause
-        pauses = level_json["pause_diff"].values[1:]
+        pauses = level_json[measures["pause"]].values[1:]
 
-        df.loc[j, f"{level_name}_length_minutes"] = (
+        df.loc[j, measures[f"{level_name}_minutes"]] = (
             float(level_json.iloc[-1][time_index[1]])
             - float(level_json.iloc[0][time_index[0]])
         ) / 60
-        df.loc[j, f"{level_name}_length_words"] = len(level_json)
+        df.loc[j, measures[f"{level_name}_words"]] = len(level_json)
 
-        df.loc[j, "pause_variability"] = np.var(pauses)
-        df.loc[j, "mean_pause_length"] = np.mean(pauses)
-        df.loc[j, "speech_percentage"] = 100 * (
+        df.loc[j, measures["pause_var"]] = np.var(pauses)
+        df.loc[j, measures["pause_meandur"]] = np.mean(pauses)
+        df.loc[j, measures["speech_percentage"]] = 100 * (
             1 - np.sum(pauses) / (
-                60 * df.loc[j, f"{level_name}_length_minutes"]
+                60 * df.loc[j, measures[f"{level_name}_minutes"]]
             )
         )
 
         # articulation rate
-        df.loc[j, "syllables_per_min"] = (
-            get_num_of_syllables(text_level[j]) / df.loc[j, f"{level_name}_length_minutes"]
+        df.loc[j, measures["syllable_rate"]] = (
+            get_num_of_syllables(text_level[j]) / df.loc[j, measures[f"{level_name}_minutes"]]
         )
 
-    df["words_per_min"] = (
-        df[f"{level_name}_length_words"] / df[f"{level_name}_length_minutes"]
+    df[measures["word_rate"]] = (
+        df[measures[f"{level_name}_words"]] / df[measures[f"{level_name}_minutes"]]
     )
-    df["pauses_per_min"] = df["words_per_min"]
+    df[measures["pause_rate"]] = df[measures["word_rate"]]
 
     return df
 
 
 def update_summ_df(
-    df_diff, summ_df, full_text, time_index, word_df, phrase_df, turn_df
+    df_diff, summ_df, full_text, time_index, word_df, phrase_df, turn_df, measures
 ):
     """
     ------------------------------------------------------------------------------------------------------
@@ -428,6 +439,8 @@ def update_summ_df(
         A dataframe containing phrase summary information
     turn_df: pandas dataframe
         A dataframe containing turn summary information
+    measures: dict
+        A dictionary containing the names of the columns in the output dataframes.
 
     Returns:
     ...........
@@ -436,57 +449,57 @@ def update_summ_df(
 
     ------------------------------------------------------------------------------------------------------
     """
-    summ_df["speech_length_minutes"] = [
+    summ_df[measures["speech_minutes"]] = [
         (
             float(df_diff.iloc[-1][time_index[1]])
             - float(df_diff.iloc[0][time_index[0]])
         ) / 60
     ]
-    summ_df["speech_length_words"] = len(df_diff)
-    summ_df["words_per_min"] = (
-        summ_df["speech_length_words"] / summ_df["speech_length_minutes"]
+    summ_df[measures["speech_words"]] = len(df_diff)
+    summ_df[measures["word_rate"]] = (
+        summ_df[measures["speech_words"]] / summ_df[measures["speech_minutes"]]
     )
-    summ_df["syllables_per_min"] = (
-        get_num_of_syllables(full_text) / summ_df["speech_length_minutes"]
+    summ_df[measures["syllable_rate"]] = (
+        get_num_of_syllables(full_text) / summ_df[measures["speech_minutes"]]
     )
-    summ_df["pauses_per_min"] = summ_df["words_per_min"]
-    summ_df["word_pause_length_mean"] = word_df["pre_word_pause"].mean(
+    summ_df[measures["pause_rate"]] = summ_df[measures["word_rate"]]
+    summ_df[measures["word_pause_mean"]] = word_df[measures["word_pause"]].mean(
         skipna=True
     )
-    summ_df["word_pause_variability"] = word_df["pre_word_pause"].var(
+    summ_df[measures["word_pause_var"]] = word_df[measures["word_pause"]].var(
         skipna=True
     )
-    summ_df["phrase_pause_length_mean"] = phrase_df["pre_phrase_pause"].mean(
+    summ_df[measures["phrase_pause_mean"]] = phrase_df[measures["phrase_pause"]].mean(
         skipna=True
     )
-    summ_df["phrase_pause_variability"] = phrase_df["pre_phrase_pause"].var(
+    summ_df[measures["phrase_pause_var"]] = phrase_df[measures["phrase_pause"]].var(
         skipna=True
     )
-    summ_df["speech_percentage"] = 100 * (
+    summ_df[measures["speech_percentage"]] = 100 * (
         1
-        - df_diff.loc[1:, "pause_diff"].sum()
-        / (60 * summ_df["speech_length_minutes"])
+        - df_diff.loc[1:, measures["pause"]].sum()
+        / (60 * summ_df[measures["speech_minutes"]])
     )
     if len(turn_df) > 0:
-        summ_df["num_turns"] = len(turn_df)
-        summ_df["mean_turn_length_minutes"] = turn_df[
-            "turn_length_minutes"
+        summ_df[measures["num_turns"]] = len(turn_df)
+        summ_df[measures["turn_minutes_mean"]] = turn_df[
+            measures["turn_minutes"]
         ].mean()
-        summ_df["mean_turn_length_words"] = turn_df[
-            "turn_length_words"
+        summ_df[measures["turn_words_mean"]] = turn_df[
+            measures["turn_words"]
         ].mean()
-        summ_df["mean_pre_turn_pause"] = turn_df[
-            "pre_turn_pause"
+        summ_df[measures["turn_pause_mean"]] = turn_df[
+            measures["turn_pause"]
         ].mean(skipna=True)
         summ_df["num_one_word_turns"] = len(
-            turn_df[turn_df["turn_length_words"] == 1]
+            turn_df[turn_df[measures["turn_words"]] == 1]
         )
-        summ_df["num_interrupts"] = sum(turn_df["interrupt_flag"])
+        summ_df[measures["num_interrupts"]] = sum(turn_df[measures["interrupt_flag"]])
 
     return summ_df
 
 
-def get_pause_feature(json_conf, df_list, text_list, text_indices, time_index):
+def get_pause_feature(json_conf, df_list, text_list, text_indices, time_index, measures):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -509,6 +522,8 @@ def get_pause_feature(json_conf, df_list, text_list, text_indices, time_index):
     time_index: list
         A list containing the names of the columns
          in json that contain the start and end times of each word.
+    measures: dict
+        A dictionary containing the names of the columns in the output dataframes.
 
     Returns:
     ...........
@@ -531,64 +546,64 @@ def get_pause_feature(json_conf, df_list, text_list, text_indices, time_index):
 
     # Calculate the pause time between
     # each word and add the results to pause_list
-    if "pause_diff" not in df_diff.columns:
-        df_diff["pause_diff"] = df_diff[time_index[0]].astype(float) - df_diff[
+    if measures["pause"] not in df_diff.columns:
+        df_diff[measures["pause"]] = df_diff[time_index[0]].astype(float) - df_diff[
             time_index[1]
         ].astype(float).shift(1)
 
     # word-level analysis
     phrase_starts = [pindex[0] for pindex in phrase_index]
-    word_df["pre_word_pause"] = df_diff["pause_diff"].where(
-        ~df_diff["old_idx"].isin(phrase_starts), np.nan
+    word_df[measures["word_pause"]] = df_diff[measures["pause"]].where(
+        ~df_diff[measures["old_index"]].isin(phrase_starts), np.nan
     )
     # calculate the number of syllables in each word from the word list
-    word_df["num_syllables"] = [
+    word_df[measures["num_syllables"]] = [
         get_num_of_syllables(word) for word in word_list
     ]
 
     # phrase-level analysis
     df_diff_phrase = df_diff[
-        df_diff["old_idx"].isin(phrase_starts)
+        df_diff[measures["old_index"]].isin(phrase_starts)
     ]  # get the rows corresponding to the start of each phrase
 
     if len(turn_index) > 0:
         turn_starts = [
             uindex[0] for uindex in turn_index
         ]  # get the start index of each turn
-        phrase_df["pre_phrase_pause"] = df_diff_phrase["pause_diff"].where(
-            ~df_diff_phrase["old_idx"].isin(turn_starts), np.nan
+        phrase_df[measures["phrase_pause"]] = df_diff_phrase[measures["pause"]].where(
+            ~df_diff_phrase[measures["old_index"]].isin(turn_starts), np.nan
         )
     else:
-        phrase_df["pre_phrase_pause"] = df_diff_phrase["pause_diff"]
+        phrase_df[measures["phrase_pause"]] = df_diff_phrase[measures["pause"]]
     phrase_df = phrase_df.reset_index(drop=True)
 
     phrase_df = process_pause_feature(
-        df_diff, phrase_df, phrase_list, phrase_index, time_index, "phrase"
+        df_diff, phrase_df, phrase_list, phrase_index, time_index, measures["phrase"], measures
     )
 
     # turn-level analysis
     if len(turn_index) > 0:
         df_diff_turn = df_diff[
-            df_diff["old_idx"].isin(turn_starts)
+            df_diff[measures["old_index"]].isin(turn_starts)
         ]  # get the rows corresponding to the start of each turn
 
-        turn_df["pre_turn_pause"] = df_diff_turn["pause_diff"]
-        turn_df["interrupt_flag"] = False
+        turn_df[measures["turn_pause"]] = df_diff_turn[measures["pause"]]
+        turn_df[measures["interrupt_flag"]] = False
         # set pre_turn_pause to 0 if negative (due to overlapping turns)
         # and set interrupt_flag to True
-        negative_pause = turn_df["pre_turn_pause"] < 0
-        turn_df.loc[negative_pause, "pre_turn_pause"] = 0
-        turn_df.loc[negative_pause, "interrupt_flag"] = True
+        negative_pause = turn_df[measures["turn_pause"]] < 0
+        turn_df.loc[negative_pause, measures["turn_pause"]] = 0
+        turn_df.loc[negative_pause, measures["interrupt_flag"]] = True
 
         turn_df = turn_df.reset_index(drop=True)
 
         turn_df = process_pause_feature(
-            df_diff, turn_df, turn_list, turn_index, time_index, "turn"
+            df_diff, turn_df, turn_list, turn_index, time_index, measures["turn"], measures
         )
 
     # file-level analysis
     summ_df = update_summ_df(
-        df_diff, summ_df, full_text, time_index, word_df, phrase_df, turn_df
+        df_diff, summ_df, full_text, time_index, word_df, phrase_df, turn_df, measures
     )
 
     df_feature = [word_df, phrase_df, turn_df, summ_df]
@@ -597,7 +612,8 @@ def get_pause_feature(json_conf, df_list, text_list, text_indices, time_index):
 
 
 def process_language_feature(
-    json_conf, df_list, text_list, text_indices, language, time_index
+    json_conf, df_list, text_list,
+    text_indices, language, time_index, measures,
 ):
     """
     ------------------------------------------------------------------------------------------------------
@@ -617,9 +633,13 @@ def process_language_feature(
     text_indices: list
         List of indices for text_list.
          for phrases and turns.
+    language: str
+        Language of the transcribed text.
     time_index: list
         A list containing the names of the columns in json that contain the
          start and end times of each word.
+    measures: dict
+        A dictionary containing the names of the columns in the output dataframes.
 
     Returns:
     ...........
@@ -635,13 +655,13 @@ def process_language_feature(
     ------------------------------------------------------------------------------------------------------
     """
 
-    df_list = get_pause_feature(json_conf, df_list, text_list, text_indices, time_index)
+    df_list = get_pause_feature(json_conf, df_list, text_list, text_indices, time_index, measures)
 
     if language == "en-us":
-        json_conf = get_tag(json_conf, TAG_DICT)
-        df_list = get_tag_summ(json_conf, df_list, text_indices)
+        json_conf = get_tag(json_conf, TAG_DICT, measures)
+        df_list = get_tag_summ(json_conf, df_list, text_indices, measures)
 
-        df_list = get_sentiment(df_list, text_list)
+        df_list = get_sentiment(df_list, text_list, measures)
 
     word_df, phrase_df, turn_df, summ_df = df_list
     return word_df, phrase_df, turn_df, summ_df
