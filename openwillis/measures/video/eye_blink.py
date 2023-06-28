@@ -304,7 +304,7 @@ def eye_blink_rate(video_directory):
     ---------------------------------------------------------------------------------------------------
     """
 
-    framewise, blinks, summary = None, None, None
+    ear, blinks, summary = None, None, None
     
     config = get_config(os.path.abspath(__file__), "eye.json")
 
@@ -322,10 +322,10 @@ def eye_blink_rate(video_directory):
         vs, fps = get_video_capture(video_directory)
 
         # calculate EAR of each frame
-        framewise, frame_n = calculate_framewise(vs, face_mesh, config)
+        ear, frame_n = calculate_framewise(vs, face_mesh, config)
 
         # detect blinks from EAR array
-        troughs, left_ips, right_ips = detect_blinks(framewise, prominence, width)
+        troughs, left_ips, right_ips = detect_blinks(ear, prominence, width)
 
         # convert frame number to time and create blinks dataframe
         blinks = convert_frame_to_time(troughs, left_ips, right_ips, fps, config)
@@ -346,4 +346,4 @@ def eye_blink_rate(video_directory):
             if vs is not None:
                 vs.release()
 
-        return framewise, blinks, summary
+        return ear, blinks, summary
