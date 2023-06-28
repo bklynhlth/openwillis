@@ -181,6 +181,97 @@ def is_amazon_transcribe(json_conf):
     return "jobName" in json_conf and "results" in json_conf
 
 
+def filter_speaker_label(item_data, speaker_label, turns_idxs, turns, phrases_idxs, phrases):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    This function updates the turns and phrases lists
+        to only include the speaker label provided.
+
+    Parameters:
+    ...........
+    item_data: dict
+        JSON response object.
+    speaker_label: str
+        Speaker label
+    turns_idxs: list
+        A list of tuples containing
+            the start and end indices of the turns in the JSON object.
+    turns: list
+        A list of turns extracted from the JSON object.
+    phrases_idxs: list
+        A list of tuples containing
+            the start and end indices of the phrases in the JSON object.
+    phrases: list
+        A list of phrases extracted from the JSON object.
+
+    Returns:
+    ...........
+    turns_idxs: list
+        A list of tuples containing
+            the start and end indices of the turns in the JSON object.
+    turns: list
+        A list of turns extracted from the JSON object.
+    phrases_idxs: list
+        A list of tuples containing
+            the start and end indices of the phrases in the JSON object.
+    phrases: list
+        A list of phrases extracted from the JSON object.
+
+    ------------------------------------------------------------------------------------------------------
+    """
+
+    # phrase-split for the speaker label
+    phrases_idxs2 = []
+    phrases2 = []
+    for i, phrase in enumerate(phrases_idxs):
+        start_idx = phrase[0]
+        if item_data[start_idx].get("speaker_label", "") == speaker_label:
+            phrases_idxs2.append(phrase)
+            phrases2.append(phrases[i])
+
+    phrases_idxs = phrases_idxs2
+    phrases = phrases2
+
+    # turn-split for the speaker label
+    start_idx = 0
+    for i, item in enumerate(item_data):
+        if (
+            i > 0
+            and item.get("speaker_label", "") == speaker_label
+            and item_data[i - 1].get("speaker_label", "") != speaker_label
+        ):
+            start_idx = i
+        elif (
+            i > 0
+            and item.get("speaker_label", "") != speaker_label
+            and item_data[i - 1].get("speaker_label", "") == speaker_label
+        ):
+            turns_idxs.append((start_idx, i - 1))
+            # create turns texts
+            turns.append(
+                " ".join(
+                    [
+                        item["alternatives"][0]["content"]
+                        for item in item_data[start_idx:i]
+                    ]
+                )
+            )
+
+    if start_idx not in [item[0] for item in turns_idxs]:
+        turns_idxs.append((start_idx, len(item_data) - 1))
+        turns.append(
+            " ".join(
+                [
+                    item["alternatives"][0]["content"]
+                    for item in item_data[start_idx:]
+                ]
+            )
+        )
+
+    return turns_idxs, turns, phrases_idxs, phrases
+
+
 def filter_transcribe(json_conf, measures, speaker_label=None):
     """
     ------------------------------------------------------------------------------------------------------
@@ -265,53 +356,9 @@ def filter_transcribe(json_conf, measures, speaker_label=None):
                 "not found in the json response object."
             )
 
-        # phrase-split for the speaker label
-        phrases_idxs2 = []
-        phrases2 = []
-        for i, phrase in enumerate(phrases_idxs):
-            start_idx = phrase[0]
-            if item_data[start_idx].get("speaker_label", "") == speaker_label:
-                phrases_idxs2.append(phrase)
-                phrases2.append(phrases[i])
-
-        phrases_idxs = phrases_idxs2
-        phrases = phrases2
-
-        # turn-split for the speaker label
-        start_idx = 0
-        for i, item in enumerate(item_data):
-            if (
-                i > 0
-                and item.get("speaker_label", "") == speaker_label
-                and item_data[i - 1].get("speaker_label", "") != speaker_label
-            ):
-                start_idx = i
-            elif (
-                i > 0
-                and item.get("speaker_label", "") != speaker_label
-                and item_data[i - 1].get("speaker_label", "") == speaker_label
-            ):
-                turns_idxs.append((start_idx, i - 1))
-                # create turns texts
-                turns.append(
-                    " ".join(
-                        [
-                            item["alternatives"][0]["content"]
-                            for item in item_data[start_idx:i]
-                        ]
-                    )
-                )
-
-        if start_idx not in [item[0] for item in turns_idxs]:
-            turns_idxs.append((start_idx, len(item_data) - 1))
-            turns.append(
-                " ".join(
-                    [
-                        item["alternatives"][0]["content"]
-                        for item in item_data[start_idx:]
-                    ]
-                )
-            )
+        turns_idxs, turns, phrases_idxs, phrases = filter_speaker_label(
+            item_data, speaker_label, turns_idxs, turns, phrases_idxs, phrases
+        )
 
     # entire transcript - by joining all the phrases
     text = " ".join(phrases)
