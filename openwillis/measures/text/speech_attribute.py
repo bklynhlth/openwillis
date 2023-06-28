@@ -10,37 +10,11 @@ import nltk
 import numpy as np
 import pandas as pd
 
+from openwillis.measures.commons import get_config
 from openwillis.measures.text.util import characteristics_util as cutil
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger()
-
-
-def get_config():
-    """
-    ------------------------------------------------------------------------------------------------------
-
-    This function reads the configuration file containing
-     the column names for the output dataframes,
-     and returns the contents of the file as a dictionary.
-
-    Parameters:
-    ...........
-    None
-
-    Returns:
-    ...........
-    measures: A dictionary containing the names
-     of the columns in the output dataframes.
-
-    ------------------------------------------------------------------------------------------------------
-    """
-    dir_name = os.path.dirname(os.path.abspath(__file__))
-    measure_path = os.path.abspath(os.path.join(dir_name, "config/text.json"))
-
-    file = open(measure_path)
-    measures = json.load(file)
-    return measures
 
 
 def create_empty_dataframes(measures):
@@ -455,7 +429,7 @@ def speech_characteristics(json_conf, language="en-us", speaker_label=None):
 
     ------------------------------------------------------------------------------------------------------
     """
-    measures = get_config()
+    measures = get_config(os.path.abspath(__file__), "text.json")
     word_df, phrase_df, turn_df, summ_df = create_empty_dataframes(measures)
 
     try:
