@@ -249,15 +249,19 @@ def calculate_framewise(vs, face_mesh, config):
             break
 
         frame_n += 1
-        frame = cv2.resize(frame, (450, int(frame.shape[0] * (450. / frame.shape[1]))))
+        ear = np.nan
+        try:
+            frame = cv2.resize(frame, (450, int(frame.shape[0] * (450. / frame.shape[1]))))
 
-        leftEye, rightEye = process_frame(face_mesh, frame, config)
-        if leftEye is None:
-            continue
+            leftEye, rightEye = process_frame(face_mesh, frame, config)
+            if leftEye is None:
+                continue
 
-        leftEAR = eye_aspect_ratio(leftEye)
-        rightEAR = eye_aspect_ratio(rightEye)
-        ear = (leftEAR + rightEAR) / 2.0
+            leftEAR = eye_aspect_ratio(leftEye)
+            rightEAR = eye_aspect_ratio(rightEye)
+            ear = (leftEAR + rightEAR) / 2.0
+        except Exception as e:
+            logger.error(e)
 
         framewise.append([frame_n, ear])
 
