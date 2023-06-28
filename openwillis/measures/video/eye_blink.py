@@ -136,7 +136,7 @@ def process_frame(face_mesh, frame, config):
     return None, None
 
 
-def detect_blinks(framewise, prominence, width):
+def detect_blinks(framewise, prominence, width, config):
     """
     ---------------------------------------------------------------------------------------------------
 
@@ -150,6 +150,8 @@ def detect_blinks(framewise, prominence, width):
         The prominence of the peaks
     width : float
         The width of the peaks
+    config : dict
+        The configuration dictionary
 
     Returns:
     ............
@@ -162,7 +164,7 @@ def detect_blinks(framewise, prominence, width):
 
     ---------------------------------------------------------------------------------------------------
     """
-    troughs, properties = find_peaks(-framewise['EAR'], prominence=prominence, width=width)
+    troughs, properties = find_peaks(-framewise[config["ear"]], prominence=prominence, width=width)
 
     left_ips = properties["left_ips"]
     right_ips = properties["right_ips"]
@@ -325,7 +327,7 @@ def eye_blink_rate(video_directory):
         ear, frame_n = calculate_framewise(vs, face_mesh, config)
 
         # detect blinks from EAR array
-        troughs, left_ips, right_ips = detect_blinks(ear, prominence, width)
+        troughs, left_ips, right_ips = detect_blinks(ear, prominence, width, config)
 
         # convert frame number to time and create blinks dataframe
         blinks = convert_frame_to_time(troughs, left_ips, right_ips, fps, config)
