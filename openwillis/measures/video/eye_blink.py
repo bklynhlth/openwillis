@@ -210,6 +210,62 @@ def convert_frame_to_time(troughs, left_ips, right_ips, fps, config):
     return blinks
 
 
+def calculate_framewise(vs, face_mesh, config):
+    """
+    ---------------------------------------------------------------------------------------------------
+
+    This function calculates the eye aspect ratio (EAR) of each frame.
+
+    Parameters:
+    ............
+    vs : object
+        The video capture object
+    face_mesh : object
+        The MediaPipe Face Mesh model
+    config : dict
+        The configuration dictionary
+
+    Returns:
+    ............
+    framewise : pd.DataFrame
+        Contains the frame number and the eye aspect ratio (EAR) of each frame
+    frame_n : int
+        The total number of frames
+
+    ---------------------------------------------------------------------------------------------------
+    """
+
+    framewise = []
+    frame_n = 0
+
+    while True:
+        ret, frame = vs.read()
+        if not ret:
+            break
+
+        frame_n += 1
+        frame = cv2.resize(frame, (450, int(frame.shape[0] * (450. / frame.shape[1]))))
+
+        leftEye, rightEye = process_frame(face_mesh, frame)
+        if leftEye is None:
+            continue
+
+        leftEAR = eye_aspect_ratio(leftEye)
+        rightEAR = eye_aspect_ratio(rightEye)
+        ear = (leftEAR + rightEAR) / 2.0
+
+        framewise.append([frame_n, ear])
+
+    framewise = pd.DataFrame(framewise, columns=[config['frame'], config['ear']])
+
+    # z-score normalization
+    framewise[config['ear']] = (
+        framewise[config['ear']] - framewise[config['ear']].mean()
+    ) / framewise[config['ear']].std()
+
+    return framewise, frame_n
+
+
 def eye_blink_rate(video_directory):
     """
     ---------------------------------------------------------------------------------------------------
@@ -263,33 +319,8 @@ def eye_blink_rate(video_directory):
 
         vs, fps = get_video_capture(video_directory)
 
-        framewise = []
-        frame_n = 0
-
-        while True:
-            ret, frame = vs.read()
-            if not ret:
-                break
-
-            frame_n += 1
-            frame = cv2.resize(frame, (450, int(frame.shape[0] * (450. / frame.shape[1]))))
-
-            leftEye, rightEye = process_frame(face_mesh, frame)
-            if leftEye is None:
-                continue
-
-            leftEAR = eye_aspect_ratio(leftEye)
-            rightEAR = eye_aspect_ratio(rightEye)
-            ear = (leftEAR + rightEAR) / 2.0
-
-            framewise.append([frame_n, ear])
-
-        framewise = pd.DataFrame(framewise, columns=[config['frame'], config['ear']])
-
-        # z-score normalization
-        framewise[config['ear']] = (
-            framewise[config['ear']] - framewise[config['ear']].mean()
-        ) / framewise[config['ear']].std()
+        # calculate EAR of each frame
+        framewise, frame_n = calculate_framewise(vs, face_mesh, config)
 
         # detect blinks from EAR array
         troughs, left_ips, right_ips = detect_blinks(framewise, prominence, width)
