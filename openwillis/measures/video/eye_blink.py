@@ -30,7 +30,6 @@ def eye_aspect_ratio(eye_landmarks):
     Introduced by Soukupová and Čech in their 2016 paper,
     Real-Time Eye Blink Detection Using Facial Landmarks.
 
-
     Parameters:
     ............
     eye_landmarks : array
@@ -255,6 +254,13 @@ def eye_blink_rate(video_directory):
         prominence, width = config['PROMINENCE'], config['WIDTH']
 
         face_mesh = initialize_facemesh()
+
+        # validate video directory exists and is a video file
+        if not os.path.isfile(video_directory):
+            raise ValueError(f"{video_directory} does not exist")
+        if not video_directory.endswith(('.mp4', '.avi', '.mov')):
+            raise ValueError(f"{video_directory} is not a video file")
+
         vs, fps = get_video_capture(video_directory)
 
         framewise = []
@@ -298,7 +304,7 @@ def eye_blink_rate(video_directory):
             index=[config['blinks'], config['blink_rate']],
             columns=[config['value']]
         )
-    
+
     except Exception as e:
         logger.error(e)
 
