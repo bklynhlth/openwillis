@@ -2,5 +2,16 @@
     "LEFT_EYE_INDICES": [362, 385, 387, 263, 373, 380],
     "RIGHT_EYE_INDICES": [33, 160, 158, 133, 153, 144],
     "PROMINENCE": 2,
-    "WIDTH": 0.01
+    "WIDTH": 0.01,
+    "peak_frame": "Blink Peak Frame",
+    "start_frame": "Blink Starting Frame",
+    "end_frame": "Blink Ending Frame",
+    "peak_time": "Blink Peak Time",
+    "start_time": "Blink Starting Time",
+    "end_time": "Blink Ending Time",
+    "frame": "frame",
+    "ear": "EAR",
+    "blinks": "blinks",
+    "blink_rate": "blink_rate",
+    "value": "value"
 }

@@ -121,11 +121,14 @@ def process_frame(face_mesh, frame):
     ---------------------------------------------------------------------------------------------------
     """
     results = face_mesh.process(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+
     if results.multi_face_landmarks:
         face_landmarks = results.multi_face_landmarks[0]
+
         leftEye = np.array([(face_landmarks.landmark[lidx].x, face_landmarks.landmark[lidx].y) for lidx in LEFT_EYE_INDICES], dtype=np.float32)
         rightEye = np.array([(face_landmarks.landmark[ridx].x, face_landmarks.landmark[ridx].y) for ridx in RIGHT_EYE_INDICES], dtype=np.float32)
         return leftEye, rightEye
+
     return None, None
 
 
@@ -156,16 +159,19 @@ def detect_blinks(framewise, prominence, width):
     ---------------------------------------------------------------------------------------------------
     """
     troughs, properties = find_peaks(-framewise['EAR'], prominence=prominence, width=width)
+
     left_ips = properties["left_ips"]
     right_ips = properties["right_ips"]
+
     # round to nearest integer and add 1 to match frame number
     left_ips = np.round(left_ips).astype(int) + 1
     right_ips = np.round(right_ips).astype(int) + 1
     troughs = np.round(troughs).astype(int) + 1
+
     return troughs, left_ips, right_ips
 
 
-def convert_frame_to_time(troughs, left_ips, right_ips, fps):
+def convert_frame_to_time(troughs, left_ips, right_ips, fps, config):
     """
     ---------------------------------------------------------------------------------------------------
 
@@ -181,6 +187,8 @@ def convert_frame_to_time(troughs, left_ips, right_ips, fps):
         Array containing the frame number of the end of each blink
     fps : float
         The fps of the video
+    config : dict
+        The configuration dictionary
 
     Returns:
     ............
@@ -194,8 +202,12 @@ def convert_frame_to_time(troughs, left_ips, right_ips, fps):
     left_ips_time = left_ips/fps
     right_ips_time = right_ips/fps
 
-    blinks = pd.DataFrame({'Blink Peak Frame': troughs, 'Blink Starting Frame': left_ips, 'Blink Ending Frame': right_ips,
-                            'Blink Peak Time': troughs_time, 'Blink Starting Time': left_ips_time, 'Blink Ending Time': right_ips_time})
+    blinks = pd.DataFrame(
+        {
+            config['peak_frame']: troughs, config['start_frame']: left_ips, config['end_frame']: right_ips,
+            config['peak_time']: troughs_time, config['start_time']: left_ips_time, config['end_time']: right_ips_time
+        }
+    )
     return blinks
 
 
@@ -266,16 +278,26 @@ def eye_blink_rate(video_directory):
 
             framewise.append([frame_n, ear])
 
-        framewise = pd.DataFrame(framewise, columns=['frame', 'EAR'])
+        framewise = pd.DataFrame(framewise, columns=[config['frame'], config['ear']])
+
         # z-score normalization
-        framewise['EAR'] = (framewise['EAR'] - framewise['EAR'].mean()) / framewise['EAR'].std()
+        framewise[config['ear']] = (
+            framewise[config['ear']] - framewise[config['ear']].mean()
+        ) / framewise[config['ear']].std()
+
         # detect blinks from EAR array
         troughs, left_ips, right_ips = detect_blinks(framewise, prominence, width)
+
         # convert frame number to time and create blinks dataframe
-        blinks = convert_frame_to_time(troughs, left_ips, right_ips, fps)
+        blinks = convert_frame_to_time(troughs, left_ips, right_ips, fps, config)
+
         # create summary dataframe
         summary_list = [len(troughs), len(troughs)/(frame_n/fps)*60]
-        summary = pd.DataFrame(summary_list, index=['blinks', 'blink_rate'], columns=['value'])
+        summary = pd.DataFrame(
+            summary_list,
+            index=[config['blinks'], config['blink_rate']],
+            columns=[config['value']]
+        )
     
     except Exception as e:
         logger.error(e)
@@ -283,4 +305,5 @@ def eye_blink_rate(video_directory):
     finally:
         if vs is not None:
             vs.release()
+
         return framewise, blinks, summary
