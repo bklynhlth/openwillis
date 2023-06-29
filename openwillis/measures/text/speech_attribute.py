@@ -57,25 +57,15 @@ def filter_transcribe(json_conf, measures, speaker_label=None):
 
     Returns:
     ...........
-    words: list
-        A list of words extracted from the JSON object.
-    phrases: list
-        A list of phrases extracted from the JSON object.
-    phrases_idxs: list
-        A list of tuples containing
-         the start and end indices of the phrases in the JSON object.
-    turns: list
-        A list of turns extracted from the JSON object.
-    turns_idxs: list
-        A list of tuples containing
-         the start and end indices of the turns in the JSON object.
-    text: str
-        The text extracted from the JSON object.
-         if speaker_label is not None,
-         then only the text from the speaker label is extracted.
     filter_json: list
         The filtered JSON object containing
         only the relevant data for processing.
+    text_list: list
+        List of transcribed text.
+         split into words, phrases, turns, and full text.
+    text_indices: list
+        List of indices for text_list.
+         for phrases and turns.
 
     Raises:
     ...........
@@ -119,10 +109,10 @@ def filter_transcribe(json_conf, measures, speaker_label=None):
     # extract words
     words = [word["alternatives"][0]["content"] for word in filter_json]
 
-    return (
-        words, phrases, phrases_idxs, turns,
-        turns_idxs, text, filter_json
-    )
+    text_list = [words, phrases, turns, text]
+    text_indices = [phrases_idxs, turns_idxs]
+
+    return filter_json, text_list, text_indices
 
 
 def filter_vosk(json_conf, measures):
@@ -194,15 +184,9 @@ def speech_characteristics(json_conf, language="en-us", speaker_label=None):
             cutil.download_nltk_resources()
 
             if is_amazon_transcribe(json_conf):
-                (
-                    words,
-                    phrases,
-                    phrases_idxs,
-                    turns,
-                    turns_idxs,
-                    text,
-                    filter_json,
-                ) = filter_transcribe(json_conf, measures, speaker_label=speaker_label)
+                filter_json, text_list, text_indices = filter_transcribe(
+                    json_conf, measures, speaker_label
+                )
 
                 if len(filter_json) > 0 and len(text) > 0:
                     (
@@ -213,8 +197,8 @@ def speech_characteristics(json_conf, language="en-us", speaker_label=None):
                     ) = cutil.process_language_feature(
                         filter_json,
                         [word_df, phrase_df, turn_df, summ_df],
-                        [words, phrases, turns, text],
-                        [phrases_idxs, turns_idxs],
+                        text_list,
+                        text_indices,
                         language,
                         ["start_time", "end_time"],
                         measures,
