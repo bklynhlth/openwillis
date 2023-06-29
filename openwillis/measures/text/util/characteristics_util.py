@@ -33,6 +33,123 @@ TAG_DICT = {
 }
 
 
+def create_empty_dataframes(measures):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    Creating empty measures dataframes
+
+    Parameters:
+    ...........
+    measures: dict
+        A dictionary containing the names of the columns in the output dataframes.
+
+    Returns:
+    ...........
+    word_df: pandas dataframe
+        A dataframe containing word summary information
+    phrase_df: pandas dataframe
+        A dataframe containing phrase summary information
+    turn_df: pandas dataframe
+        A dataframe containing turn summary information
+    summ_df: pandas dataframe
+        A dataframe containing summary information on the speech
+
+    ------------------------------------------------------------------------------------------------------
+    """
+
+    word_df = pd.DataFrame(
+        columns=[
+            measures["word_pause"],
+            measures["num_syllables"],
+            measures["part_of_speech"],
+            measures["pos"],
+            measures["neg"],
+            measures["neu"],
+            measures["compound"],
+        ]
+    )
+
+    phrase_df = pd.DataFrame(
+        columns=[
+            measures["phrase_pause"],
+            measures["phrase_minutes"],
+            measures["phrase_words"],
+            measures["word_rate"],
+            measures["syllable_rate"],
+            measures["pause_rate"],
+            measures["pause_var"],
+            measures["pause_meandur"],
+            measures["speech_percentage"],
+            measures["speech_noun"],
+            measures["speech_verb"],
+            measures["speech_adj"],
+            measures["speech_pronoun"],
+            measures["pos"],
+            measures["neg"],
+            measures["neu"],
+            measures["compound"],
+            measures["speech_mattr"],
+        ]
+    )
+
+    turn_df = pd.DataFrame(
+        columns=[
+            measures["turn_pause"],
+            measures["turn_minutes"],
+            measures["turn_words"],
+            measures["word_rate"],
+            measures["syllable_rate"],
+            measures["pause_rate"],
+            measures["pause_var"],
+            measures["pause_meandur"],
+            measures["speech_percentage"],
+            measures["speech_noun"],
+            measures["speech_verb"],
+            measures["speech_adj"],
+            measures["speech_pronoun"],
+            measures["pos"],
+            measures["neg"],
+            measures["neu"],
+            measures["compound"],
+            measures["speech_mattr"],
+            measures["interrupt_flag"],
+        ]
+    )
+
+    summ_df = pd.DataFrame(
+        columns=[
+            measures["speech_minutes"],
+            measures["speech_words"],
+            measures["word_rate"],
+            measures["syllable_rate"],
+            measures["pause_rate"],
+            measures["word_pause_mean"],
+            measures["word_pause_var"],
+            measures["phrase_pause_mean"],
+            measures["phrase_pause_var"],
+            measures["speech_percentage"],
+            measures["speech_noun"],
+            measures["speech_verb"],
+            measures["speech_adj"],
+            measures["speech_pronoun"],
+            measures["pos"],
+            measures["neg"],
+            measures["neu"],
+            measures["compound"],
+            measures["speech_mattr"],
+            measures["num_turns"],
+            measures["turn_minutes_mean"],
+            measures["turn_words_mean"],
+            measures["turn_pause_mean"],
+            measures["num_one_word_turns"],
+            measures["num_interrupts"],
+        ]
+    )
+
+    return word_df, phrase_df, turn_df, summ_df
+
+
 def download_nltk_resources():
     """
     ------------------------------------------------------------------------------------------------------
