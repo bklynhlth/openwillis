@@ -709,24 +709,36 @@ def get_sentiment(df_list, text_list, measures):
 
     # word-level analysis
     for idx, w in enumerate(word_list):
-        sentiment_dict = sentiment.polarity_scores(w)
-        mattr = get_mattr(w)
+        try:
+            sentiment_dict = sentiment.polarity_scores(w)
+            mattr = get_mattr(w)
 
-        word_df.loc[idx, cols] = list(sentiment_dict.values()) + [mattr]
+            word_df.loc[idx, cols] = list(sentiment_dict.values()) + [mattr]
+        except Exception as e:
+            logger.error(f"Error in sentiment analysis for word {w}: {e}")
+            continue
 
     # phrase-level analysis
     for idx, p in enumerate(phrase_list):
-        sentiment_dict = sentiment.polarity_scores(p)
-        mattr = get_mattr(p)
+        try:
+            sentiment_dict = sentiment.polarity_scores(p)
+            mattr = get_mattr(p)
 
-        phrase_df.loc[idx, cols] = list(sentiment_dict.values()) + [mattr]
+            phrase_df.loc[idx, cols] = list(sentiment_dict.values()) + [mattr]
+        except Exception as e:
+            logger.error(f"Error in sentiment analysis for phrase {p}: {e}")
+            continue
 
     # turn-level analysis
     for idx, u in enumerate(turn_list):
-        sentiment_dict = sentiment.polarity_scores(u)
-        mattr = get_mattr(u)
+        try:
+            sentiment_dict = sentiment.polarity_scores(u)
+            mattr = get_mattr(u)
 
-        turn_df.loc[idx, cols] = list(sentiment_dict.values()) + [mattr]
+            turn_df.loc[idx, cols] = list(sentiment_dict.values()) + [mattr]
+        except Exception as e:
+            logger.error(f"Error in sentiment analysis for turn {u}: {e}")
+            continue
 
     # file-level analysis
     sentiment_dict = sentiment.polarity_scores(full_text)
