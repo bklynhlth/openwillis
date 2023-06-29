@@ -82,10 +82,14 @@ def filter_speaker_label(item_data, speaker_label, turns_idxs, turns, phrases_id
     phrases_idxs2 = []
     phrases2 = []
     for i, phrase in enumerate(phrases_idxs):
-        start_idx = phrase[0]
-        if item_data[start_idx].get("speaker_label", "") == speaker_label:
-            phrases_idxs2.append(phrase)
-            phrases2.append(phrases[i])
+        try:
+            start_idx = phrase[0]
+            if item_data[start_idx].get("speaker_label", "") == speaker_label:
+                phrases_idxs2.append(phrase)
+                phrases2.append(phrases[i])
+        except Exception as e:
+            logger.error(f"Error in phrase-split for speaker {speaker_label}: {e}")
+            continue
 
     phrases_idxs = phrases_idxs2
     phrases = phrases2
@@ -93,28 +97,33 @@ def filter_speaker_label(item_data, speaker_label, turns_idxs, turns, phrases_id
     # turn-split for the speaker label
     start_idx = 0
     for i, item in enumerate(item_data):
-        if (
-            i > 0
-            and item.get("speaker_label", "") == speaker_label
-            and item_data[i - 1].get("speaker_label", "") != speaker_label
-        ):
-            start_idx = i
-        elif (
-            i > 0
-            and item.get("speaker_label", "") != speaker_label
-            and item_data[i - 1].get("speaker_label", "") == speaker_label
-        ):
-            turns_idxs.append((start_idx, i - 1))
-            # create turns texts
-            turns.append(
-                " ".join(
-                    [
-                        item["alternatives"][0]["content"]
-                        for item in item_data[start_idx:i]
-                    ]
+        try:
+            if (
+                i > 0
+                and item.get("speaker_label", "") == speaker_label
+                and item_data[i - 1].get("speaker_label", "") != speaker_label
+            ):
+                start_idx = i
+            elif (
+                i > 0
+                and item.get("speaker_label", "") != speaker_label
+                and item_data[i - 1].get("speaker_label", "") == speaker_label
+            ):
+                turns_idxs.append((start_idx, i - 1))
+                # create turns texts
+                turns.append(
+                    " ".join(
+                        [
+                            item["alternatives"][0]["content"]
+                            for item in item_data[start_idx:i]
+                        ]
+                    )
                 )
-            )
+        except Exception as e:
+            logger.error(f"Error in turn-split for speaker {speaker_label}: {e}")
+            continue
 
+    # if the last item is the speaker label
     if start_idx not in [item[0] for item in turns_idxs]:
         turns_idxs.append((start_idx, len(item_data) - 1))
         turns.append(
@@ -370,7 +379,7 @@ def speech_characteristics(json_conf, language="en-us", speaker_label=None):
             if turn_df.empty:
                 turn_df.loc[0] = np.nan
     except Exception as e:
-        logger.error(f"Error in speech Characteristics {e}")
+        logger.error(f"Error in Speech Characteristics {e}")
 
     finally:
         return word_df, phrase_df, turn_df, summ_df
