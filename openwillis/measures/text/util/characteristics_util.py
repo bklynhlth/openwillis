@@ -824,30 +824,34 @@ def process_pause_feature(df_diff, df, text_level, index_list, time_index, level
         return df
 
     for j, index in enumerate(index_list):
-        rng = range(index[0], index[1] + 1)
-        level_json = df_diff[df_diff[measures["old_index"]].isin(rng)]
+        try:
+            rng = range(index[0], index[1] + 1)
+            level_json = df_diff[df_diff[measures["old_index"]].isin(rng)]
 
-        # remove first pause as it is the pre_pause
-        pauses = level_json[measures["pause"]].values[1:]
+            # remove first pause as it is the pre_pause
+            pauses = level_json[measures["pause"]].values[1:]
 
-        df.loc[j, measures[f"{level_name}_minutes"]] = (
-            float(level_json.iloc[-1][time_index[1]])
-            - float(level_json.iloc[0][time_index[0]])
-        ) / 60
-        df.loc[j, measures[f"{level_name}_words"]] = len(level_json)
+            df.loc[j, measures[f"{level_name}_minutes"]] = (
+                float(level_json.iloc[-1][time_index[1]])
+                - float(level_json.iloc[0][time_index[0]])
+            ) / 60
+            df.loc[j, measures[f"{level_name}_words"]] = len(level_json)
 
-        df.loc[j, measures["pause_var"]] = np.var(pauses)
-        df.loc[j, measures["pause_meandur"]] = np.mean(pauses)
-        df.loc[j, measures["speech_percentage"]] = 100 * (
-            1 - np.sum(pauses) / (
-                60 * df.loc[j, measures[f"{level_name}_minutes"]]
+            df.loc[j, measures["pause_var"]] = np.var(pauses)
+            df.loc[j, measures["pause_meandur"]] = np.mean(pauses)
+            df.loc[j, measures["speech_percentage"]] = 100 * (
+                1 - np.sum(pauses) / (
+                    60 * df.loc[j, measures[f"{level_name}_minutes"]]
+                )
             )
-        )
 
-        # articulation rate
-        df.loc[j, measures["syllable_rate"]] = (
-            get_num_of_syllables(text_level[j]) / df.loc[j, measures[f"{level_name}_minutes"]]
-        )
+            # articulation rate
+            df.loc[j, measures["syllable_rate"]] = (
+                get_num_of_syllables(text_level[j]) / df.loc[j, measures[f"{level_name}_minutes"]]
+            )
+        except Exception as e:
+            logger.error(f"Error in pause feature calculation for {level_name} {j}: {e}")
+            continue
 
     df[measures["word_rate"]] = (
         df[measures[f"{level_name}_words"]] / df[measures[f"{level_name}_minutes"]]
