@@ -303,6 +303,10 @@ def filter_speaker(item_data, speaker_label, turns_idxs, turns, phrases_idxs, ph
     phrases: list
         A list of phrases extracted from the JSON object.
 
+    Raises:
+    ...........
+        ValueError: If the speaker label is not found in the json response object.
+
     ------------------------------------------------------------------------------------------------------
     """
 
