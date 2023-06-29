@@ -306,6 +306,17 @@ def filter_speaker(item_data, speaker_label, turns_idxs, turns, phrases_idxs, ph
     ------------------------------------------------------------------------------------------------------
     """
 
+    speaker_labels = [
+        item["speaker_label"] for item
+        in item_data if "speaker_label" in item
+    ]
+
+    if speaker_label not in speaker_labels:
+        raise ValueError(
+            f"Speaker label {speaker_label} "
+            "not found in the json response object."
+        )
+
     # phrase-split for the speaker label
     phrases_idxs, phrases = filter_speaker_phrase(
         item_data, speaker_label, phrases_idxs, phrases
@@ -317,6 +328,136 @@ def filter_speaker(item_data, speaker_label, turns_idxs, turns, phrases_idxs, ph
     )
 
     return turns_idxs, turns, phrases_idxs, phrases
+
+
+def create_index_column(item_data, measures):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    This function creates an index column in the JSON response object.
+
+    Parameters:
+    ...........
+    item_data: dict
+        JSON response object.
+
+    Returns:
+    ...........
+    item_data: dict
+        The updated JSON response object.
+    measures: dict
+        A dictionary containing the names of the columns in the output dataframes.
+
+    ------------------------------------------------------------------------------------------------------
+    """
+    for i, item in enumerate(item_data):
+        item[measures["old_index"]] = i
+    
+    return item_data
+
+
+def phrase_split(text):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    This function splits the input text into phrases.
+
+    Parameters:
+    ...........
+    text: str
+        The input text.
+
+    Returns:
+    ...........
+    phrases: list
+        A list of phrases extracted from the input text.
+    phrases_idxs: list
+        A list of tuples containing
+            the start and end indices of the phrases in the input text.
+
+    ------------------------------------------------------------------------------------------------------
+    """
+    phrases = nltk.tokenize.sent_tokenize(text)
+    phrases_idxs = []
+
+    start_idx = 0
+    for phrase in phrases:
+        end_idx = start_idx + len(phrase.split()) - 1
+        phrases_idxs.append((start_idx, end_idx))
+        start_idx = end_idx + 1
+
+    return phrases, phrases_idxs
+
+
+def pause_calculation(filter_json, measures):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    This function calculates the pause duration between each word.
+
+    Parameters:
+    ...........
+    filter_json: list
+        JSON response object.
+    measures: dict
+        A dictionary containing the names of the columns in the output dataframes.
+
+    Returns:
+    ...........
+    filter_json: list
+        The updated JSON response object.
+
+    ------------------------------------------------------------------------------------------------------
+    """
+    for i, item in enumerate(filter_json):
+        if i > 0:
+            item[measures["pause"]] = float(item["start_time"]) - float(
+                filter_json[i - 1]["end_time"]
+            )
+        else:
+            item[measures["pause"]] = np.nan
+    
+    return filter_json
+
+
+def filter_json_transcribe(item_data, speaker_label, measures):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    This function filters the JSON response object to only include items with start_time and end_time.
+
+    Parameters:
+    ...........
+    item_data: dict
+        JSON response object.
+    speaker_label: str
+        Speaker label
+    measures: dict
+        A dictionary containing the names of the columns in the output dataframes.
+
+    Returns:
+    ...........
+    filter_json: list
+        The updated JSON response object.
+
+    ------------------------------------------------------------------------------------------------------
+    """
+    filter_json = [
+        item for item in item_data
+        if "start_time" in item and "end_time" in item
+    ]
+
+    # calculate time difference between each word
+    filter_json = pause_calculation(filter_json, measures)
+
+    if speaker_label is not None:
+        filter_json = [
+            item
+            for item in filter_json
+            if item.get("speaker_label", "") == speaker_label
+        ]
+
+    return filter_json
 
 
 def download_nltk_resources():

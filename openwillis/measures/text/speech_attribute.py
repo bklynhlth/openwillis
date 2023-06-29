@@ -86,8 +86,9 @@ def filter_transcribe(json_conf, measures, speaker_label=None):
     item_data = json_conf["results"]["items"]
 
     # make a dictionary to map old indices to new indices
-    for i, item in enumerate(item_data):
-        item[measures["old_index"]] = i
+    item_data = cutil.create_index_column(item_data, measures)
+    
+    # extract text
     text = " ".join(
         [
             item["alternatives"][0]["content"]
@@ -97,30 +98,13 @@ def filter_transcribe(json_conf, measures, speaker_label=None):
     )
 
     # phrase-split
-    phrases = nltk.tokenize.sent_tokenize(text)
-    phrases_idxs = []
-
-    start_idx = 0
-    for phrase in phrases:
-        end_idx = start_idx + len(phrase.split()) - 1
-        phrases_idxs.append((start_idx, end_idx))
-        start_idx = end_idx + 1
+    phrases, phrases_idxs = cutil.phrase_split(text)
 
     # turn-split
     turns = []
     turns_idxs = []
 
     if speaker_label is not None:
-        speaker_labels = [
-            item["speaker_label"] for item
-            in item_data if "speaker_label" in item
-        ]
-
-        if speaker_label not in speaker_labels:
-            raise ValueError(
-                f"Speaker label {speaker_label} "
-                "not found in the json response object."
-            )
 
         turns_idxs, turns, phrases_idxs, phrases = cutil.filter_speaker(
             item_data, speaker_label, turns_idxs, turns, phrases_idxs, phrases
@@ -130,26 +114,7 @@ def filter_transcribe(json_conf, measures, speaker_label=None):
     text = " ".join(phrases)
 
     # filter json to only include items with start_time and end_time
-    filter_json = [
-        item for item in item_data
-        if "start_time" in item and "end_time" in item
-    ]
-
-    # calculate time difference between each word
-    for i, item in enumerate(filter_json):
-        if i > 0:
-            item[measures["pause"]] = float(item["start_time"]) - float(
-                filter_json[i - 1]["end_time"]
-            )
-        else:
-            item[measures["pause"]] = np.nan
-
-    if speaker_label is not None:
-        filter_json = [
-            item
-            for item in filter_json
-            if item.get("speaker_label", "") == speaker_label
-        ]
+    filter_json = cutil.filter_json_transcribe(item_data, speaker_label, measures)
 
     # extract words
     words = [word["alternatives"][0]["content"] for word in filter_json]
