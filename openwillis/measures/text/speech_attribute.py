@@ -165,19 +165,20 @@ def speech_characteristics(json_conf, language="en-us", speaker_label=None):
 
     Returns:
     ...........
-    word_df: pandas dataframe
-        A dataframe containing word summary information
-    phrase_df: pandas dataframe
-        A dataframe containing phrase summary information
-    turn_df: pandas dataframe
-        A dataframe containing turn summary information
-    summ_df: pandas dataframe
-        A dataframe containing summary information on the speech
+    df_list: list, contains:
+        word_df: pandas dataframe
+            A dataframe containing word summary information
+        phrase_df: pandas dataframe
+            A dataframe containing phrase summary information
+        turn_df: pandas dataframe
+            A dataframe containing turn summary information
+        summ_df: pandas dataframe
+            A dataframe containing summary information on the speech
 
     ------------------------------------------------------------------------------------------------------
     """
     measures = get_config(os.path.abspath(__file__), "text.json")
-    word_df, phrase_df, turn_df, summ_df = cutil.create_empty_dataframes(measures)
+    df_list = cutil.create_empty_dataframes(measures)
 
     try:
         if bool(json_conf):
@@ -188,47 +189,29 @@ def speech_characteristics(json_conf, language="en-us", speaker_label=None):
                     json_conf, measures, speaker_label
                 )
 
-                if len(filter_json) > 0 and len(text) > 0:
-                    (
-                        word_df,
-                        phrase_df,
-                        turn_df,
-                        summ_df,
-                    ) = cutil.process_language_feature(
-                        filter_json,
-                        [word_df, phrase_df, turn_df, summ_df],
-                        text_list,
-                        text_indices,
-                        language,
-                        ["start_time", "end_time"],
+                if len(filter_json) > 0 and len(text_list[-1]) > 0:
+                    df_list = cutil.process_language_feature(
+                        filter_json, df_list, text_list,
+                        text_indices, language, ["start_time", "end_time"],
                         measures,
                     )
             else:
                 words, text = filter_vosk(json_conf, measures)
                 if len(text) > 0:
-                    (
-                        word_df,
-                        phrase_df,
-                        turn_df,
-                        summ_df,
-                    ) = cutil.process_language_feature(
-                        json_conf,
-                        [word_df, phrase_df, turn_df, summ_df],
-                        [words, [], [], text],
-                        [[], []],
-                        language,
-                        ["start", "end"],
+                    df_list = cutil.process_language_feature(
+                        json_conf, df_list, [words, [], [], text],
+                        [[], []], language, ["start", "end"],
                         measures,
                     )
             
             # if phrase_df is empty, then add a row of NaNs
-            if phrase_df.empty:
-                phrase_df.loc[0] = np.nan
+            if df_list[1].empty:
+                df_list[1].loc[0] = np.nan
             # if turn_df is empty, then add a row of NaNs
-            if turn_df.empty:
-                turn_df.loc[0] = np.nan
+            if df_list[2].empty:
+                df_list[2].loc[0] = np.nan
     except Exception as e:
         logger.error(f"Error in Speech Characteristics {e}")
 
     finally:
-        return word_df, phrase_df, turn_df, summ_df
+        return df_list
