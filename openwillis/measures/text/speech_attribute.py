@@ -9,13 +9,37 @@ import logging
 import nltk
 import numpy as np
 import pandas as pd
-
-from openwillis.measures.commons import get_config
 from openwillis.measures.text.util import characteristics_util as cutil
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger()
 
+def get_config(filepath, json_file):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    This function reads the configuration file containing the column names for the output dataframes,
+    and returns the contents of the file as a dictionary.
+
+    Parameters:
+    ...........
+    filepath : str
+        The path to the configuration file.
+    json_file : str
+        The name of the configuration file.
+
+    Returns:
+    ...........
+    measures: A dictionary containing the names of the columns in the output dataframes.
+
+    ------------------------------------------------------------------------------------------------------
+    """
+    dir_name = os.path.dirname(filepath)
+    measure_path = os.path.abspath(os.path.join(dir_name, f"config/{json_file}"))
+
+    file = open(measure_path)
+    measures = json.load(file)
+    return measures
 
 def is_amazon_transcribe(json_conf):
     """
