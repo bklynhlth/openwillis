@@ -154,7 +154,7 @@ def transcribe_audio(s3uri, input_param):
 
     ------------------------------------------------------------------------------------------------------
     """
-    response = "{}"
+    response = json.loads("{}")
     transcript = ""
 
     try:
