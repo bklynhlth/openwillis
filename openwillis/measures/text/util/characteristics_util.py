@@ -711,9 +711,8 @@ def get_sentiment(df_list, text_list, measures):
     for idx, w in enumerate(word_list):
         try:
             sentiment_dict = sentiment.polarity_scores(w)
-            mattr = get_mattr(w)
 
-            word_df.loc[idx, cols] = list(sentiment_dict.values()) + [mattr]
+            word_df.loc[idx, cols[:-1]] = list(sentiment_dict.values())
         except Exception as e:
             logger.error(f"Error in sentiment analysis for word {w}: {e}")
             continue
