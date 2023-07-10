@@ -228,12 +228,18 @@ def speech_characteristics(json_conf, language="en-us", speaker_label=None):
                         measures,
                     )
             
+            # if word_df is empty, then add a row of NaNs
+            if df_list[0].empty:
+                df_list[0].loc[0] = np.nan
             # if phrase_df is empty, then add a row of NaNs
             if df_list[1].empty:
                 df_list[1].loc[0] = np.nan
             # if turn_df is empty, then add a row of NaNs
             if df_list[2].empty:
                 df_list[2].loc[0] = np.nan
+            # if summ_df is empty, then add a row of NaNs
+            if df_list[3].empty:
+                df_list[3].loc[0] = np.nan
     except Exception as e:
         logger.error(f"Error in Speech Characteristics {e}")
 
