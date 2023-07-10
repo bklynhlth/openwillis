@@ -439,7 +439,7 @@ def transcribe_response_to_dataframe(response):
     speakers = 0
     df = pd.DataFrame()
 
-    if response['results']:
+    if 'results' in response:
         if 'speaker_labels' in response['results']:
 
             if 'speakers' in response['results']['speaker_labels']:
