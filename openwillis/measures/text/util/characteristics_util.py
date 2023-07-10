@@ -563,6 +563,9 @@ def get_part_of_speech(df, tags, measures, index=0):
 
     ------------------------------------------------------------------------------------------------------
     """
+    if len(tags) == 0:
+        return df
+
     df.loc[index, measures["speech_noun"]] = (
         100 * len(tags[tags == "Noun"]) / len(tags)
     )
@@ -838,23 +841,26 @@ def process_pause_feature(df_diff, df, text_level, index_list, time_index, level
 
             df.loc[j, measures["pause_var"]] = np.var(pauses)
             df.loc[j, measures["pause_meandur"]] = np.mean(pauses)
-            df.loc[j, measures["speech_percentage"]] = 100 * (
-                1 - np.sum(pauses) / (
-                    60 * df.loc[j, measures[f"{level_name}_minutes"]]
-                )
-            )
 
-            # articulation rate
-            df.loc[j, measures["syllable_rate"]] = (
-                get_num_of_syllables(text_level[j]) / df.loc[j, measures[f"{level_name}_minutes"]]
-            )
+            if df.loc[j, measures[f"{level_name}_minutes"]] > 0:
+                df.loc[j, measures["speech_percentage"]] = 100 * (
+                    1 - np.sum(pauses) / (
+                        60 * df.loc[j, measures[f"{level_name}_minutes"]]
+                    )
+                )
+
+                # articulation rate
+                df.loc[j, measures["syllable_rate"]] = (
+                    get_num_of_syllables(text_level[j]) / df.loc[j, measures[f"{level_name}_minutes"]]
+                )
+
+                df.loc[j, measures["word_rate"]] = (
+                    df.loc[j, measures[f"{level_name}_words"]] / df.loc[j, measures[f"{level_name}_minutes"]]
+                )
         except Exception as e:
             logger.error(f"Error in pause feature calculation for {level_name} {j}: {e}")
             continue
 
-    df[measures["word_rate"]] = (
-        df[measures[f"{level_name}_words"]] / df[measures[f"{level_name}_minutes"]]
-    )
     df[measures["pause_rate"]] = df[measures["word_rate"]]
 
     return df
@@ -901,13 +907,21 @@ def update_summ_df(
             - float(df_diff.iloc[0][time_index[0]])
         ) / 60
     ]
+
     summ_df[measures["speech_words"]] = len(df_diff)
-    summ_df[measures["word_rate"]] = (
-        summ_df[measures["speech_words"]] / summ_df[measures["speech_minutes"]]
+    if len(df_diff) > 0:
+        summ_df[measures["word_rate"]] = (
+            summ_df[measures["speech_words"]] / summ_df[measures["speech_minutes"]]
+        )
+        summ_df[measures["syllable_rate"]] = (
+            get_num_of_syllables(full_text) / summ_df[measures["speech_minutes"]]
+        )
+        summ_df[measures["speech_percentage"]] = 100 * (
+        1
+        - df_diff.loc[1:, measures["pause"]].sum()
+        / (60 * summ_df[measures["speech_minutes"]])
     )
-    summ_df[measures["syllable_rate"]] = (
-        get_num_of_syllables(full_text) / summ_df[measures["speech_minutes"]]
-    )
+
     summ_df[measures["pause_rate"]] = summ_df[measures["word_rate"]]
     summ_df[measures["word_pause_mean"]] = word_df[measures["word_pause"]].mean(
         skipna=True
@@ -921,11 +935,7 @@ def update_summ_df(
     summ_df[measures["phrase_pause_var"]] = phrase_df[measures["phrase_pause"]].var(
         skipna=True
     )
-    summ_df[measures["speech_percentage"]] = 100 * (
-        1
-        - df_diff.loc[1:, measures["pause"]].sum()
-        / (60 * summ_df[measures["speech_minutes"]])
-    )
+    
     if len(turn_df) > 0:
         summ_df[measures["num_turns"]] = len(turn_df)
         summ_df[measures["turn_minutes_mean"]] = turn_df[
