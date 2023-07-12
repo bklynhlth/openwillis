@@ -901,7 +901,7 @@ def update_summ_df(
 
     ------------------------------------------------------------------------------------------------------
     """
-    summ_df[measures["speech_minutes"]] = phrase_df[measures["phrase_minutes"]].sum()
+    summ_df[measures["speech_minutes"]] = [phrase_df[measures["phrase_minutes"]].sum()]
 
     summ_df[measures["speech_words"]] = len(df_diff)
     if len(df_diff) > 0:
