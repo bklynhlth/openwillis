@@ -1,0 +1,718 @@
+{
+    "1" : {
+        "text" : "Have you been feeling worried or nervous in the past week?",
+        "points": [2, 3]
+    },
+    "2" : {
+        "text": "Would you say that you're usually calm and relaxed?",
+        "points": [3, 8]
+    },
+    "3" : {
+        "text": "What's been making you feel nervous (worried, not calm, not relaxed)?",
+        "points": [4]
+    },
+    "4" : {
+        "text": "Just how nervous (worried, etc.) have you been feeling?",
+        "points": [5]
+    },
+    "5" : {
+        "text": "Have you been shaking at times, or has your heart been racing?",
+        "points": [6]
+    },
+    "6" : {
+        "text": "Do you get into a state of panic?",
+        "points": [7]
+    },
+    "7" : {
+        "text": "Has your sleep, eating, or participation in activities been affected?",
+        "points": [8]
+    },
+    "8" : {
+        "text": "Have things been going well for you?",
+        "points": [9]
+    },
+    "9" : {
+        "text": "Has anything been bothering you lately?",
+        "points": [10]
+    },
+    "10" : {
+        "text": "Can you tell me something about your thoughts on life and its purpose?",
+        "points": [11]
+    },
+    "11" : {
+        "text": "Do you follow a particular philosophy (any special rules, teachings, or religious doctrine)?",
+        "points": [12]
+    },
+    "12" : {
+        "text": "Some people tell me they believe in the Devil; what do you think?",
+        "points": [13, 14]
+    },
+    "13" : {
+        "text": "Can you tell me more about this?",
+        "points": [14]
+    },
+    "14" : {
+        "text": "Can you read other people's minds?",
+        "points": [15, 16]
+    },
+    "15" : {
+        "text": "How does that work?",
+        "points": [16]
+    },
+    "16" : {
+        "text": "Can others read your mind?",
+        "points": [17, 19]
+    },
+    "17" : {
+        "text": "How can they do that?",
+        "points": [18]
+    },
+    "18" : {
+        "text": "Is there any reason that someone would want to read your mind?",
+        "points": [19]
+    },
+    "19" : {
+        "text": "Who controls your thoughts?",
+        "points": [20]
+    },
+    "20" : {
+        "text": "How do you spend your time these days?",
+        "points": [21]
+    },
+    "21" : {
+        "text": "Do you prefer to be alone?",
+        "points": [22]
+    },
+    "22" : {
+        "text": "Do you join in activities with others?",
+        "points": [23, 25]
+    },
+    "23" : {
+        "text": "Why not? ... Are you afraid of people, or do you dislike them?",
+        "points": [24, 26]
+    },
+    "24" : {
+        "text": "Can you explain?",
+        "points": [26]
+    },
+    "25" : {
+        "text": "Tell me about it.",
+        "points": [26]
+    },
+    "26" : {
+        "text": "Do you have many friends?",
+        "points": [27, 30]
+    },
+    "27" : {
+        "text": "Just a few?",
+        "points": [28, 29]
+    },
+    "28" : {
+        "text": "Any? .... Why?",
+        "points": [32]
+    },
+    "29" : {
+        "text": "Why just a few friends?",
+        "points": [30]
+    },
+    "30" : {
+        "text": "Close friends?",
+        "points": [31, 32]
+    },
+    "31" : {
+        "text": "Why not?",
+        "points": [32]
+    },
+    "32" : {
+        "text": "Do you feel that you can trust most people?",
+        "points": [33, 34]
+    },
+    "33" : {
+        "text": "Why not?",
+        "points": [34]
+    },
+    "34" : {
+        "text": "Are there some people in particular who you don't trust?",
+        "points": [35, 36, 41]
+    },
+    "35" : {
+        "text": "Can you tell me who they are?",
+        "points": [36]
+    },
+    "36" : {
+        "text": "Why don't you trust people (or name specific person)?",
+        "points": [37, 41]
+    },
+    "37" : {
+        "text": "Do you have a good reason not to trust ...?",
+        "points": [38]
+    },
+    "38" : {
+        "text": "Is there something that .... did to you?",
+        "points": [39]
+    },
+    "39" : {
+        "text": "Perhaps something that ... might do to you now?",
+        "points": [40, 41]
+    },
+    "40" : {
+        "text": "Can you explain to me?",
+        "points": [41]
+    },
+    "41" : {
+        "text": "Do you get along well with others?",
+        "points": [42, 43]
+    },
+    "42" : {
+        "text": "What's the problem?",
+        "points": [43]
+    },
+    "43" : {
+        "text": "Do you have a quick temper?",
+        "points": [44]
+    },
+    "44" : {
+        "text": "Do you get into fights?",
+        "points": [45, 48]
+    },
+    "45" : {
+        "text": "How do these fights start?",
+        "points": [46]
+    },
+    "46" : {
+        "text": "Tell me about these fights.",
+        "points": [47]
+    },
+    "47" : {
+        "text": "How often does this happen?",
+        "points": [48]
+    },
+    "48" : {
+        "text": "Do you sometimes lose control of yourself?",
+        "points": [49, 50]
+    },
+    "49" : {
+        "text": "What happens when you lose control of yourself?",
+        "points": [50]
+    },
+    "50" : {
+        "text": "Do you like most people?",
+        "points": [51, 52]
+    },
+    "51" : {
+        "text": "Why not?",
+        "points": [52]
+    },
+    "52" : {
+        "text": "Are there perhaps some people who don't like you?",
+        "points": [53, 54]
+    },
+    "53" : {
+        "text": "For what reason?",
+        "points": [54]
+    },
+    "54" : {
+        "text": "Do others talk about you behind your back?",
+        "points": [55, 57]
+    },
+    "55" : {
+        "text": "What do they say about you?",
+        "points": [56]
+    },
+    "56" : {
+        "text": "Why?",
+        "points": [57]
+    },
+    "57" : {
+        "text": "Does anyone ever spy on you or plot against you?",
+        "points": [58]
+    },
+    "58" : {
+        "text": "Do you sometimes feel in danger?",
+        "points": [59, 64]
+    },
+    "59" : {
+        "text": "Would you say that your life is in danger?",
+        "points": [60]
+    },
+    "60" : {
+        "text": "Is someone thinking of harming you or even perhaps thinking of killing you?",
+        "points": [61]
+    },
+    "61" : {
+        "text": "Have you gone to the police for help?",
+        "points": [62]
+    },
+    "62" : {
+        "text": "Do you sometimes take matters into your own hands or take action against those who might harm you?",
+        "points": [63, 64]
+    },
+    "63" : {
+        "text": "What have you done?",
+        "points": [64]
+    },
+    "64" : {
+        "text": "Do you once in a while have strange or unusual experiences?",
+        "points": [65]
+    },
+    "65" : {
+        "text": "Sometimes people tell me that they can hear noises or voices inside their head that others can't hear. What about you?",
+        "points": [66, 68]
+    },
+    "66" : {
+        "text": "Do you sometimes receive personal communications from the radio or TV?",
+        "points": [67, 68]
+    },
+    "67" : {
+        "text": "From God or the Devil?",
+        "points": [68, 83]
+    },
+    "68" : {
+        "text": "What do you hear?",
+        "points": [69]
+    },
+    "69" : {
+        "text": "Are these as clear and loud as my voice?",
+        "points": [70]
+    },
+    "70" : {
+        "text": "How often do you hear these voices, noises, messages, etc.?",
+        "points": [71]
+    },
+    "71" : {
+        "text": "Does this happen at a particular time of day or all the time?",
+        "points": [72, 80]
+    },
+    "72" : {
+        "text": "Can you recognize whose voices these are?",
+        "points": [73]
+    },
+    "73" : {
+        "text": "What do the voices say?",
+        "points": [74]
+    },
+    "74" : {
+        "text": "Are the voices good or bad?",
+        "points": [75]
+    },
+    "75" : {
+        "text": "Pleasant or unpleasant?",
+        "points": [76]
+    },
+    "76" : {
+        "text": "Do the voices interrupt your thinking or your activities?",
+        "points": [77]
+    },
+    "77" : {
+        "text": "Do they sometimes give you orders or instructions?",
+        "points": [78, 80]
+    },
+    "78" : {
+        "text": "For example?",
+        "points": [79]
+    },
+    "79" : {
+        "text": "Do you usually obey these orders (instructions)?",
+        "points": [80]
+    },
+    "80" : {
+        "text": "What do you make of these voices (or noises); where do they really come from?",
+        "points": [81]
+    },
+    "81" : {
+        "text": "Why do you have these experiences?",
+        "points": [82]
+    },
+    "82" : {
+        "text": "Are these normal experiences?",
+        "points": [83]
+    },
+    "83" : {
+        "text": "Do ordinary things sometimes look strange or distorted to you?",
+        "points": [84]
+    },
+    "84" : {
+        "text": "Do you sometimes have “visions” or see things that others can't see?",
+        "points": [85, 88]
+    },
+    "85" : {
+        "text": "For example?",
+        "points": [86]
+    },
+    "86" : {
+        "text": "Do these visions seem very real or life-like?",
+        "points": [87]
+    },
+    "87" : {
+        "text": "How often do you have these experiences?",
+        "points": [88]
+    },
+    "88" : {
+        "text": "Do you sometimes smell things that are unusual or that others don't smell?",
+        "points": [89, 90]
+    },
+    "89" : {
+        "text": "Please explain.",
+        "points": [90]
+    },
+    "90" : {
+        "text": "Do you get any strange or unusual sensations from your body?",
+        "points": [91, 92]
+    },
+    "91" : {
+        "text": "Tell me about this.",
+        "points": [92]
+    },
+    "92" : {
+        "text": "How have you been feeling in terms of your health?",
+        "points": [93, 94]
+    },
+    "93" : {
+        "text": "Do you consider yourself to be in top health?",
+        "points": [94, 95]
+    },
+    "94" : {
+        "text": "What has been troubling you?",
+        "points": [95]
+    },
+    "95" : {
+        "text": "Do you have any medical illness or disease?",
+        "points": [96]
+    },
+    "96" : {
+        "text": "Has any part of your body been troubling you?",
+        "points": [97, 98]
+    },
+    "97" : {
+        "text": "How is your head? Your heart? Stomach? The rest of your body?",
+        "points": [98]
+    },
+    "98" : {
+        "text": "Could you explain?",
+        "points": [99]
+    },
+    "99" : {
+        "text": "Has your head or body changed in shape or size?",
+        "points": [100, 102]
+    },
+    "100" : {
+        "text": "Please explain.",
+        "points": [101]
+    },
+    "101" : {
+        "text": "What is causing these changes?",
+        "points": [102]
+    },
+    "102" : {
+        "text": "How has your mood been in the past week: mostly good, mostly bad?",
+        "points": [103, 104]
+    },
+    "103" : {
+        "text": "Have there been times in the past week when you were feeling sad or unhappy?",
+        "points": [104, 114]
+    },
+    "104" : {
+        "text": "Is there something in particular that is making you sad?",
+        "points": [105]
+    },
+    "105" : {
+        "text": "How often do you feel sad?",
+        "points": [106]
+    },
+    "106" : {
+        "text": "Just how sad have you been feeling?",
+        "points": [107]
+    },
+    "107" : {
+        "text": "Have you been crying lately?",
+        "points": [108]
+    },
+    "108" : {
+        "text": "Has your mood in any way affected your sleep?",
+        "points": [109]
+    },
+    "109" : {
+        "text": "Has it affected your appetite?",
+        "points": [110]
+    },
+    "110" : {
+        "text": "Do you participate less in activities on account of your mood?",
+        "points": [111]
+    },
+    "111" : {
+        "text": "Have you had any thoughts of harming yourself?",
+        "points": [112, 114]
+    },
+    "112" : {
+        "text": "Any thoughts about ending your life?",
+        "points": [113, 114]
+    },
+    "113" : {
+        "text": "Have you attempted suicide?",
+        "points": [114]
+    },
+    "114" : {
+        "text": "If you were to compare yourself to the average person, how would you come out: a little better, maybe a little worse, or about the same?",
+        "points": [115, 117, 118]
+    },
+    "115" : {
+        "text": "Worse in what ways?",
+        "points": [116]
+    },
+    "116" : {
+        "text": "Just how do you feel about yourself?",
+        "points": [120]
+    },
+    "117" : {
+        "text": "Better in what ways?",
+        "points": [120]
+    },
+    "118" : {
+        "text": "Are you special in some ways?",
+        "points": [119, 120]
+    },
+    "119" : {
+        "text": "In what ways?",
+        "points": [120]
+    },
+    "120" : {
+        "text": "Would you consider yourself gifted?",
+        "points": [121]
+    },
+    "121" : {
+        "text": "Do you have talents or abilities that most people don't have?",
+        "points": [122, 123]
+    },
+    "122" : {
+        "text": "Please explain.",
+        "points": [123]
+    },
+    "123" : {
+        "text": "Do you have any special powers?",
+        "points": [124, 126]
+    },
+    "124" : {
+        "text": "What are these?",
+        "points": [125]
+    },
+    "125" : {
+        "text": "Where do these powers come from?",
+        "points": [126]
+    },
+    "126" : {
+        "text": "Do you have extrasensory perception (ESP), or can you read other people's minds?",
+        "points": [127]
+    },
+    "127" : {
+        "text": "Are you very wealthy?",
+        "points": [128, 129]
+    },
+    "128" : {
+        "text": "Explain please.",
+        "points": [129]
+    },
+    "129" : {
+        "text": "Can you be considered to be very bright?",
+        "points": [130, 131]
+    },
+    "130" : {
+        "text": "Why would you say so?",
+        "points": [131]
+    },
+    "131" : {
+        "text": "Would you describe yourself as famous?",
+        "points": [132]
+    },
+    "132" : {
+        "text": "Would some people recognize you from TV, radio, or the newspaper?",
+        "points": [133, 134]
+    },
+    "133" : {
+        "text": "Can you tell me about it?",
+        "points": [134]
+    },
+    "134" : {
+        "text": "Are you a religious person?",
+        "points": [135, 140]
+    },
+    "135" : {
+        "text": "Are you close to God?",
+        "points": [136, 140]
+    },
+    "136" : {
+        "text": "Did God assign you some special role or purpose?",
+        "points": [137]
+    },
+    "137" : {
+        "text": "Can you be one of God's messengers or angels?",
+        "points": [138, 139]
+    },
+    "138" : {
+        "text": "What special powers do you have as God's messenger (angel)?",
+        "points": [139]
+    },
+    "139" : {
+        "text": "Do you perhaps consider yourself to be God?",
+        "points": [140]
+    },
+    "140" : {
+        "text": "Do you have some special mission in life?",
+        "points": [141, 143]
+    },
+    "141" : {
+        "text": "What is your mission?",
+        "points": [142]
+    },
+    "142" : {
+        "text": "Who assigned you to that mission?",
+        "points": [143]
+    },
+    "143" : {
+        "text": "Did you ever do something wrong — something you feel bad or guilty about?",
+        "points": [144, 149]
+    },
+    "144" : {
+        "text": "Just how much does that bother you now?",
+        "points": [145]
+    },
+    "145" : {
+        "text": "Do you feel that you deserve punishment for that?",
+        "points": [146, 149]
+    },
+    "146" : {
+        "text": "What kind of punishment would you deserve?",
+        "points": [147]
+    },
+    "147" : {
+        "text": "Have you at times thought of punishing yourself?",
+        "points": [148, 149]
+    },
+    "148" : {
+        "text": "Have you ever acted on those thoughts of punishing yourself?",
+        "points": [149]
+    },
+    "149" : {
+        "text": "Can you tell me today's date (i.e., the day, month, and year)?",
+        "points": [150, 151]
+    },
+    "150" : {
+        "text": "Can you tell me what day of the week it is?",
+        "points": [151]
+    },
+    "151" : {
+        "text": "What is the name of the place that you are in now?",
+        "points": [152, 154]
+    },
+    "152" : {
+        "text": "What ward are you on?",
+        "points": [153]
+    },
+    "153" : {
+        "text": "What is the address of where you're now staying?",
+        "points": [154, 155]
+    },
+    "154" : {
+        "text": "Can you tell me your home address?",
+        "points": [155, 156]
+    },
+    "155" : {
+        "text": "If someone had to reach you by phone, what number would that person call?",
+        "points": [156]
+    },
+    "156" : {
+        "text": "If someone had to reach you at home, what number would that person call?",
+        "points": [157]
+    },
+    "157" : {
+        "text": "What is the name of the doctor who is treating you?",
+        "points": [158, 159]
+    },
+    "158" : {
+        "text": "Can you tell me who else is on the staff and what they do?",
+        "points": [159]
+    },
+    "159" : {
+        "text": "Do you know who is currently the president (prime minister, etc.)?",
+        "points": [160]
+    },
+    "160" : {
+        "text": "Who is our governor (premier, etc.)??",
+        "points": [161]
+    },
+    "161" : {
+        "text": "Who is the mayor (town supervisor, etc.) of this city (town, etc.)?",
+        "points": [162]
+    },
+    "162" : {
+        "text": "How long have you been in the hospital (clinic, etc.)?",
+        "points": [163]
+    },
+    "163" : {
+        "text": "Why did you come to the hospital (clinic, etc.)?",
+        "points": [164]
+    },
+    "164" : {
+        "text": "Did you need to be in a hospital (clinic, etc.)?",
+        "points": [165, 167]
+    },
+    "165" : {
+        "text": "Did you have a problem that needed treatment?",
+        "points": [166, 169]
+    },
+    "166" : {
+        "text": "Would you say that you had a psychiatric or mental problem?",
+        "points": [167, 169]
+    },
+    "167" : {
+        "text": "Why?....would you say that you had a psychiatric or mental problem?",
+        "points": [168, 169]
+    },
+    "168" : {
+        "text": "Can you tell me about it and what it consisted of?",
+        "points": [169]
+    },
+    "169" : {
+        "text": "In your own opinion, do you need to be taking medicine?",
+        "points": [170, 171, 172]
+    },
+    "170" : {
+        "text": "Why then are you taking medicines?",
+        "points": [171, 172]
+    },
+    "171" : {
+        "text": "Why?... Does the medicine help you in any way?",
+        "points": [172]
+    },
+    "172" : {
+        "text": "Do you at this time have any psychiatric or mental problems?",
+        "points": [173, 174]
+    },
+    "173" : {
+        "text": "For what reason are you at the hospital (clinic, etc.)?",
+        "points": [175]
+    },
+    "174" : {
+        "text": "Please explain",
+        "points": [175]
+    },
+    "175" : {
+        "text": "Just how serious are these problems?",
+        "points": [176, 178]
+    },
+    "176" : {
+        "text": "Are you ready yet for discharge from the hospital?",
+        "points": [177]
+    },
+    "177" : {
+        "text": "Do you think youll be taking medicine for your problems after discharge?",
+        "points": [178]
+    },
+    "178" : {
+        "text": "What are your future plans?",
+        "points": [179]
+    },
+    "179" : {
+        "text": "What about your longer-range goals?",
+        "points": []
+    }
+}

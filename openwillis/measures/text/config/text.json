@@ -40,10 +40,21 @@
   "num_turns": "num_turns",
   "turn_minutes_mean": "mean_turn_length_minutes",
   "turn_words_mean": "mean_turn_length_words",
-  "turn_pause_mean": "mean_pre_turn_pause",
+  "turn_pause_mean": "turn_pause_length_mean",
+  "turn_pause_var": "turn_pause_variability",
   "num_one_word_turns": "num_one_word_turns",
   "num_interrupts": "num_interrupts",
+  "prompt_id": "prompt_id",
+  "pre_prompt_pause_duration": "pre_prompt_pause_duration",
+  "prompt_length_minutes": "prompt_length_minutes",
+  "prompt_percentage": "prompt_percentage",
+  "prompt_adherence": "prompt_adherence",
+  "no_prompts": "number_of_prompts",
+  "mean_prompt_adherence": "mean_prompt_adherence",
+  "promps_turns_percentage": "promps_turns_percentage",
   "old_index": "old_idx",
   "pause": "pause_diff",
-  "panss_string": "[Hi I am We are going to be spending the next 30 to 40 minutes talking about you and your reasons for being here. Maybe you can start out by telling me something about yourself and your background,Have you been feeling worried or nervous in the past week,Would you say that you are usually calm and relaxed,What is been making you feel nervous,Just how nervous have you been feeling,Have you been shaking at times or has your heart been racing,Do you get into a state of panic,Has your sleep eating or participation in activities been affected,Have things been going well for you,Has anything been bothering you lately,Can you tell me something about your thoughts on life and its purpose,Do you follow a particular philosophy any special rules teachings or religious doctrine,Some people tell me they believe in the Devil what do you think,Can you tell me more about this,Can you read other people minds, How does that work,Can others read your mind,How can they do that,Is there any reason that someone would want to read your mind,Who controls your thoughts]"
+  "panss_string": "[Hi I am We are going to be spending the next 30 to 40 minutes talking about you and your reasons for being here. Maybe you can start out by telling me something about yourself and your background,Have you been feeling worried or nervous in the past week,Would you say that you are usually calm and relaxed,What is been making you feel nervous,Just how nervous have you been feeling,Have you been shaking at times or has your heart been racing,Do you get into a state of panic,Has your sleep eating or participation in activities been affected,Have things been going well for you,Has anything been bothering you lately,Can you tell me something about your thoughts on life and its purpose,Do you follow a particular philosophy any special rules teachings or religious doctrine,Some people tell me they believe in the Devil what do you think,Can you tell me more about this,Can you read other people minds, How does that work,Can others read your mind,How can they do that,Is there any reason that someone would want to read your mind,Who controls your thoughts]",
+  "panss_prompt_ids": [1, 8, 9, 10, 11, 12, 19],
+  "madrs_prompt_ids": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 }

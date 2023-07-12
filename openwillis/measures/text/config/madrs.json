@@ -1,0 +1,42 @@
+{
+    "1" : {
+        "text" : "Apparent sadness Despondency, gloom, and despair (more than just ordinary transient low spirits), reflected in speech, facial expression, and posture; rate by depth and inability to brighten up",
+        "points": [2]
+    },
+    "2" : {
+        "text" : "Reported sadness Reports of depressed mood, regardless of whether it is reflected in appearance or not; includes low spirits, despondency, or the feeling of being beyond help and without hope",
+        "points": [3]
+    },
+    "3" : {
+        "text" : "Inner tension Feelings of ill-defined discomfort, edginess, inner turmoil, mental tension mounting to either panic, dread, or anguish; rate by intensity, frequency, duration, and extent of reassurance called for",
+        "points": [4]
+    },
+    "4" : {
+        "text" : "Reduced sleep Experience of reduced duration or depth of sleep compared to the patient's own normal pattern when well",
+        "points": [5]
+    },
+    "5" : {
+        "text" : "Reduced appetite Feeling of loss of appetite; rate by loss of desire for food or the need to force oneself to eat",
+        "points": [6]
+    },
+    "6" : {
+        "text" : "Concentration difficulty Difficulties in collecting one's thoughts mounting to incapacitating lack of concentration; rate by intensity, frequency, and degree of incapacity produced",
+        "points": [7]
+    },
+    "7" : {
+        "text" : "Lassitude Difficulty getting started or slowness initiating and performing everyday activities",
+        "points": [8]
+    },
+    "8" : {
+        "text" : "Inability to feel Subjective experience of reduced interest in the surroundings or activities that normally give pleasure; the ability to react with adequate emotion to circumstances or people is reduced",
+        "points": [9]
+    },
+    "9" : {
+        "text" : "Pessimistic thoughts Thoughts of guilt, inferiority, self reproach, sinfulness, remorse, and ruin",
+        "points": [10]
+    },
+    "10" : {
+        "text" : "Suicidal thoughts Feeling that life is not worth living, that a natural death would be welcome, suicidal thoughts, and the preparations for suicide; suicidal attempts should not in themselves influence the rating",
+        "points": []
+    }
+}
