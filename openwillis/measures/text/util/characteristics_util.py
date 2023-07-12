@@ -6,8 +6,10 @@
 import pandas as pd
 import numpy as np
 import logging
+from scipy import spatial
 
 import nltk
+from sentence_transformers import SentenceTransformer
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 from lexicalrichness import LexicalRichness
 
@@ -148,6 +150,69 @@ def create_empty_dataframes(measures):
     )
 
     return word_df, phrase_df, turn_df, summ_df
+
+
+def create_empty_dataframes_clinician(measures):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    Creating empty measures dataframes for clinician attributes
+
+    Parameters:
+    ...........
+    measures: dict
+        A dictionary containing the names of the columns in the output dataframes.
+
+    Returns:
+    ...........
+    prompt_df: pandas dataframe
+        A dataframe containing clinician prompts information on the speech
+    summ_df: pandas dataframe
+        A dataframe containing summary information on the speech
+
+    ------------------------------------------------------------------------------------------------------
+    """
+
+    prompt_df = pd.DataFrame(
+        columns=[
+            measures["prompt_id"],
+            measures["pre_prompt_pause_duration"],
+            measures["prompt_length_minutes"],
+            measures["prompt_percentage"],
+            measures["prompt_adherence"],
+            measures["word_rate"],
+            measures["syllable_rate"],
+            measures["word_pause_mean"],
+            measures["word_pause_var"],
+            measures["pos"],
+            measures["neg"],
+            measures["neu"],
+            measures["compound"],
+        ]
+    )
+
+    summ_df = pd.DataFrame(
+        columns=[
+            measures["speech_minutes"],
+            measures["no_prompts"],
+            measures["mean_prompt_adherence"],
+            measures["promps_turns_percentage"],
+            measures["speech_percentage"],
+            measures["word_rate"],
+            measures["syllable_rate"],
+            measures["pause_rate"],
+            measures["word_pause_mean"],
+            measures["word_pause_var"],
+            measures["turn_pause_mean"],
+            measures["turn_pause_var"],
+            measures["pos"],
+            measures["neg"],
+            measures["neu"],
+            measures["compound"],
+        ]
+    )
+
+    return prompt_df, summ_df
 
 
 def filter_speaker_phrase(item_data, speaker_label, phrases_idxs, phrases):
@@ -332,6 +397,56 @@ def filter_speaker(item_data, speaker_label, turns_idxs, turns, phrases_idxs, ph
     )
 
     return turns_idxs, turns, phrases_idxs, phrases
+
+
+def filter_rater(item_data, rater_label):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    This function updates the turns and phrases lists
+        to only include the rater label provided.
+
+    Parameters:
+    ...........
+    item_data: dict
+        JSON response object.
+    rater_label: str
+        Speaker label for clinician
+
+    Returns:
+    ...........
+    turns_idxs: list
+        A list of tuples containing
+            the start and end indices of the turns in the JSON object.
+    turns: list
+        A list of turns extracted from the JSON object.
+
+    Raises:
+    ...........
+        ValueError: If the rater label is not found in the json response object.
+
+    ------------------------------------------------------------------------------------------------------
+    """
+
+    turns_idxs, turns = [], []
+
+    speaker_labels = [
+        item["speaker_label"] for item
+        in item_data if "speaker_label" in item
+    ]
+
+    if rater_label not in speaker_labels:
+        raise ValueError(
+            f"Rater label {rater_label} "
+            "not found in the json response object."
+        )
+
+    # turn-split for the speaker label
+    turns_idxs, turns = filter_speaker_turn(
+        item_data, rater_label, turns_idxs, turns
+    )
+
+    return turns_idxs, turns
 
 
 def create_index_column(item_data, measures):
@@ -1188,6 +1303,225 @@ def get_pause_feature(json_conf, df_list, text_list, text_indices, time_index, m
     df_feature = [word_df, phrase_df, turn_df, summ_df]
 
     return df_feature
+
+
+def get_similarity_matrix(embeddings1, embeddings2):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    This function calculates the cosine similarity between
+        two sets of embeddings.
+
+    Parameters:
+    ...........
+    embeddings1: numpy array
+        A numpy array containing the embeddings of the first set of text.
+    embeddings2: numpy array
+        A numpy array containing the embeddings of the second set of text.
+
+    Returns:
+    ...........
+    similarity_matrix: numpy array
+        A numpy array containing the cosine similarity between the two sets of embeddings.
+
+    ------------------------------------------------------------------------------------------------------
+    """
+    similarity_matrix = np.zeros((len(embeddings1), len(embeddings2)))
+
+    for i in range(len(embeddings1)):
+        for j in range(len(embeddings2)):
+            similarity_matrix[i, j] = 1 - spatial.distance.cosine(embeddings1[i], embeddings2[j])
+
+    return similarity_matrix
+
+
+def text_adherence_prompt(prompt_df, prompt_indices, similarity_matrix, measures):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    This function calculates the prompt adherence of the input text.
+        and adds them to the output dataframe prompt_df.
+
+    Parameters:
+    ...........
+    prompt_df: pandas dataframe
+        A dataframe containing prompt summary information
+    prompt_indices: list
+        A list containing the indices of prompts in the interview transcript.
+    similarity_matrix: numpy array
+        A numpy array containing the cosine similarity between the two sets of embeddings.
+    measures: dict
+        A dictionary containing the names of the columns in the output dataframes.
+
+    Returns:
+    ...........
+    prompt_df: pandas dataframe
+        The updated prompt_df dataframe.
+    turn_ids: numpy array
+        A numpy array containing the indices of the turns that are prompt-adherent.
+
+    ------------------------------------------------------------------------------------------------------
+    """
+
+    # calculate the maximum similarity score for each prompt
+    prompt_similarities = np.max(similarity_matrix, axis=0)
+    prompt_matchings = np.argmax(similarity_matrix, axis=0)
+
+    prompt_indices = np.array(prompt_indices)
+    prompt_similarities_bool = prompt_similarities > 0.7
+
+    # matchings with adequate similarity
+    prompt_ids = prompt_indices[prompt_similarities_bool]
+    turn_ids = prompt_matchings[prompt_similarities_bool]
+
+    prompt_df[measures["prompt_id"]] = prompt_ids
+    prompt_df[measures["prompt_adherence"]] = prompt_similarities[prompt_similarities_bool]
+
+    return prompt_df, turn_ids
+
+
+def text_adherence_summ(summ_df, prompt_df, similarity_matrix, measures):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    This function updates the summary dataframe summ_df with prompt adherence information.
+
+    Parameters:
+    ...........
+    summ_df: pandas dataframe
+        A dataframe containing phrase summary information
+    prompt_df: pandas dataframe
+        A dataframe containing prompt summary information
+    similarity_matrix: numpy array
+        A numpy array containing the cosine similarity between the two sets of embeddings.
+    measures: dict
+        A dictionary containing the names of the columns in the output dataframes.
+
+    Returns:
+    ...........
+    summ_df: pandas dataframe
+        The updated summ_df dataframe.
+
+    ------------------------------------------------------------------------------------------------------
+    """
+    # number of prompts
+    summ_df[measures["no_prompts"]] = [len(prompt_df)]
+    # average prompt adherence
+    summ_df[measures["mean_prompt_adherence"]] = prompt_df[measures["prompt_adherence"]].mean()
+    # percentage of turns being prompt-adherent
+    summ_df[measures["promps_turns_percentage"]] = 100 * len(prompt_df) / len(similarity_matrix)
+    
+    return summ_df
+
+
+def get_text_adherence(df_list, text_list, text_indices, measures):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    This function calculates the prompt adherence of the input text.
+
+    Parameters:
+    ...........
+    df_list: list
+        List of pandas dataframes.
+            prompt_df, summ_df
+    text_list: list
+        List of transcribed text.
+            split into turns, full text, and prompt list.
+    text_indices: list
+        List of indices for text_list.
+            for turns and prompts.
+    measures: dict
+        A dictionary containing the names of the columns in the output dataframes.
+
+    Returns:
+    ...........
+    df_list: list
+        List of updated pandas dataframes.
+            prompt_df, summ_df
+    text_list: list
+        List of updated transcribed text.
+            split into turns, full text, and prompt list.
+
+    ------------------------------------------------------------------------------------------------------
+    """
+    prompt_df, summ_df = df_list
+    turn_list, full_text, prompt_list = text_list
+    turn_indices, prompt_indices = text_indices
+
+    model = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
+
+    turn_embeddings = model.encode(turn_list)
+    prompt_embeddings = model.encode(prompt_list)
+
+    similarity_matrix = get_similarity_matrix(turn_embeddings, prompt_embeddings)
+
+    prompt_df, turn_ids = text_adherence_prompt(prompt_df, prompt_indices, similarity_matrix, measures)
+
+    summ_df = text_adherence_summ(summ_df, prompt_df, similarity_matrix, measures)
+
+    # update prompt_list with matched prompts
+    prompt_list2 = [turn_list[i] for i in turn_ids]
+
+    df_list = [prompt_df, summ_df]
+    text_list[2] = prompt_list2
+
+    return df_list, text_list
+
+
+def process_rater_feature(
+    json_conf, df_list, text_list,
+    text_indices, language, measures,
+):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    This function processes the language features from json response.
+
+    Parameters:
+    ...........
+    json_conf: list
+        JSON response object.
+    df_list: list
+        List of pandas dataframes.
+         word_df, phrase_df, turn_df, summ_df
+    text_list: list
+        List of transcribed text.
+         split into words, phrases, turns, and full text.
+    text_indices: list
+        List of indices for text_list.
+         for phrases and turns.
+    language: str
+        Language of the transcribed text.
+    time_index: list
+        A list containing the names of the columns in json that contain the
+         start and end times of each word.
+    measures: dict
+        A dictionary containing the names of the columns in the output dataframes.
+
+    Returns:
+    ...........
+    prompt_df: pandas dataframe
+        A dataframe containing prompt summary information
+    summ_df: pandas dataframe
+        A dataframe containing phrase summary information
+    ------------------------------------------------------------------------------------------------------
+    """
+
+    time_index = ["start_time", "end_time"]
+
+    df_list, text_list = get_text_adherence(df_list, text_list, text_indices, measures)
+
+    # df_list = get_pause_feature(json_conf, df_list, text_list, text_indices, time_index, measures)
+
+    # if language == "en-us":
+    #     json_conf = get_tag(json_conf, TAG_DICT, measures)
+    #     df_list = get_tag_summ(json_conf, df_list, text_indices, measures)
+
+    #     df_list = get_sentiment(df_list, text_list, measures)
+
+    prompt_df, summ_df = df_list
+    return prompt_df, summ_df
 
 
 def process_language_feature(
