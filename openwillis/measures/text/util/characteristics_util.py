@@ -176,7 +176,7 @@ def create_empty_dataframes_clinician(measures):
     prompt_df = pd.DataFrame(
         columns=[
             measures["prompt_id"],
-            measures["pre_prompt_pause_duration"],
+            measures["prompt_pause"],
             measures["prompt_length_minutes"],
             measures["prompt_percentage"],
             measures["prompt_adherence"],
@@ -981,6 +981,92 @@ def process_pause_feature(df_diff, df, text_level, index_list, time_index, level
     return df
 
 
+def process_pause_feature_prompt(df_diff, prompt_df, turn_list, turn_index, prompt_turn_index, measures):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    This function calculates various pause-related speech
+     characteristic features at the prompt level
+     and adds them to the output dataframe prompt_df.
+
+    Parameters:
+    ...........
+    df_diff: pandas dataframe
+        A dataframe containing the word-level information
+         from the JSON response.
+    prompt_df: pandas dataframe
+        A dataframe containing prompt summary information
+    turn_list: list
+        List of transcribed text at the turn level.
+    turn_index: list
+        A list containing the indices of the first and last word
+         in each turn.
+    prompt_turn_index: list
+        A list containing the indices of the first and last word
+         in each prompt.
+    measures: dict
+        A dictionary containing the names of the columns in the output dataframes.
+
+    Returns:
+    ...........
+    prompt_df: pandas dataframe
+        The updated prompt_df dataframe.
+
+    ------------------------------------------------------------------------------------------------------
+    """
+    i = -1
+    for j, index in enumerate(turn_index):
+        try:
+            if index not in prompt_turn_index:
+                continue
+
+            # prompt df index
+            i += 1
+            if i >= len(prompt_df):
+                break
+
+            prompt_range = range(index[0], index[1] + 1)
+            # get response range for each prompt
+            if j != len(turn_index) - 1:
+                response_end = turn_index[j+1][0]
+                response_end_time = df_diff[df_diff[measures["old_index"]] == response_end].iloc[0]["start_time"]
+
+            prompt_json = df_diff[df_diff[measures["old_index"]].isin(prompt_range)]
+
+            # remove first pause as it is the pre_pause
+            pauses = prompt_json[measures["pause"]].values[1:]
+
+            # total length of prompt in minutes
+            prompt_df.loc[i, measures["prompt_length_minutes"]] = (
+                float(prompt_json.iloc[-1]["end_time"])
+                - float(prompt_json.iloc[0]["start_time"])
+            ) / 60
+            # percentage of total duration of rater prompt vs. duration of prompt and answer
+            if j != len(turn_index) - 1:
+                prompt_df.loc[i, measures["prompt_percentage"]] = (
+                    float(prompt_json.iloc[-1]["end_time"]) - float(prompt_json.iloc[0]["start_time"])
+                ) / (
+                    float(response_end_time) - float(prompt_json.iloc[0]["start_time"])
+                )
+
+            prompt_df.loc[i, measures["word_pause_var"]] = np.var(pauses)
+            prompt_df.loc[i, measures["word_pause_mean"]] = np.mean(pauses)
+
+            if prompt_df.loc[i, measures["prompt_length_minutes"]] > 0:
+                prompt_df.loc[i, measures["syllable_rate"]] = (
+                    get_num_of_syllables(turn_list[j]) / prompt_df.loc[i, measures["prompt_length_minutes"]]
+                )
+
+                prompt_df.loc[i, measures["word_rate"]] = (
+                    len(prompt_json) / prompt_df.loc[i, measures["prompt_length_minutes"]]
+                )
+        except Exception as e:
+            logger.error(f"Error in pause feature calculation for row {i} in prompt_df: {e}")
+            continue
+
+    return prompt_df
+
+
 def update_summ_df(
     df_diff, summ_df, full_text, time_index, word_df, phrase_df, turn_df, measures
 ):
@@ -1305,6 +1391,114 @@ def get_pause_feature(json_conf, df_list, text_list, text_indices, time_index, m
     return df_feature
 
 
+def get_pause_feature_prompt(prompt_df, df_diff, turn_list, turn_index, prompt_turn_index, measures):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    This function calculates various pause-related speech characteristic
+        features at the prompt level and adds them to the output dataframe prompt_df.
+
+    Parameters:
+    ...........
+    prompt_df: pandas dataframe
+        A dataframe containing prompt summary information
+    df_diff: pandas dataframe
+        A dataframe containing the word-level information
+            from the JSON response.
+    turn_list: list
+        List of transcribed text at the turn level.
+    turn_index: list
+        A list containing the indices of the first and last word
+            in each turn.
+    prompt_turn_index: list
+        A list containing the indices of the first and last word
+            in each prompt.
+    measures: dict
+        A dictionary containing the names of the columns in the output dataframes.
+    
+    Returns:
+    ...........
+    prompt_df: pandas dataframe
+        The updated prompt_df dataframe.
+
+    ------------------------------------------------------------------------------------------------------
+    """
+    turn_starts = [uindex[0] for uindex in prompt_turn_index]
+
+    # get the rows corresponding to the start of each turn
+    df_diff_prompt = df_diff[
+        df_diff[measures["old_index"]].isin(turn_starts)
+    ]
+
+    prompt_df.loc[:, measures["prompt_pause"]] = df_diff_prompt[measures["pause"]].reset_index(drop=True)
+
+    prompt_df = process_pause_feature_prompt(
+        df_diff, prompt_df, turn_list, turn_index, prompt_turn_index, measures
+    )
+
+    return prompt_df
+
+
+def get_pause_rater(json_conf, df_list, text_list, text_indices, measures):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    This function calculates various pause-related speech characteristic features
+
+    Parameters:
+    ...........
+    json_conf: list
+        JSON response object.
+    df_list: list
+        List of pandas dataframes.
+            prompt_df, summ_df
+    text_list: list
+        List of transcribed text.
+            split into turns, full text and prompt-adherent turns.
+    text_indices: list
+        List of indices for text_list.
+            for turns, prompt indices and prompt-adherent turn indices.
+    measures: dict
+        A dictionary containing the names of the columns in the output dataframes.
+
+    Returns:
+    ...........
+    df_feature: list
+        List of updated pandas dataframes.
+            prompt_df, summ_df
+
+    ------------------------------------------------------------------------------------------------------
+    """
+    time_index = ["start_time", "end_time"]
+
+    # Check if json_conf is empty
+    if len(json_conf) <= 0:
+        return df_list
+
+    prompt_df, summ_df = df_list
+    turn_list, _, prompt_turn_list = text_list
+    turn_index, _, prompt_turn_index = text_indices
+
+    # Convert json_conf to a pandas DataFrame
+    df_diff = pd.DataFrame(json_conf)
+
+    # prompt-level analysis
+    if len(prompt_turn_list) > 0:
+        prompt_df = get_pause_feature_prompt(
+            prompt_df, df_diff, turn_list, turn_index, prompt_turn_index, measures
+        )
+
+    # file-level analysis
+    # summ_df = update_summ_df_rater(
+    #     df_diff, summ_df, full_text, time_index, word_df, phrase_df, turn_df, measures
+    # )
+
+    df_feature = [prompt_df, summ_df]
+
+    return df_feature
+
+
+
 def get_similarity_matrix(embeddings1, embeddings2):
     """
     ------------------------------------------------------------------------------------------------------
@@ -1441,7 +1635,10 @@ def get_text_adherence(df_list, text_list, text_indices, measures):
             prompt_df, summ_df
     text_list: list
         List of updated transcribed text.
-            split into turns, full text, and prompt list.
+            split into turns, full text, and prompt-adherent turns.
+    text_indices: list
+        List of updated indices for text_list.
+            for turns, prompts, and prompt-adherent turns.
 
     ------------------------------------------------------------------------------------------------------
     """
@@ -1462,11 +1659,13 @@ def get_text_adherence(df_list, text_list, text_indices, measures):
 
     # update prompt_list with matched prompts
     prompt_list2 = [turn_list[i] for i in turn_ids]
+    prompt_indices2 = [turn_indices[i] for i in turn_ids]
 
     df_list = [prompt_df, summ_df]
     text_list[2] = prompt_list2
+    text_indices.append(prompt_indices2)
 
-    return df_list, text_list
+    return df_list, text_list, text_indices
 
 
 def process_rater_feature(
@@ -1510,9 +1709,9 @@ def process_rater_feature(
 
     time_index = ["start_time", "end_time"]
 
-    df_list, text_list = get_text_adherence(df_list, text_list, text_indices, measures)
+    df_list, text_list, text_indices = get_text_adherence(df_list, text_list, text_indices, measures)
 
-    # df_list = get_pause_feature(json_conf, df_list, text_list, text_indices, time_index, measures)
+    df_list = get_pause_rater(json_conf, df_list, text_list, text_indices, measures)
 
     # if language == "en-us":
     #     json_conf = get_tag(json_conf, TAG_DICT, measures)

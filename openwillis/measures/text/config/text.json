@@ -45,7 +45,7 @@
   "num_one_word_turns": "num_one_word_turns",
   "num_interrupts": "num_interrupts",
   "prompt_id": "prompt_id",
-  "pre_prompt_pause_duration": "pre_prompt_pause_duration",
+  "prompt_pause": "pre_prompt_pause_duration",
   "prompt_length_minutes": "prompt_length_minutes",
   "prompt_percentage": "prompt_percentage",
   "prompt_adherence": "prompt_adherence",
