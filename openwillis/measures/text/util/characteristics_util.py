@@ -1044,7 +1044,7 @@ def process_pause_feature(df_diff, df, text_level, index_list, time_index, level
     return df
 
 
-def process_pause_feature_prompt(df_diff, prompt_df, turn_list, turn_index, prompt_turn_index, measures):
+def process_pause_feature_prompt(df_diff, prompt_df, turn_list, turn_index, prompt_turn_index, interview_time, measures):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -1067,6 +1067,8 @@ def process_pause_feature_prompt(df_diff, prompt_df, turn_list, turn_index, prom
     prompt_turn_index: list
         A list containing the indices of the first and last word
          in each prompt.
+    interview_time: float
+        The duration of the interview in minutes.
     measures: dict
         A dictionary containing the names of the columns in the output dataframes.
 
@@ -1077,22 +1079,19 @@ def process_pause_feature_prompt(df_diff, prompt_df, turn_list, turn_index, prom
 
     ------------------------------------------------------------------------------------------------------
     """
-    i = -1
-    for j, index in enumerate(turn_index):
+    for i, index in enumerate(prompt_turn_index):
         try:
-            if index not in prompt_turn_index:
-                continue
-
-            # prompt df index
-            i += 1
-            if i >= len(prompt_df):
-                break
 
             prompt_range = range(index[0], index[1] + 1)
+            # get index in turn_index
+            j = turn_index.index(index)
+
             # get response range for each prompt
             if j != len(turn_index) - 1:
                 response_end = turn_index[j+1][0]
                 response_end_time = df_diff[df_diff[measures["old_index"]] == response_end].iloc[0]["start_time"]
+            else:
+                response_end_time = interview_time * 60
 
             prompt_json = df_diff[df_diff[measures["old_index"]].isin(prompt_range)]
 
@@ -1105,12 +1104,11 @@ def process_pause_feature_prompt(df_diff, prompt_df, turn_list, turn_index, prom
                 - float(prompt_json.iloc[0]["start_time"])
             ) / 60
             # percentage of total duration of rater prompt vs. duration of prompt and answer
-            if j != len(turn_index) - 1:
-                prompt_df.loc[i, measures["prompt_percentage"]] = (
-                    float(prompt_json.iloc[-1]["end_time"]) - float(prompt_json.iloc[0]["start_time"])
-                ) / (
-                    float(response_end_time) - float(prompt_json.iloc[0]["start_time"])
-                )
+            prompt_df.loc[i, measures["prompt_percentage"]] = (
+                float(prompt_json.iloc[-1]["end_time"]) - float(prompt_json.iloc[0]["start_time"])
+            ) / (
+                float(response_end_time) - float(prompt_json.iloc[0]["start_time"])
+            )
 
             prompt_df.loc[i, measures["word_pause_var"]] = np.var(pauses)
             prompt_df.loc[i, measures["word_pause_mean"]] = np.mean(pauses)
@@ -1519,7 +1517,7 @@ def get_pause_feature(json_conf, df_list, text_list, text_indices, time_index, m
     return df_feature
 
 
-def get_pause_feature_prompt(prompt_df, df_diff, turn_list, turn_index, prompt_turn_index, measures):
+def get_pause_feature_prompt(prompt_df, df_diff, turn_list, turn_index, prompt_turn_index, interview_time, measures):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -1541,6 +1539,8 @@ def get_pause_feature_prompt(prompt_df, df_diff, turn_list, turn_index, prompt_t
     prompt_turn_index: list
         A list containing the indices of the first and last word
             in each prompt.
+    interview_time: float
+        The length of the interview in minutes.
     measures: dict
         A dictionary containing the names of the columns in the output dataframes.
     
@@ -1554,14 +1554,13 @@ def get_pause_feature_prompt(prompt_df, df_diff, turn_list, turn_index, prompt_t
     turn_starts = [uindex[0] for uindex in prompt_turn_index]
 
     # get the rows corresponding to the start of each turn
-    df_diff_prompt = df_diff[
-        df_diff[measures["old_index"]].isin(turn_starts)
-    ]
+    turn_starts_df = pd.DataFrame({measures["old_index"]: turn_starts})
+    df_diff_prompt = df_diff.merge(turn_starts_df, on=measures["old_index"], how='right')
 
     prompt_df.loc[:, measures["prompt_pause"]] = df_diff_prompt[measures["pause"]].reset_index(drop=True)
 
     prompt_df = process_pause_feature_prompt(
-        df_diff, prompt_df, turn_list, turn_index, prompt_turn_index, measures
+        df_diff, prompt_df, turn_list, turn_index, prompt_turn_index, interview_time, measures
     )
 
     return prompt_df
@@ -1622,7 +1621,7 @@ def get_pause_rater(json_conf, df_list, text_list, text_indices, interview_time,
     # prompt-level analysis
     if len(prompt_turn_list) > 0:
         prompt_df = get_pause_feature_prompt(
-            prompt_df, df_diff, turn_list, turn_index, prompt_turn_index, measures
+            prompt_df, df_diff, turn_list, turn_index, prompt_turn_index, interview_time, measures
         )
 
     # file-level analysis
@@ -1697,17 +1696,10 @@ def text_adherence_prompt(prompt_df, prompt_indices, similarity_matrix, measures
     prompt_similarities = np.max(similarity_matrix, axis=0)
     prompt_matchings = np.argmax(similarity_matrix, axis=0)
 
-    prompt_indices = np.array(prompt_indices)
-    prompt_similarities_bool = prompt_similarities > 0.7
+    prompt_df[measures["prompt_id"]] = prompt_indices
+    prompt_df[measures["prompt_adherence"]] = prompt_similarities
 
-    # matchings with adequate similarity
-    prompt_ids = prompt_indices[prompt_similarities_bool]
-    turn_ids = prompt_matchings[prompt_similarities_bool]
-
-    prompt_df[measures["prompt_id"]] = prompt_ids
-    prompt_df[measures["prompt_adherence"]] = prompt_similarities[prompt_similarities_bool]
-
-    return prompt_df, turn_ids
+    return prompt_df, prompt_matchings
 
 
 def text_adherence_summ(summ_df, prompt_df, similarity_matrix, measures):
