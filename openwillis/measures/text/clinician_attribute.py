@@ -134,6 +134,8 @@ def filter_transcribe(json_conf, measures, rater_label):
          split into words, phrases, turns, and full text.
     turn_indices: list
         indices for turns/prompts.
+    interview_time: float
+        Interview time in minutes.
 
     Raises:
     ...........
@@ -145,16 +147,14 @@ def filter_transcribe(json_conf, measures, rater_label):
 
     # make a dictionary to map old indices to new indices
     item_data = cutil.create_index_column(item_data, measures)
-    
-    # extract text
-    text = " ".join(
-        [
-            item["alternatives"][0]["content"]
-            for item in item_data
-            if "alternatives" in item
-        ]
-    )
 
+    # get interview time
+    item_data_df = pd.DataFrame(item_data)
+    interview_time = (
+        item_data_df["end_time"].astype(float).max(skipna=True)
+        - item_data_df["start_time"].astype(float).min(skipna=True)
+    ) / 60
+    
     turn_indices, turns = cutil.filter_rater(item_data, rater_label)
 
     # entire transcript - by joining all the phrases
@@ -165,7 +165,7 @@ def filter_transcribe(json_conf, measures, rater_label):
 
     text_list = [turns, text]
 
-    return filter_json, text_list, turn_indices
+    return filter_json, text_list, turn_indices, interview_time
 
 
 def clinician_characteristics(json_conf, language="en-us", rater_label = 'clinician', interview_type = 'panss'):
@@ -205,7 +205,7 @@ def clinician_characteristics(json_conf, language="en-us", rater_label = 'clinic
             cutil.download_nltk_resources()
 
             if is_amazon_transcribe(json_conf):
-                filter_json, text_list, turn_indices = filter_transcribe(
+                filter_json, text_list, turn_indices, interview_time = filter_transcribe(
                     json_conf, measures, rater_label
                 )
 
@@ -218,7 +218,7 @@ def clinician_characteristics(json_conf, language="en-us", rater_label = 'clinic
                 if len(filter_json) > 0 and len(text_list[-1]) > 0:
                     df_list = cutil.process_rater_feature(
                         filter_json, df_list, text_list,
-                        text_indices, language,
+                        text_indices, language, interview_time,
                         measures,
                     )
             else:
