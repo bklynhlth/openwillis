@@ -953,8 +953,14 @@ def process_pause_feature(df_diff, df, text_level, index_list, time_index, level
             ) / 60
             df.loc[j, measures[f"{level_name}_words"]] = len(level_json)
 
-            df.loc[j, measures["pause_var"]] = np.var(pauses)
-            df.loc[j, measures["pause_meandur"]] = np.mean(pauses)
+            # if there is 1 pause
+            if len(pauses) == 1:
+                df.loc[j, measures["pause_var"]] = 0
+                df.loc[j, measures["pause_meandur"]] = np.mean(pauses)
+            # if there are more than 1 pauses
+            elif len(pauses) > 1:
+                df.loc[j, measures["pause_var"]] = np.var(pauses)
+                df.loc[j, measures["pause_meandur"]] = np.mean(pauses)
 
             if df.loc[j, measures[f"{level_name}_minutes"]] > 0:
                 df.loc[j, measures["speech_percentage"]] = 100 * (
@@ -1101,15 +1107,11 @@ def update_summ_df(
 
     ------------------------------------------------------------------------------------------------------
     """
-    summ_df[measures["speech_minutes"]] = [
-        (
-            float(df_diff.iloc[-1][time_index[1]])
-            - float(df_diff.iloc[0][time_index[0]])
-        ) / 60
-    ]
+    speech_minutes = phrase_df[measures["phrase_minutes"]].sum()
+    summ_df[measures["speech_minutes"]] = [speech_minutes]
 
     summ_df[measures["speech_words"]] = len(df_diff)
-    if len(df_diff) > 0:
+    if speech_minutes > 0:
         summ_df[measures["word_rate"]] = (
             summ_df[measures["speech_words"]] / summ_df[measures["speech_minutes"]]
         )
@@ -1123,27 +1125,31 @@ def update_summ_df(
     )
 
     summ_df[measures["pause_rate"]] = summ_df[measures["word_rate"]]
-    summ_df[measures["word_pause_mean"]] = word_df[measures["word_pause"]].mean(
-        skipna=True
-    )
-    summ_df[measures["word_pause_var"]] = word_df[measures["word_pause"]].var(
-        skipna=True
-    )
-    summ_df[measures["phrase_pause_mean"]] = phrase_df[measures["phrase_pause"]].mean(
-        skipna=True
-    )
-    summ_df[measures["phrase_pause_var"]] = phrase_df[measures["phrase_pause"]].var(
-        skipna=True
-    )
+    
+    if len(word_df[measures["word_pause"]]) > 1:
+        summ_df[measures["word_pause_mean"]] = word_df[measures["word_pause"]].mean(
+            skipna=True
+        )
+        summ_df[measures["word_pause_var"]] = word_df[measures["word_pause"]].var(
+            skipna=True
+        )
+    
+    if len(phrase_df[measures["phrase_pause"]]) > 1:
+        summ_df[measures["phrase_pause_mean"]] = phrase_df[measures["phrase_pause"]].mean(
+            skipna=True
+        )
+        summ_df[measures["phrase_pause_var"]] = phrase_df[measures["phrase_pause"]].var(
+            skipna=True
+        )
     
     if len(turn_df) > 0:
         summ_df[measures["num_turns"]] = len(turn_df)
         summ_df[measures["turn_minutes_mean"]] = turn_df[
             measures["turn_minutes"]
-        ].mean()
+        ].mean(skipna=True)
         summ_df[measures["turn_words_mean"]] = turn_df[
             measures["turn_words"]
-        ].mean()
+        ].mean(skipna=True)
         summ_df[measures["turn_pause_mean"]] = turn_df[
             measures["turn_pause"]
         ].mean(skipna=True)
