@@ -790,7 +790,7 @@ def get_sentiment(df_list, text_list, measures):
     ------------------------------------------------------------------------------------------------------
 
     This function calculates the sentiment scores of the input text using
-     VADER, and adds them to the output dataframe summ_df.
+     VADER, and adds them to the output dataframes.
 
     Parameters:
     ...........
@@ -863,6 +863,64 @@ def get_sentiment(df_list, text_list, measures):
     summ_df.loc[0, cols] = list(sentiment_dict.values()) + [mattr]
 
     df_list = [word_df, phrase_df, turn_df, summ_df]
+
+    return df_list
+
+
+def get_sentiment_rater(df_list, text_list, measures):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    This function calculates the sentiment scores of the input text using
+     VADER, and adds them to the output dataframes.
+
+    Parameters:
+    ...........
+    df_list: list
+        List of pandas dataframes.
+            prompt_df, summ_df
+    text_list: list
+        List of transcribed text.
+            split into turns, full text and prompt-adherent turns.
+    measures: dict
+        A dictionary containing the names of the columns in the output dataframes.
+
+    Returns:
+    ...........
+    df_list: list
+        List of updated pandas dataframes.
+
+    ------------------------------------------------------------------------------------------------------
+    """
+    prompt_df, summ_df = df_list
+    turn_list, full_text, prompt_turn_list = text_list
+
+    sentiment = SentimentIntensityAnalyzer()
+
+    # column names
+    cols = [
+        measures["neg"],
+        measures["neu"],
+        measures["pos"],
+        measures["compound"],
+    ]
+
+    # turn-level analysis
+    for idx, u in enumerate(prompt_turn_list):
+        try:
+            sentiment_dict = sentiment.polarity_scores(u)
+
+            prompt_df.loc[idx, cols] = list(sentiment_dict.values())
+        except Exception as e:
+            logger.error(f"Error in sentiment analysis for prompt {u}: {e}")
+            continue
+
+    # file-level analysis
+    sentiment_dict = sentiment.polarity_scores(full_text)
+
+    summ_df.loc[0, cols] = list(sentiment_dict.values())
+
+    df_list = [prompt_df, summ_df]
 
     return df_list
 
@@ -1577,7 +1635,6 @@ def get_pause_rater(json_conf, df_list, text_list, text_indices, interview_time,
     return df_feature
 
 
-
 def get_similarity_matrix(embeddings1, embeddings2):
     """
     ------------------------------------------------------------------------------------------------------
@@ -1791,11 +1848,8 @@ def process_rater_feature(
 
     df_list = get_pause_rater(json_conf, df_list, text_list, text_indices, interview_time, measures)
 
-    # if language == "en-us":
-    #     json_conf = get_tag(json_conf, TAG_DICT, measures)
-    #     df_list = get_tag_summ(json_conf, df_list, text_indices, measures)
-
-    #     df_list = get_sentiment(df_list, text_list, measures)
+    if language == "en-us":
+        df_list = get_sentiment_rater(df_list, text_list, measures)
 
     prompt_df, summ_df = df_list
     return prompt_df, summ_df
