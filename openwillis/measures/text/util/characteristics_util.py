@@ -200,7 +200,6 @@ def create_empty_dataframes_clinician(measures):
             measures["speech_percentage"],
             measures["word_rate"],
             measures["syllable_rate"],
-            measures["pause_rate"],
             measures["word_pause_mean"],
             measures["word_pause_var"],
             measures["turn_pause_mean"],
@@ -1156,6 +1155,71 @@ def update_summ_df(
     return summ_df
 
 
+def update_summ_df_rater(
+    df_diff, summ_df, turn_df, full_text, interview_lenth, measures,
+):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    This function calculates various pause-related speech characteristic
+     features at the file level and adds them to the output dataframe summ_df.
+
+    Parameters:
+    ...........
+    df_diff: pandas dataframe
+        A dataframe containing the word-level information
+            from the JSON response.
+    summ_df: pandas dataframe
+        A dataframe containing the speech characteristics of the input text.
+    turn_df: pandas dataframe
+        A dataframe containing turn summary information
+    full_text: str
+        The full transcribed text.
+    interview_lenth: float
+        The length of the interview in minutes.
+    measures: dict
+        A dictionary containing the names of the columns in the output dataframes.
+
+    Returns:
+    ...........
+    summ_df: pandas dataframe
+        The updated summ_df dataframe.
+
+    ------------------------------------------------------------------------------------------------------
+    """
+    summ_df[measures["speech_minutes"]] = [turn_df[measures["turn_minutes"]].sum()]
+
+    no_words = len(df_diff)
+    if turn_df[measures["turn_minutes"]].sum() > 0:
+        summ_df[measures["word_rate"]] = (
+            len(df_diff) / summ_df[measures["speech_minutes"]]
+        )
+        summ_df[measures["syllable_rate"]] = (
+            get_num_of_syllables(full_text) / summ_df[measures["speech_minutes"]]
+        )
+    
+    summ_df[measures["speech_percentage"]] = 100 * summ_df[measures["speech_minutes"]] / (
+        interview_lenth
+    )
+
+    summ_df[measures["word_pause_mean"]] = df_diff[measures["pause"]].mean(
+        skipna=True
+    )
+    summ_df[measures["word_pause_var"]] = df_diff[measures["pause"]].var(
+        skipna=True
+    )
+    
+    if len(turn_df) > 1:
+        summ_df[measures["turn_pause_mean"]] = turn_df[
+            measures["turn_pause"]
+        ].mean(skipna=True)
+        summ_df[measures["turn_pause_var"]] = turn_df[
+            measures["turn_pause"]
+        ].var(skipna=True)
+
+    return summ_df
+
+
 def get_pause_feature_word(word_df, df_diff, word_list, phrase_index, measures):
     """
     ------------------------------------------------------------------------------------------------------
@@ -1439,7 +1503,7 @@ def get_pause_feature_prompt(prompt_df, df_diff, turn_list, turn_index, prompt_t
     return prompt_df
 
 
-def get_pause_rater(json_conf, df_list, text_list, text_indices, measures):
+def get_pause_rater(json_conf, df_list, text_list, text_indices, interview_time, measures):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -1458,6 +1522,8 @@ def get_pause_rater(json_conf, df_list, text_list, text_indices, measures):
     text_indices: list
         List of indices for text_list.
             for turns, prompt indices and prompt-adherent turn indices.
+    interview_time: float
+        The length of the interview in minutes.
     measures: dict
         A dictionary containing the names of the columns in the output dataframes.
 
@@ -1476,11 +1542,18 @@ def get_pause_rater(json_conf, df_list, text_list, text_indices, measures):
         return df_list
 
     prompt_df, summ_df = df_list
-    turn_list, _, prompt_turn_list = text_list
+    turn_list, full_text, prompt_turn_list = text_list
     turn_index, _, prompt_turn_index = text_indices
 
     # Convert json_conf to a pandas DataFrame
     df_diff = pd.DataFrame(json_conf)
+
+    # turn_df pause calculations - to use for summ_df    
+    if len(turn_index) > 0:
+        turn_df = create_empty_dataframes(measures)[2]
+        turn_df = get_pause_feature_turn(
+            turn_df, df_diff, turn_list, turn_index, time_index, measures
+        )
 
     # prompt-level analysis
     if len(prompt_turn_list) > 0:
@@ -1489,9 +1562,9 @@ def get_pause_rater(json_conf, df_list, text_list, text_indices, measures):
         )
 
     # file-level analysis
-    # summ_df = update_summ_df_rater(
-    #     df_diff, summ_df, full_text, time_index, word_df, phrase_df, turn_df, measures
-    # )
+    summ_df = update_summ_df_rater(
+        df_diff, summ_df, turn_df, full_text, interview_time, measures
+    )
 
     df_feature = [prompt_df, summ_df]
 
@@ -1670,7 +1743,7 @@ def get_text_adherence(df_list, text_list, text_indices, measures):
 
 def process_rater_feature(
     json_conf, df_list, text_list,
-    text_indices, language, measures,
+    text_indices, language, interview_time, measures,
 ):
     """
     ------------------------------------------------------------------------------------------------------
@@ -1692,9 +1765,8 @@ def process_rater_feature(
          for phrases and turns.
     language: str
         Language of the transcribed text.
-    time_index: list
-        A list containing the names of the columns in json that contain the
-         start and end times of each word.
+    interview_time: float
+        The length of the interview in minutes.
     measures: dict
         A dictionary containing the names of the columns in the output dataframes.
 
@@ -1711,7 +1783,7 @@ def process_rater_feature(
 
     df_list, text_list, text_indices = get_text_adherence(df_list, text_list, text_indices, measures)
 
-    df_list = get_pause_rater(json_conf, df_list, text_list, text_indices, measures)
+    df_list = get_pause_rater(json_conf, df_list, text_list, text_indices, interview_time, measures)
 
     # if language == "en-us":
     #     json_conf = get_tag(json_conf, TAG_DICT, measures)
