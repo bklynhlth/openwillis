@@ -199,7 +199,9 @@ def clinician_characteristics(json_conf, language="en-us", rater_label = 'clinic
     df_list = cutil.create_empty_dataframes_clinician(measures)
 
     try:
-        prompts, prompt_indices = get_prompts(interview_type, measures)
+        prompts, prompt_ids = get_prompts(interview_type, measures)
+        # add prompt ids to prompts_df
+        df_list[0][measures["prompt_id"]] = prompt_ids
         
         if bool(json_conf):
             cutil.download_nltk_resources()
@@ -211,9 +213,8 @@ def clinician_characteristics(json_conf, language="en-us", rater_label = 'clinic
 
                 # add prompts to text_list
                 text_list.append(prompts)
-                # add prompt_indices to turn_indices
+                # create text indices for turns/prompts
                 text_indices = [turn_indices.copy()]
-                text_indices.append([int(i) for i in prompt_indices])
 
                 if len(filter_json) > 0 and len(text_list[-1]) > 0:
                     df_list = cutil.process_rater_feature(

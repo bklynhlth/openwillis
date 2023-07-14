@@ -1098,22 +1098,24 @@ def process_pause_feature_prompt(df_diff, prompt_df, turn_list, turn_index, prom
             # remove first pause as it is the pre_pause
             pauses = prompt_json[measures["pause"]].values[1:]
 
+            prompt_time = float(prompt_json.iloc[-1]["end_time"]) - float(prompt_json.iloc[0]["start_time"])
+            prompt_response_time = float(response_end_time) - float(prompt_json.iloc[0]["start_time"])
+
             # total length of prompt in minutes
-            prompt_df.loc[i, measures["prompt_length_minutes"]] = (
-                float(prompt_json.iloc[-1]["end_time"])
-                - float(prompt_json.iloc[0]["start_time"])
-            ) / 60
+            prompt_df.loc[i, measures["prompt_length_minutes"]] = prompt_time / 60
             # percentage of total duration of rater prompt vs. duration of prompt and answer
-            prompt_df.loc[i, measures["prompt_percentage"]] = (
-                float(prompt_json.iloc[-1]["end_time"]) - float(prompt_json.iloc[0]["start_time"])
-            ) / (
-                float(response_end_time) - float(prompt_json.iloc[0]["start_time"])
-            )
+            if prompt_response_time > 0:
+                prompt_df.loc[i, measures["prompt_percentage"]] = 100 * prompt_time / prompt_response_time
 
-            prompt_df.loc[i, measures["word_pause_var"]] = np.var(pauses)
-            prompt_df.loc[i, measures["word_pause_mean"]] = np.mean(pauses)
+            # if there is 1 pause
+            if len(pauses) == 1:
+                prompt_df.loc[i, measures["word_pause_var"]] = 0
+                prompt_df.loc[i, measures["word_pause_mean"]] = np.mean(pauses)
+            elif len(pauses) > 1:
+                prompt_df.loc[i, measures["word_pause_var"]] = np.var(pauses)
+                prompt_df.loc[i, measures["word_pause_mean"]] = np.mean(pauses)
 
-            if prompt_df.loc[i, measures["prompt_length_minutes"]] > 0:
+            if prompt_time > 0:
                 prompt_df.loc[i, measures["syllable_rate"]] = (
                     get_num_of_syllables(turn_list[j]) / prompt_df.loc[i, measures["prompt_length_minutes"]]
                 )
@@ -1249,12 +1251,13 @@ def update_summ_df_rater(
 
     ------------------------------------------------------------------------------------------------------
     """
-    summ_df[measures["speech_minutes"]] = [turn_df[measures["turn_minutes"]].sum()]
+    speech_minutes = turn_df[measures["turn_minutes"]].sum()
+    summ_df[measures["speech_minutes"]] = [speech_minutes]
 
     no_words = len(df_diff)
-    if turn_df[measures["turn_minutes"]].sum() > 0:
+    if speech_minutes > 0:
         summ_df[measures["word_rate"]] = (
-            len(df_diff) / summ_df[measures["speech_minutes"]]
+            no_words / summ_df[measures["speech_minutes"]]
         )
         summ_df[measures["syllable_rate"]] = (
             get_num_of_syllables(full_text) / summ_df[measures["speech_minutes"]]
@@ -1264,12 +1267,13 @@ def update_summ_df_rater(
         interview_lenth
     )
 
-    summ_df[measures["word_pause_mean"]] = df_diff[measures["pause"]].mean(
-        skipna=True
-    )
-    summ_df[measures["word_pause_var"]] = df_diff[measures["pause"]].var(
-        skipna=True
-    )
+    if len(df_diff[measures["pause"]]) > 1:
+        summ_df[measures["word_pause_mean"]] = df_diff[measures["pause"]].mean(
+            skipna=True
+        )
+        summ_df[measures["word_pause_var"]] = df_diff[measures["pause"]].var(
+            skipna=True
+        )
     
     if len(turn_df) > 1:
         summ_df[measures["turn_pause_mean"]] = turn_df[
@@ -1584,7 +1588,7 @@ def get_pause_rater(json_conf, df_list, text_list, text_indices, interview_time,
             split into turns, full text and prompt-adherent turns.
     text_indices: list
         List of indices for text_list.
-            for turns, prompt indices and prompt-adherent turn indices.
+            for turns and prompt-adherent turns.
     interview_time: float
         The length of the interview in minutes.
     measures: dict
@@ -1598,15 +1602,13 @@ def get_pause_rater(json_conf, df_list, text_list, text_indices, interview_time,
 
     ------------------------------------------------------------------------------------------------------
     """
-    time_index = ["start_time", "end_time"]
-
     # Check if json_conf is empty
     if len(json_conf) <= 0:
         return df_list
 
     prompt_df, summ_df = df_list
-    turn_list, full_text, prompt_turn_list = text_list
-    turn_index, _, prompt_turn_index = text_indices
+    turn_list, full_text, _ = text_list
+    turn_index, prompt_turn_index = text_indices
 
     # Convert json_conf to a pandas DataFrame
     df_diff = pd.DataFrame(json_conf)
@@ -1615,11 +1617,11 @@ def get_pause_rater(json_conf, df_list, text_list, text_indices, interview_time,
     if len(turn_index) > 0:
         turn_df = create_empty_dataframes(measures)[2]
         turn_df = get_pause_feature_turn(
-            turn_df, df_diff, turn_list, turn_index, time_index, measures
+            turn_df, df_diff, turn_list, turn_index, ["start_time", "end_time"], measures
         )
 
     # prompt-level analysis
-    if len(prompt_turn_list) > 0:
+    if len(prompt_turn_index) > 0:
         prompt_df = get_pause_feature_prompt(
             prompt_df, df_diff, turn_list, turn_index, prompt_turn_index, interview_time, measures
         )
@@ -1664,7 +1666,7 @@ def get_similarity_matrix(embeddings1, embeddings2):
     return similarity_matrix
 
 
-def text_adherence_prompt(prompt_df, prompt_indices, similarity_matrix, measures):
+def text_adherence_prompt(prompt_df, similarity_matrix, measures):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -1675,8 +1677,6 @@ def text_adherence_prompt(prompt_df, prompt_indices, similarity_matrix, measures
     ...........
     prompt_df: pandas dataframe
         A dataframe containing prompt summary information
-    prompt_indices: list
-        A list containing the indices of prompts in the interview transcript.
     similarity_matrix: numpy array
         A numpy array containing the cosine similarity between the two sets of embeddings.
     measures: dict
@@ -1696,7 +1696,6 @@ def text_adherence_prompt(prompt_df, prompt_indices, similarity_matrix, measures
     prompt_similarities = np.max(similarity_matrix, axis=0)
     prompt_matchings = np.argmax(similarity_matrix, axis=0)
 
-    prompt_df[measures["prompt_id"]] = prompt_indices
     prompt_df[measures["prompt_adherence"]] = prompt_similarities
 
     return prompt_df, prompt_matchings
@@ -1727,6 +1726,8 @@ def text_adherence_summ(summ_df, prompt_df, similarity_matrix, measures):
     ------------------------------------------------------------------------------------------------------
     """
     # number of prompts
+    ## could add a check here for the number of prompts being
+    ## rows with prompt_adherence > some threshold
     summ_df[measures["no_prompts"]] = [len(prompt_df)]
     # average prompt adherence
     summ_df[measures["mean_prompt_adherence"]] = prompt_df[measures["prompt_adherence"]].mean()
@@ -1752,7 +1753,7 @@ def get_text_adherence(df_list, text_list, text_indices, measures):
             split into turns, full text, and prompt list.
     text_indices: list
         List of indices for text_list.
-            for turns and prompts.
+            for turns and prompts (ids).
     measures: dict
         A dictionary containing the names of the columns in the output dataframes.
 
@@ -1766,13 +1767,13 @@ def get_text_adherence(df_list, text_list, text_indices, measures):
             split into turns, full text, and prompt-adherent turns.
     text_indices: list
         List of updated indices for text_list.
-            for turns, prompts, and prompt-adherent turns.
+            for turns, prompts (ids), and prompt-adherent turns.
 
     ------------------------------------------------------------------------------------------------------
     """
     prompt_df, summ_df = df_list
     turn_list, full_text, prompt_list = text_list
-    turn_indices, prompt_indices = text_indices
+    turn_indices = text_indices[0]
 
     model = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
 
@@ -1781,17 +1782,17 @@ def get_text_adherence(df_list, text_list, text_indices, measures):
 
     similarity_matrix = get_similarity_matrix(turn_embeddings, prompt_embeddings)
 
-    prompt_df, turn_ids = text_adherence_prompt(prompt_df, prompt_indices, similarity_matrix, measures)
+    prompt_df, turn_ids = text_adherence_prompt(prompt_df, similarity_matrix, measures)
 
     summ_df = text_adherence_summ(summ_df, prompt_df, similarity_matrix, measures)
 
     # update prompt_list with matched prompts
-    prompt_list2 = [turn_list[i] for i in turn_ids]
-    prompt_indices2 = [turn_indices[i] for i in turn_ids]
+    turn_prompt_list = [turn_list[i] for i in turn_ids]
+    prompt_indices = [turn_indices[i] for i in turn_ids]
 
     df_list = [prompt_df, summ_df]
-    text_list[2] = prompt_list2
-    text_indices.append(prompt_indices2)
+    text_list[2] = turn_prompt_list
+    text_indices.append(prompt_indices)
 
     return df_list, text_list, text_indices
 
@@ -1811,13 +1812,13 @@ def process_rater_feature(
         JSON response object.
     df_list: list
         List of pandas dataframes.
-         word_df, phrase_df, turn_df, summ_df
+         prompt_df and summ_df
     text_list: list
         List of transcribed text.
-         split into words, phrases, turns, and full text.
+         split into turns, full text and prompts.
     text_indices: list
         List of indices for text_list.
-         for phrases and turns.
+         for turns.
     language: str
         Language of the transcribed text.
     interview_time: float
@@ -1833,8 +1834,6 @@ def process_rater_feature(
         A dataframe containing phrase summary information
     ------------------------------------------------------------------------------------------------------
     """
-
-    time_index = ["start_time", "end_time"]
 
     df_list, text_list, text_indices = get_text_adherence(df_list, text_list, text_indices, measures)
 
