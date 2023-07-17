@@ -9,7 +9,12 @@ import logging
 import nltk
 import numpy as np
 import pandas as pd
+
 from openwillis.measures.text.util import characteristics_util as cutil
+from openwillis.measures.text.util.text_adherence import get_text_adherence
+from openwillis.measures.text.util.pause_features import get_pause_rater
+from openwillis.measures.text.util.text_features import get_sentiment_rater
+
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger()
@@ -168,6 +173,55 @@ def filter_transcribe(json_conf, measures, rater_label):
     return filter_json, text_list, turn_indices, interview_time
 
 
+def process_rater_feature(
+    json_conf, df_list, text_list,
+    text_indices, language, interview_time, measures,
+):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    This function processes the language features from json response.
+
+    Parameters:
+    ...........
+    json_conf: list
+        JSON response object.
+    df_list: list
+        List of pandas dataframes.
+         prompt_df and summ_df
+    text_list: list
+        List of transcribed text.
+         split into turns, full text and prompts.
+    text_indices: list
+        List of indices for text_list.
+         for turns.
+    language: str
+        Language of the transcribed text.
+    interview_time: float
+        The length of the interview in minutes.
+    measures: dict
+        A dictionary containing the names of the columns in the output dataframes.
+
+    Returns:
+    ...........
+    prompt_df: pandas dataframe
+        A dataframe containing prompt summary information
+    summ_df: pandas dataframe
+        A dataframe containing phrase summary information
+    ------------------------------------------------------------------------------------------------------
+    """
+
+    df_list, text_list, text_indices = get_text_adherence(df_list, text_list, text_indices, measures)
+
+    df_list = get_pause_rater(json_conf, df_list, text_list, text_indices, interview_time, measures)
+
+    if language == "en-us":
+        df_list = get_sentiment_rater(df_list, text_list, measures)
+
+    prompt_df, summ_df = df_list
+    return prompt_df, summ_df
+
+
 def clinician_characteristics(json_conf, language="en-us", rater_label = 'clinician', interview_type = 'panss'):
     """
     ------------------------------------------------------------------------------------------------------
@@ -217,7 +271,7 @@ def clinician_characteristics(json_conf, language="en-us", rater_label = 'clinic
                 text_indices = [turn_indices.copy()]
 
                 if len(filter_json) > 0 and len(text_list[-1]) > 0:
-                    df_list = cutil.process_rater_feature(
+                    df_list = process_rater_feature(
                         filter_json, df_list, text_list,
                         text_indices, language, interview_time,
                         measures,
