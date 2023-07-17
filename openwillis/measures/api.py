@@ -14,7 +14,8 @@ from openwillis.measures.audio import (
     speech_transcription_cloud,
 )
 from openwillis.measures.text import (
-    speech_characteristics
+    speech_characteristics,
+    clinician_characteristics,
 )
 
 from openwillis.measures.commons import (
