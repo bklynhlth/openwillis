@@ -224,7 +224,10 @@ def update_summ_df(
 
     ------------------------------------------------------------------------------------------------------
     """
-    speech_minutes = phrase_df[measures["phrase_minutes"]].sum()
+    if len(turn_df) > 0:
+        speech_minutes = turn_df[measures["turn_minutes"]].sum()
+    else:
+        speech_minutes = (float(df_diff.iloc[-1][time_index[1]]) - float(df_diff.iloc[0][time_index[0]])) / 60
     summ_df[measures["speech_minutes"]] = [speech_minutes]
 
     summ_df[measures["speech_words"]] = len(df_diff)
