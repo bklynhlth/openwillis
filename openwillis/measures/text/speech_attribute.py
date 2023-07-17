@@ -9,7 +9,12 @@ import logging
 import nltk
 import numpy as np
 import pandas as pd
+
 from openwillis.measures.text.util import characteristics_util as cutil
+from openwillis.measures.text.util.pause_features import get_pause_feature
+from openwillis.measures.text.util.text_features import (
+    get_tag, get_tag_summ, get_sentiment, TAG_DICT
+)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger()
@@ -172,6 +177,62 @@ def filter_vosk(json_conf, measures):
     return words, text
 
 
+def process_language_feature(
+    json_conf, df_list, text_list,
+    text_indices, language, time_index, measures,
+):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    This function processes the language features from json response.
+
+    Parameters:
+    ...........
+    json_conf: list
+        JSON response object.
+    df_list: list
+        List of pandas dataframes.
+         word_df, phrase_df, turn_df, summ_df
+    text_list: list
+        List of transcribed text.
+         split into words, phrases, turns, and full text.
+    text_indices: list
+        List of indices for text_list.
+         for phrases and turns.
+    language: str
+        Language of the transcribed text.
+    time_index: list
+        A list containing the names of the columns in json that contain the
+         start and end times of each word.
+    measures: dict
+        A dictionary containing the names of the columns in the output dataframes.
+
+    Returns:
+    ...........
+    word_df: pandas dataframe
+        A dataframe containing word summary information
+    phrase_df: pandas dataframe
+        A dataframe containing phrase summary information
+    turn_df: pandas dataframe
+        A dataframe containing turn summary information
+    summ_df: pandas dataframe
+        A dataframe containing summary information on the speech
+
+    ------------------------------------------------------------------------------------------------------
+    """
+
+    df_list = get_pause_feature(json_conf, df_list, text_list, text_indices, time_index, measures)
+
+    if language == "en-us":
+        json_conf = get_tag(json_conf, TAG_DICT, measures)
+        df_list = get_tag_summ(json_conf, df_list, text_indices, measures)
+
+        df_list = get_sentiment(df_list, text_list, measures)
+
+    word_df, phrase_df, turn_df, summ_df = df_list
+    return word_df, phrase_df, turn_df, summ_df
+
+
 def speech_characteristics(json_conf, language="en-us", speaker_label=None):
     """
     ------------------------------------------------------------------------------------------------------
@@ -214,7 +275,7 @@ def speech_characteristics(json_conf, language="en-us", speaker_label=None):
                 )
 
                 if len(filter_json) > 0 and len(text_list[-1]) > 0:
-                    df_list = cutil.process_language_feature(
+                    df_list = process_language_feature(
                         filter_json, df_list, text_list,
                         text_indices, language, ["start_time", "end_time"],
                         measures,
@@ -222,7 +283,7 @@ def speech_characteristics(json_conf, language="en-us", speaker_label=None):
             else:
                 words, text = filter_vosk(json_conf, measures)
                 if len(text) > 0:
-                    df_list = cutil.process_language_feature(
+                    df_list = process_language_feature(
                         json_conf, df_list, [words, [], [], text],
                         [[], []], language, ["start", "end"],
                         measures,

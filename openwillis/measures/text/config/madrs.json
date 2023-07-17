@@ -1,0 +1,42 @@
+{
+    "1" : {
+        "text" : "In the past week, have you been feeling sad or unhappy?",
+        "points": [2]
+    },
+    "2" : {
+        "text" : "In the past week, do you think you have looked sad or depressed to other people? Did anyone say you looked sad or down?",
+        "points": [3]
+    },
+    "3" : {
+        "text" : "Have you felt tense or edgy in the past week? Have you felt anxious or nervous?",
+        "points": [4]
+    },
+    "4" : {
+        "text" : "How has your sleeping been in the past week?",
+        "points": [5]
+    },
+    "5" : {
+        "text" : "How has your appetite been this past week?",
+        "points": [6]
+    },
+    "6" : {
+        "text" : "Have you had trouble concentrating or collecting your thoughts in the past week?",
+        "points": [7]
+    },
+    "7" : {
+        "text" : "Have you had any trouble getting started at things in the past week?",
+        "points": [8]
+    },
+    "8" : {
+        "text" : "Have you been less interested in things around you, or in activities you used to enjoy?",
+        "points": [9]
+    },
+    "9" : {
+        "text" : "Have you been putting yourself down, or feeling that you're a failure in some way, over the past week?",
+        "points": [10]
+    },
+    "10" : {
+        "text" : "This past week, have you felt like life isn't worth living?",
+        "points": []
+    }
+}
