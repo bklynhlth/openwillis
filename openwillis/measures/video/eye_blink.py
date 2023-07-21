@@ -325,11 +325,6 @@ def eye_blink_rate(video_directory):
     summary : pd.DataFrame
         The number of eye blinks and blink rate (blinks per minute)
 
-    Raises:
-    ............
-    ValueError
-        If device is not 'laptop' or 'mobile'
-
     ---------------------------------------------------------------------------------------------------
     """
 
