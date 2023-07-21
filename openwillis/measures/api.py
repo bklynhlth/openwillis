@@ -11,6 +11,7 @@ from openwillis.measures.audio import (
     vocal_acoustics,
     speech_transcription,
     speaker_separation,
+    speaker_separation_cloud,
     speech_transcription_cloud,
 )
 from openwillis.measures.text import (
