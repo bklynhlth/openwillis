@@ -5,6 +5,7 @@
 import numpy as np
 import pandas as pd
 import cv2
+import json
 import os
 import math
 
@@ -15,6 +16,33 @@ import logging
 
 logging.basicConfig(level=logging.INFO)
 logger=logging.getLogger()
+
+def get_config(filepath, json_file):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    This function reads the configuration file containing the column names for the output dataframes,
+    and returns the contents of the file as a dictionary.
+
+    Parameters:
+    ...........
+    filepath : str
+        The path to the configuration file.
+    json_file : str
+        The name of the configuration file.
+
+    Returns:
+    ...........
+    measures: A dictionary containing the names of the columns in the output dataframes.
+
+    ------------------------------------------------------------------------------------------------------
+    """
+    dir_name = os.path.dirname(filepath)
+    measure_path = os.path.abspath(os.path.join(dir_name, f"config/{json_file}"))
+
+    file = open(measure_path)
+    measures = json.load(file)
+    return measures
 
 def init_facemesh():
     """
@@ -342,7 +370,7 @@ def get_empty_dataframe():
     empty_df = pd.DataFrame(columns=columns)
     return empty_df
 
-def get_displacement(lmk_df, base_path):
+def get_displacement(lmk_df, base_path, measures):
     """
     ---------------------------------------------------------------------------------------------------
 
@@ -355,6 +383,8 @@ def get_displacement(lmk_df, base_path):
         facial landmark dataframe
     base_path : str
         baseline input file path
+    measures : dict
+        dictionary of landmark indices
 
     Returns:
     ............
@@ -373,6 +403,7 @@ def get_displacement(lmk_df, base_path):
         if len(lmk_df)>1:
             disp_actual_df = get_distance(lmk_df)
             disp_actual_df['overall'] = pd.DataFrame(disp_actual_df.mean(axis=1))
+            disp_actual_df = calculate_areas_displacement(disp_actual_df, measures)
 
             if os.path.exists(base_path):
                 disp_base_df = baseline(base_path)
@@ -388,6 +419,45 @@ def get_displacement(lmk_df, base_path):
     except Exception as e:
 
         logger.error(f'Error in displacement calculation is {e}')
+    return displacement_df
+
+def calculate_areas_displacement(displacement_df, measures):
+    """
+    ---------------------------------------------------------------------------------------------------
+
+    This function calculates the summary framewise displacement for upper face,
+     lower face, lips and eyebros.
+
+    Parameters:
+    ............
+    displacement_df : pandas.DataFrame
+        euclidean displacement dataframe
+    measures : dict
+        dictionary of landmark indices
+
+    Returns:
+    ............
+    displacement_df : pandas.DataFrame
+        updated euclidean displacement dataframe
+
+    ---------------------------------------------------------------------------------------------------
+    """
+
+    lower_face_indices = measures["lower_face_landmarks"]
+    upper_face_indices = [i for i in range(0, 468) if i not in lower_face_indices]
+    lip_indices = measures["lips_landmarks"]
+    eyebrow_indices = measures["eyebrows_landmarks"]
+
+    lower_face_cols = ['lmk' + str(col+1).zfill(3) for col in lower_face_indices]
+    upper_face_cols = ['lmk' + str(col+1).zfill(3) for col in upper_face_indices]
+    lip_cols = ['lmk' + str(col+1).zfill(3) for col in lip_indices]
+    eyebrow_cols = ['lmk' + str(col+1).zfill(3) for col in eyebrow_indices]
+
+    displacement_df['lower_face'] = displacement_df[lower_face_cols].mean(axis=1)
+    displacement_df['upper_face'] = displacement_df[upper_face_cols].mean(axis=1)
+    displacement_df['lips'] = displacement_df[lip_cols].mean(axis=1)
+    displacement_df['eyebrows'] = displacement_df[eyebrow_cols].mean(axis=1)
+
     return displacement_df
 
 def get_summary(df):
@@ -459,10 +529,11 @@ def facial_expressivity(filepath, baseline_filepath=''):
 
     ---------------------------------------------------------------------------------------------------
     """
+    config = get_config(os.path.abspath(__file__), "facial.json")
 
     try:
         df_landmark = get_landmarks(filepath, 'input')
-        df_disp = get_displacement(df_landmark, baseline_filepath)
+        df_disp = get_displacement(df_landmark, baseline_filepath, config)
 
         df_summ = get_summary(df_disp)
         return df_landmark, df_disp, df_summ
