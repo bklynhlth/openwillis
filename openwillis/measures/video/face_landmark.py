@@ -316,6 +316,43 @@ def get_distance(df):
     displacement_df = pd.concat(disp_list, axis=1).reset_index(drop=True)
     return displacement_df
 
+def get_mouth_height(df, measures):
+    """
+    ---------------------------------------------------------------------------------------------------
+
+    This function takes a Pandas dataframe of landmark coordinates as input, calculates the Euclidean distance
+    between the upper and lower lips, and returns an array of the displacement values.
+
+    Parameters:
+    ............
+    df : pandas.DataFrame
+        Dataframe containing landmark coordinates
+    measures : dict
+        dictionary of landmark indices
+
+    Returns:
+    ............
+    mouth_height : numpy.array
+        Array of displacement values for mouth height
+
+    ---------------------------------------------------------------------------------------------------
+    """
+
+    upper_lip_indices = measures["upper_lip_simple_landmarks"]
+    lower_lip_indices = measures["lower_lip_simple_landmars"]
+
+    upper_lip = ['lmk' + str(col+1).zfill(3) for col in upper_lip_indices]
+    lower_lip = ['lmk' + str(col+1).zfill(3) for col in lower_lip_indices]
+
+    mouth_height = 0
+    for i in [8, 9, 10]:
+        mouth_height += np.sqrt(
+            (df[upper_lip[i] + '_x'] - df[lower_lip[18-i] + '_x'])**2
+            + (df[upper_lip[i] + '_y'] - df[lower_lip[18-i] + '_y'])**2
+        )
+    
+    return mouth_height
+
 def baseline(base_path):
     """
     ---------------------------------------------------------------------------------------------------
@@ -535,7 +572,13 @@ def facial_expressivity(filepath, baseline_filepath=''):
         df_landmark = get_landmarks(filepath, 'input')
         df_disp = get_displacement(df_landmark, baseline_filepath, config)
 
+        # calculate mouth height
+        mouth_height = get_mouth_height(df_landmark, config)
+        normalized_mouth_height = (mouth_height - mouth_height.mean()) / mouth_height.std()
+        df_disp['mouth_signal'] = normalized_mouth_height
+
         df_summ = get_summary(df_disp)
+
         return df_landmark, df_disp, df_summ
 
     except Exception as e:
