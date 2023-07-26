@@ -339,7 +339,7 @@ def get_mouth_height(df, measures):
     """
 
     upper_lip_indices = measures["upper_lip_simple_landmarks"]
-    lower_lip_indices = measures["lower_lip_simple_landmars"]
+    lower_lip_indices = measures["lower_lip_simple_landmarks"]
 
     upper_lip = ['lmk' + str(col+1).zfill(3) for col in upper_lip_indices]
     lower_lip = ['lmk' + str(col+1).zfill(3) for col in lower_lip_indices]
@@ -352,6 +352,82 @@ def get_mouth_height(df, measures):
         )
     
     return mouth_height
+
+def get_lip_height(df, lip, measures):
+    """
+    ---------------------------------------------------------------------------------------------------
+
+    This function takes a Pandas dataframe of landmark coordinates as input, calculates the Euclidean distance
+    between the upper and lower parts of a lip, and returns an array of the displacement values.
+
+    Parameters:
+    ............
+    df : pandas.DataFrame
+        Dataframe containing landmark coordinates
+    lip : str
+        lip to calculate height for; must be either 'upper' or 'lower'
+    measures : dict
+        dictionary of landmark indices
+
+    Returns:
+    ............
+    lip_height : numpy.array
+        Array of displacement values for mouth height
+
+    Raises:
+    ............
+    ValueError
+        If lip is not 'upper' or 'lower'
+
+    ---------------------------------------------------------------------------------------------------
+    """
+
+    lip = lip.lower()
+    if lip not in ['upper', 'lower']:
+        raise ValueError('lip must be either upper or lower')
+
+    lip_indices = measures[f"{lip}_lip_simple_landmarks"]
+
+    lip_landmarks = ['lmk' + str(col+1).zfill(3) for col in lip_indices]
+
+    lip_height = 0
+    for i in [2, 3, 4]:
+        lip_height += np.sqrt(
+            (df[lip_landmarks[i] + '_x'] - df[lip_landmarks[12-i] + '_x'])**2
+            + (df[lip_landmarks[i] + '_y'] - df[lip_landmarks[12-i] + '_y'])**2
+        )
+    
+    return lip_height
+
+def get_mouth_openness(df, measures):
+    """
+    ---------------------------------------------------------------------------------------------------
+
+    This function calculates whether the mouth openness as the ratio of the mouth height to the min of
+     upper lip and lower lip height.
+
+    Parameters:
+    ............
+    df : pandas.DataFrame
+        Dataframe containing landmark coordinates
+    measures : dict
+        dictionary of landmark indices
+
+    Returns:
+    ............
+    mouth_openness : numpy.array
+        Array of mouth openness values
+
+    ---------------------------------------------------------------------------------------------------
+    """
+
+    upper_lip_height = get_lip_height(df, 'upper', measures)
+    lower_lip_height = get_lip_height(df, 'lower', measures)
+    mouth_height = get_mouth_height(df, measures)
+
+    mouth_openness = mouth_height / np.minimum(upper_lip_height, lower_lip_height)
+
+    return mouth_openness
 
 def baseline(base_path):
     """
@@ -572,10 +648,8 @@ def facial_expressivity(filepath, baseline_filepath=''):
         df_landmark = get_landmarks(filepath, 'input')
         df_disp = get_displacement(df_landmark, baseline_filepath, config)
 
-        # calculate mouth height
-        mouth_height = get_mouth_height(df_landmark, config)
-        normalized_mouth_height = (mouth_height - mouth_height.mean()) / mouth_height.std()
-        df_disp['mouth_signal'] = normalized_mouth_height
+        # use mouth height to calculate mouth openness
+        df_disp['mouth_openness'] = get_mouth_openness(df_landmark, config)
 
         df_summ = get_summary(df_disp)
 
