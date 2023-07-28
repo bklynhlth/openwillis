@@ -10,8 +10,8 @@ import numpy as np
 import pandas as pd
 
 from disvoice.glottal import Glottal
-import parselmouth
-from parselmouth.praat import call
+from parselmouth import Sound
+from parselmouth.praat import call, run_file
 from pydub import AudioSegment,silence
 
 logging.basicConfig(level=logging.INFO)
@@ -200,7 +200,7 @@ def read_audio(path):
 
     file = open(measure_path)
     measures = json.load(file)
-    sound = parselmouth.Sound(path)
+    sound = Sound(path)
 
     return sound, measures
 
@@ -577,6 +577,41 @@ def calculate_glottal(audio_path):
     glottal_features = [mean_hrf, std_hrf, mean_naq, std_naq, mean_qoq, std_qoq]
     return glottal_features
 
+def calculate_tremor(audio_path):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    Calculates the tremor features of an audio file.
+
+    Parameters:
+    ...........
+    audio_path : str
+        path to the audio file
+
+    Returns:
+    ...........
+    tremor_features : list
+        list containing the tremor features
+        [FCoM, FTrC, FMon, FTrF, FTrI, FTrP, FTrCIP, FTrPS, FCoHNR, ACoM, ATrC, AMoN, ATrF, ATrI, ATrP, ATrCIP, ATrPS, ACoHNR]
+
+    ------------------------------------------------------------------------------------------------------
+    """
+    tremor_dir = os.path.dirname(os.path.abspath(__file__))
+    tremor_dir = os.path.join(tremor_dir, "util/praat_tremor")
+
+    tremor_var = run_file(
+        f"{tremor_dir}/vocal_tremor.praat",
+        "4", audio_path, "0.015", "60", "350", "0.03", "0.3",
+        "0.01", "0.35", "0.14", "2", "1.5", "15", "0.01", "0.15",
+        "0.01", "0.01", "2", capture_output=True
+    )
+
+    # retrieve the tremor features
+    tremor_features = tremor_var[1].replace('\n', '').split('\t')
+    tremor_features = [float(x) for x in tremor_features[1:]]
+
+    return tremor_features
+
 def get_sustained_vowel_summary(df_summary, audio_path, sustained_vowel, measures):
     """
     ------------------------------------------------------------------------------------------------------
@@ -607,16 +642,29 @@ def get_sustained_vowel_summary(df_summary, audio_path, sustained_vowel, measure
         measures["mean_naq"], measures["std_naq"],
         measures["mean_qoq"], measures["std_qoq"]
     ]
+    cols2 = [
+        measures["FCoM"], measures["FTrC"], measures["FMon"],
+        measures["FTrF"], measures["FTrI"], measures["FTrP"],
+        measures["FTrCIP"], measures["FTrPS"], measures["FCoHNR"],
+        measures["ACoM"], measures["ATrC"], measures["AMoN"],
+        measures["ATrF"], measures["ATrI"], measures["ATrP"],
+        measures["ATrCIP"], measures["ATrPS"], measures["ACoHNR"]
+    ]
 
     if not sustained_vowel:
-        df_summary2 = pd.DataFrame([[np.NaN, np.NaN, np.NaN, np.NaN, np.NaN, np.NaN]], columns=cols)
-        df_summary = pd.concat([df_summary, df_summary2], axis=1)
+        df_summary2 = pd.DataFrame([[np.NaN] * 6], columns=cols)
+        df_summary3 = pd.DataFrame([[np.NaN] * 18], columns=cols2)
+
+        df_summary = pd.concat([df_summary, df_summary2, df_summary3], axis=1)
         return df_summary
 
+    tremor_features = calculate_tremor(audio_path)
     glottal_features = calculate_glottal(audio_path)
 
     df_summary2 = pd.DataFrame([glottal_features], columns=cols)
-    df_summary = pd.concat([df_summary, df_summary2], axis=1)
+    df_summary3 = pd.DataFrame([tremor_features], columns=cols2)
+
+    df_summary = pd.concat([df_summary, df_summary2, df_summary3], axis=1)
     return df_summary
 
 def vocal_acoustics(audio_path, sustained_vowel=False):
