@@ -2,17 +2,17 @@
 # website:   http://www.bklynhlth.com
 
 # import the required packages
+import os
+import json
+import logging
 
 import numpy as np
 import pandas as pd
 
+from disvoice.glottal import Glottal
 import parselmouth
 from parselmouth.praat import call
 from pydub import AudioSegment,silence
-
-import os
-import json
-import logging
 
 logging.basicConfig(level=logging.INFO)
 logger=logging.getLogger()
@@ -542,7 +542,84 @@ def calculate_relative_stds(framewise, df_silence, measures):
     df_relative = pd.DataFrame([[relF0sd, relSE0SD]], columns=[measures['relF0sd'], measures['relSE0SD']])
     return df_relative
 
-def vocal_acoustics(audio_path):
+def calculate_glottal(audio_path):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    Calculates the glottal features of an audio file.
+
+    Parameters:
+    ...........
+    audio_path : str
+        path to the audio file
+    
+    Returns:
+    ...........
+    glottal_features : list
+        list containing the glottal features
+         [mean_hrf, std_hrf, mean_naq, std_naq, mean_qoq, std_qoq]
+
+    ------------------------------------------------------------------------------------------------------
+    """
+
+    glottal = Glottal()
+    features = glottal.extract_features_file(audio_path, static=True, fmt="dataframe")
+
+    mean_hrf = features["global avg avg HRF"][0]
+    std_hrf = features["global avg std HRF"][0]
+
+    mean_naq = features["global avg avg NAQ"][0]
+    std_naq = features["global avg std NAQ"][0]
+
+    mean_qoq = features["global avg avg QOQ"][0]
+    std_qoq = features["global avg std QOQ"][0]
+
+    glottal_features = [mean_hrf, std_hrf, mean_naq, std_naq, mean_qoq, std_qoq]
+    return glottal_features
+
+def get_sustained_vowel_summary(df_summary, audio_path, sustained_vowel, measures):
+    """
+    ------------------------------------------------------------------------------------------------------
+    
+    Calculates the summary statistics for a sustained vowel.
+
+    Parameters:
+    ...........
+    df_summary : pandas dataframe
+        dataframe containing the summary statistics for the audio file
+    audio_path : str
+        path to the audio file
+    sustained_vowel : bool
+        whether to calculate the summary statistics for a sustained vowel
+    measures : dict
+        a dictionary containing the measures names for the calculated statistics.
+
+    Returns:
+    ...........
+    df_summary : pandas dataframe
+        dataframe containing the summary statistics for the audio file
+
+    ------------------------------------------------------------------------------------------------------
+    """
+
+    cols = [
+        measures["mean_hrf"], measures["std_hrf"],
+        measures["mean_naq"], measures["std_naq"],
+        measures["mean_qoq"], measures["std_qoq"]
+    ]
+
+    if not sustained_vowel:
+        df_summary2 = pd.DataFrame([[np.NaN, np.NaN, np.NaN, np.NaN, np.NaN, np.NaN]], columns=cols)
+        df_summary = pd.concat([df_summary, df_summary2], axis=1)
+        return df_summary
+
+    glottal_features = calculate_glottal(audio_path)
+
+    df_summary2 = pd.DataFrame([glottal_features], columns=cols)
+    df_summary = pd.concat([df_summary, df_summary2], axis=1)
+    return df_summary
+
+def vocal_acoustics(audio_path, sustained_vowel=False):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -552,6 +629,8 @@ def vocal_acoustics(audio_path):
     ...........
     audio_path : str
         path to the audio file
+    sustained_vowel : bool
+        whether to calculate the acoustic variables for a sustained vowel
 
     Returns:
     ...........
@@ -581,7 +660,8 @@ def vocal_acoustics(audio_path):
         sig_df = pd.concat([df_jitter, df_shimmer, df_gne], axis=1)
 
         df_summary = get_summary(sound, framewise, sig_df, df_silence, measures)
-        return framewise, df_silence, df_summary
+        df_summary2 = get_sustained_vowel_summary(df_summary, audio_path, sustained_vowel, measures)
+        return framewise, df_silence, df_summary2
 
     except Exception as e:
         logger.error(f'Error in acoustic calculation- file: {audio_path} & Error: {e}')
