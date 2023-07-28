@@ -23,5 +23,7 @@
   "silence_end": "pause_end",
   "pause_meandur": "pause_meandur",
   "pause_rate": "pause_rate",
-  "silence_ratio": "silence_ratio"
+  "silence_ratio": "silence_ratio",
+  "relF0sd": "relF0sd",
+  "relSE0SD": "relSE0SD"
 }

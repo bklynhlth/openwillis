@@ -50,7 +50,7 @@ def common_summary(df, col_name):
     df_summ = pd.DataFrame([values], columns= cols)
     return df_summ
 
-def silence_summary(sound, df, measure):
+def silence_summary(sound, df, measures):
     """
     ------------------------------------------------------------------------------------------------------
     Calculates silence summary statistics for a given audio file.
@@ -61,8 +61,8 @@ def silence_summary(sound, df, measure):
         the audio file to analyze.
     df : pandas dataframe
         the dataframe containing the silence intervals in the audio file.
-    measure : dict
-        a dictionary containing the measure names for the calculated statistics.
+    measures : dict
+        a dictionary containing the measures names for the calculated statistics.
 
     Returns:
     ...........
@@ -73,16 +73,16 @@ def silence_summary(sound, df, measure):
     """
     duration = call(sound, "Get total duration")
 
-    df_silence = df[measure['voicesilence']]
+    df_silence = df[measures['voicesilence']]
     mean = df_silence.mean()
 
     num_pause = (len(df_silence)/duration)*60
-    cols = [measure['pause_meandur'], measure['pause_rate']]
+    cols = [measures['pause_meandur'], measures['pause_rate']]
 
     silence_summ = pd.DataFrame([[mean, num_pause]], columns = cols)
     return silence_summ
 
-def get_summary(sound, framewise, sig_df, df_silence, measure):
+def get_summary(sound, framewise, sig_df, df_silence, measures):
     """
     ------------------------------------------------------------------------------------------------------
     Calculates the summary statistics for a given audio file.
@@ -98,8 +98,8 @@ def get_summary(sound, framewise, sig_df, df_silence, measure):
         a dataframe containing the jitter, shimmer, and GNE values for the audio file.
     df_silence :pandas dataframe
         a dataframe containing the silence intervals in the audio file.
-    measure : dict
-        a dictionary containing the measure names for the calculated statistics.
+    measures : dict
+        a dictionary containing the measures names for the calculated statistics.
 
     Returns:
     ...........
@@ -115,13 +115,15 @@ def get_summary(sound, framewise, sig_df, df_silence, measure):
         com_summ = common_summary(framewise[col], col)
         df_list.append(com_summ)
 
-    summ_silence = silence_summary(sound, df_silence, measure)
-    voice_pct = voice_frame(sound, measure)
+    summ_silence = silence_summary(sound, df_silence, measures)
+    voice_pct = voice_frame(sound, measures)
 
-    df_concat = pd.concat(df_list+ [sig_df, summ_silence, voice_pct], axis=1)
+    df_relative = calculate_relative_stds(framewise, df_silence, measures)
+
+    df_concat = pd.concat(df_list+ [sig_df, summ_silence, voice_pct, df_relative], axis=1)
     return df_concat
 
-def voice_frame(sound, measure):
+def voice_frame(sound, measures):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -131,8 +133,8 @@ def voice_frame(sound, measure):
     ...........
     sound : Praat sound object
         the audio file to analyze.
-    measure : dict
-        a dictionary containing the measure names for the calculated statistics.
+    measures : dict
+        a dictionary containing the measures names for the calculated statistics.
 
     Returns:
     ...........
@@ -147,14 +149,14 @@ def voice_frame(sound, measure):
     voice = pitch.count_voiced_frames()
     voice_pct = 100 - (voice/total_frames)*100
 
-    df = pd.DataFrame([voice_pct], columns=[measure['silence_ratio']])
+    df = pd.DataFrame([voice_pct], columns=[measures['silence_ratio']])
     return df
 
 def read_audio(path):
     """
     ------------------------------------------------------------------------------------------------------
 
-    Reads an audio file and returns the Praat sound object and a dictionary of measure names.
+    Reads an audio file and returns the Praat sound object and a dictionary of measures names.
 
     Parameters:
     ...........
@@ -166,7 +168,7 @@ def read_audio(path):
     sound : praat sound object
         the Praat sound object for the given audio file.
     measures : dict
-        a dictionary containing the measure names for the calculated statistics.
+        a dictionary containing the measures names for the calculated statistics.
 
     ------------------------------------------------------------------------------------------------------
     """
@@ -191,7 +193,7 @@ def pitchfreq(sound, measures, f0min, f0max):
     sound : sound object
         a praat sound object
     measures : dict
-        a dictionary containing the measure names for the calculated statistics.
+        a dictionary containing the measures names for the calculated statistics.
     f0min : int
         the minimum pitch frequency value.
     f0max : int
@@ -429,6 +431,94 @@ def get_voice_silence(sound, min_silence, measures):
 
     df_silence[measures['voicesilence']] = df_silence[cols[1]] - df_silence[cols[0]]
     return df_silence
+
+def get_voiced_segments(df_silence, min_duration, measures):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    Extracts the frames containing voice using the silence window values.
+
+    Parameters:
+    ........... 
+    df_silence : pandas dataframe
+        dataframe containing the silence window values
+    min_duration : int
+        minimum duration of the voiced segment (in ms)
+    measures : dict
+        a dictionary containing the measures names for the calculated statistics.
+
+    Returns:
+    ...........
+    speech_indices : list
+        list containing the indices of the voiced segments
+
+    ------------------------------------------------------------------------------------------------------
+    """
+    if len(df_silence) == 0:
+        return None
+    elif len(df_silence) == 1:
+        return np.arange(0, df_silence[measures['silence_start']][0] * 100)
+
+    speech_durations = df_silence[measures['silence_start']] - df_silence[measures['silence_end']].shift(1)
+    # first speech duration is the first silence start time - 0
+    speech_durations[0] = df_silence[measures['silence_start']][0]
+    # convert to ms
+    speech_durations *= 1000
+    # get indices of speech_durations > 100
+    speech_indices = speech_durations[speech_durations > min_duration].index.tolist()
+
+    speech_indices_expanded = np.array([])
+    for idx in speech_indices:
+        # multiply by 100 to get frame number
+        if idx == 0:
+            speech_start = 0
+            speech_end = np.floor(df_silence[measures['silence_start']][idx] * 100)
+        else:
+            speech_start = np.ceil(df_silence[measures['silence_end']][idx-1] * 100)
+            speech_end = np.floor(df_silence[measures['silence_start']][idx] * 100)
+
+        speech_indices_expanded = np.append(speech_indices_expanded, np.arange(speech_start, speech_end))
+
+    speech_indices_expanded = speech_indices_expanded.astype(int)
+    return speech_indices_expanded
+
+def calculate_relative_stds(framewise, df_silence, measures):
+    """
+    ------------------------------------------------------------------------------------------------------
+    
+    Calculates the relative standard deviation of F0 and loudness for the voiced segments.
+
+    Parameters:
+    ...........
+    framewise : pandas dataframe
+        dataframe containing pitch, loudness, HNR, and formant frequency values
+    df_silence : pandas dataframe
+        dataframe containing the silence window values
+    measures : dict
+        a dictionary containing the measures names for the calculated statistics.
+
+    Returns:
+    ...........
+    df_relative : pandas dataframe
+        dataframe containing the relative standard deviation of F0 and loudness for the voiced segments
+
+    ------------------------------------------------------------------------------------------------------
+    """
+
+    speech_indices = get_voiced_segments(df_silence, 100, measures)
+    if speech_indices is None:
+        speech_indices = np.arange(0, len(framewise))
+    elif speech_indices[-1] < len(framewise):
+        peech_indices = np.append(speech_indices, np.arange(speech_indices[-1], len(framewise)))
+
+    f0 = framewise[measures['fundfreq']][speech_indices]
+    loudness = framewise[measures['loudness']][speech_indices]
+
+    relF0sd = np.std(f0) / np.mean(f0)
+    relSE0SD = np.std(loudness) / np.mean(loudness)
+
+    df_relative = pd.DataFrame([[relF0sd, relSE0SD]], columns=[measures['relF0sd'], measures['relSE0SD']])
+    return df_relative
 
 def vocal_acoustics(audio_path):
     """
