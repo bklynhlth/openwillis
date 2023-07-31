@@ -9,10 +9,11 @@ import logging
 import numpy as np
 import pandas as pd
 
-from disvoice.glottal import Glottal
 from parselmouth import Sound
 from parselmouth.praat import call, run_file
 from pydub import AudioSegment,silence
+
+from openwillis.measures.audio.util import disvoice_util as dutil
 
 logging.basicConfig(level=logging.INFO)
 logger=logging.getLogger()
@@ -562,20 +563,8 @@ def calculate_glottal(audio_path):
     ------------------------------------------------------------------------------------------------------
     """
 
-    glottal = Glottal()
-    features = glottal.extract_features_file(audio_path, static=True, fmt="torch")
+    glottal_features = dutil.extract_features_file(audio_path)
 
-    mean_hrf = features[0][7]
-    std_hrf = features[0][8]
-
-    mean_naq = features[0][1]
-    std_naq = features[0][2]
-
-    mean_qoq = features[0][3]
-    std_qoq = features[0][4]
-
-    glottal_features = [mean_hrf, std_hrf, mean_naq, std_naq, mean_qoq, std_qoq]
-    glottal_features = [float(x) for x in glottal_features]
     return glottal_features
 
 def calculate_tremor(audio_path):
