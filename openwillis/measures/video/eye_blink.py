@@ -95,7 +95,7 @@ def initialize_facemesh():
     return mp_face_mesh.FaceMesh()
 
 
-def get_video_capture(video_directory):
+def get_video_capture(video):
     """
     ---------------------------------------------------------------------------------------------------
 
@@ -103,7 +103,7 @@ def get_video_capture(video_directory):
 
     Parameters:
     ............
-    video_directory : string
+    video : string
         The directory of the video to be analyzed
 
     Returns:
@@ -116,7 +116,7 @@ def get_video_capture(video_directory):
     ---------------------------------------------------------------------------------------------------
     """
     logger.info("Starting video stream thread...")
-    vs = cv2.VideoCapture(video_directory)
+    vs = cv2.VideoCapture(video)
     fps = vs.get(cv2.CAP_PROP_FPS)
     time.sleep(1.0)
     return vs, fps
@@ -304,7 +304,7 @@ def calculate_framewise(vs, face_mesh, config):
     return framewise, frame_n
 
 
-def eye_blink_rate(video_directory):
+def eye_blink_rate(video):
     """
     ---------------------------------------------------------------------------------------------------
 
@@ -312,7 +312,7 @@ def eye_blink_rate(video_directory):
 
     Parameters:
     ............
-    video_directory : string
+    video : string
         The directory of the video to be analyzed
 
     Returns:
@@ -334,16 +334,16 @@ def eye_blink_rate(video_directory):
 
     try:
         # validate video directory exists and is a video file
-        if not os.path.isfile(video_directory):
-            raise ValueError(f"{video_directory} does not exist")
-        if not video_directory.endswith(('.mp4', '.avi', '.mov')):
-            raise ValueError(f"{video_directory} is not a video file")
+        if not os.path.isfile(video):
+            raise ValueError(f"{video} does not exist")
+        if not video.endswith(('.mp4', '.avi', '.mov')):
+            raise ValueError(f"{video} is not a video file")
 
         prominence, width = config['prominence'], config['width']
 
         face_mesh = initialize_facemesh()
 
-        vs, fps = get_video_capture(video_directory)
+        vs, fps = get_video_capture(video)
 
         # calculate EAR of each frame
         ear, frame_n = calculate_framewise(vs, face_mesh, config)
