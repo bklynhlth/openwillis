@@ -598,11 +598,16 @@ def calculate_tremor(audio_path):
 
     # retrieve the tremor features
     tremor_features = tremor_var[1].replace('\n', '').split('\t')
-    tremor_features = [float(x) for x in tremor_features[1:]]
+    tremor_features2 = []
+    for x in tremor_features[1:]:
+        if x != '--undefined--':
+            tremor_features2.append(float(x))
+        else:
+            tremor_features2.append(np.NaN)
 
-    return tremor_features
+    return tremor_features2
 
-def get_sustained_vowel_summary(df_summary, audio_path, sustained_vowel, measures):
+def get_advanced_summary(df_summary, audio_path, advanced, measures):
     """
     ------------------------------------------------------------------------------------------------------
     
@@ -614,8 +619,8 @@ def get_sustained_vowel_summary(df_summary, audio_path, sustained_vowel, measure
         dataframe containing the summary statistics for the audio file
     audio_path : str
         path to the audio file
-    sustained_vowel : bool
-        whether to calculate the summary statistics for a sustained vowel
+    advanced : bool
+        whether to calculate the advanced vocal acoustic variables
     measures : dict
         a dictionary containing the measures names for the calculated statistics.
 
@@ -627,12 +632,12 @@ def get_sustained_vowel_summary(df_summary, audio_path, sustained_vowel, measure
     ------------------------------------------------------------------------------------------------------
     """
 
-    cols = [
+    glottal_cols = [
         measures["mean_hrf"], measures["std_hrf"],
         measures["mean_naq"], measures["std_naq"],
         measures["mean_qoq"], measures["std_qoq"]
     ]
-    cols2 = [
+    tremor_cols = [
         measures["FCoM"], measures["FTrC"], measures["FMon"],
         measures["FTrF"], measures["FTrI"], measures["FTrP"],
         measures["FTrCIP"], measures["FTrPS"], measures["FCoHNR"],
@@ -641,23 +646,21 @@ def get_sustained_vowel_summary(df_summary, audio_path, sustained_vowel, measure
         measures["ATrCIP"], measures["ATrPS"], measures["ACoHNR"]
     ]
 
-    if not sustained_vowel:
-        df_summary2 = pd.DataFrame([[np.NaN] * 6], columns=cols)
-        df_summary3 = pd.DataFrame([[np.NaN] * 18], columns=cols2)
+    tremor_features = calculate_tremor(audio_path)
+    tremor_summ = pd.DataFrame([tremor_features], columns=tremor_cols)
 
-        df_summary = pd.concat([df_summary, df_summary2, df_summary3], axis=1)
+    if not advanced:
+        glottal_summ = pd.DataFrame([[np.NaN] * 6], columns=glottal_cols)
+        df_summary = pd.concat([df_summary, glottal_summ, tremor_summ], axis=1)
         return df_summary
 
-    tremor_features = calculate_tremor(audio_path)
     glottal_features = calculate_glottal(audio_path)
 
-    df_summary2 = pd.DataFrame([glottal_features], columns=cols)
-    df_summary3 = pd.DataFrame([tremor_features], columns=cols2)
-
-    df_summary = pd.concat([df_summary, df_summary2, df_summary3], axis=1)
+    glottal_summ = pd.DataFrame([glottal_features], columns=glottal_cols)
+    df_summary = pd.concat([df_summary, glottal_summ, tremor_summ], axis=1)
     return df_summary
 
-def vocal_acoustics(audio_path, sustained_vowel=False):
+def vocal_acoustics(audio_path, advanced=False):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -667,8 +670,8 @@ def vocal_acoustics(audio_path, sustained_vowel=False):
     ...........
     audio_path : str
         path to the audio file
-    sustained_vowel : bool
-        whether to calculate the acoustic variables for a sustained vowel
+    advanced : bool
+        whether to calculate the advanced vocal acoustic variables
 
     Returns:
     ...........
@@ -698,7 +701,7 @@ def vocal_acoustics(audio_path, sustained_vowel=False):
         sig_df = pd.concat([df_jitter, df_shimmer, df_gne], axis=1)
 
         df_summary = get_summary(sound, framewise, sig_df, df_silence, measures)
-        df_summary2 = get_sustained_vowel_summary(df_summary, audio_path, sustained_vowel, measures)
+        df_summary2 = get_advanced_summary(df_summary, audio_path, advanced, measures)
         return framewise, df_silence, df_summary2
 
     except Exception as e:
