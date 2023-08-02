@@ -6,9 +6,11 @@ import sys
 
 import numpy as np
 from scipy.io.wavfile import read
+from scipy.integrate import cumtrapz
 from scipy.signal import find_peaks
 
-from disvoice.glottal import Glottal
+from disvoice.glottal.GCI import iaif
+from disvoice.glottal.utils_gci import create_continuous_smooth_f0, GetLPCresidual, get_MBS, get_MBS_GCI_intervals, search_res_interval_peaks
 import pysptk
 
 
@@ -19,6 +21,271 @@ HRF_freq_max=5000 # Maximum frequency used for harmonic measurement
 qoq_level=0.5 # threhold for QOQ estimation
 F0min=20
 F0max=500
+
+def get_costm_matrix(GCI_N, x, trans_wgt, ncands, pulseLen, n):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    This function is meant to replace the get_costm_matrix function in disvoice package at
+    https://github.com/jcvasquezc/DisVoice/blob/master/disvoice/glottal/utils_gci.py#L309
+    Calculates the cost matrix for the dynamic programming algorithm.
+
+    Parameters:
+    ...........
+    GCI_N : numpy array
+        Matrix containing N by M candidate GCI locations (in samples)
+    x : numpy array
+        Speech signal
+    trans_wgt: float
+        Transition cost weight
+    ncands: int
+        Number of candidates
+    pulseLen: int
+        Length of the pulses
+    n: int
+        Current frame
+    
+    Returns:
+    ...........
+    costm: numpy array
+        Cost matrix for the dynamic programming algorithm
+
+    ------------------------------------------------------------------------------------------------------
+    """
+    # Initialize the cost matrix
+    costm = np.zeros((ncands, ncands))
+
+    # Extract the pulses for the current and previous frames
+    pulses_cur = [x[max(0, int(GCI_N[n, c] - pulseLen / 2)):min(int(GCI_N[n, c] + pulseLen / 2), len(x))] for c in range(ncands)]
+    pulses_prev = [x[max(1, int(GCI_N[n - 1, p] - pulseLen / 2)):min(len(x), int(GCI_N[n - 1, p] + pulseLen / 2))] for p in range(ncands)]
+
+    # Make sure all pulses are the same length by padding with NaNs
+    max_len = max(max(len(pulse) for pulse in pulses_cur), max(len(pulse) for pulse in pulses_prev))
+    pulses_cur = [np.concatenate((pulse, np.full(max_len - len(pulse), np.nan))) for pulse in pulses_cur]
+    pulses_prev = [np.concatenate((pulse, np.full(max_len - len(pulse), np.nan))) for pulse in pulses_prev]
+
+    # Convert to NumPy arrays for vectorized computation
+    pulses_cur = np.array(pulses_cur)
+    pulses_prev = np.array(pulses_prev)
+
+    # Compute the correlations using NumPy functions
+    mean_cur = np.nanmean(pulses_cur, axis=1, keepdims=True)
+    mean_prev = np.nanmean(pulses_prev, axis=1, keepdims=True)
+    std_cur = np.nanstd(pulses_cur, axis=1, keepdims=True)
+    std_prev = np.nanstd(pulses_prev, axis=1, keepdims=True)
+    corr_matrix = ((pulses_cur - mean_cur) @ (pulses_prev - mean_prev).T) / (max_len * std_cur * std_prev.T)
+
+    # Apply conditions and scaling
+    conditions = ((std_cur > 0) & (std_prev.T > 0)).squeeze()
+    costm = np.where(conditions, (1 - np.abs(corr_matrix)) * trans_wgt, costm)
+
+    return costm
+
+def RESON_dyProg_mat(GCI_relAmp,GCI_N,F0mean,x,fs,trans_wgt,relAmp_wgt):
+    # Function to carry out dynamic programming method described in Ney (1989)
+    # and used previously in the ESPS GCI detection algorithm. The method
+    # considers target costs and transition costs which are accumulated in
+    # order to select the `cheapest' path, considering previous context
+
+    # USAGE: INPUT
+    #        GCI_relAmp - target cost matrix with N rows (GCI candidates) by M
+    #                     columns (mean based signal derived intervals).
+    #        GCI_N      - matrix containing N by M candidate GCI locations (in
+    #                     samples)
+    #        F0_inter   - F0 values updated every sample point
+    #        x          - speech signal
+    #        fs         - sampling frequency
+    #        trans_wgt  - transition cost weight
+    #
+    #        OUTPUT
+    #        GCI        - estimated glottal closure instants (in samples)
+    # =========================================================================
+    # === FUNCTION CODED BY JOHN KANE AT THE PHONETICS LAB TRINITY COLLEGE ====
+    # === DUBLIN. 25TH October 2011 ===========================================
+    # =========================================================================
+
+    # =========================================================================
+    # === FUNCTION ADAPTED AND CODED IN PYTHON BY J. C. Vasquez-Correa
+    #   AT THE PATTERN RECOGNITION LAB, UNIVERSITY OF ERLANGEN-NUREMBERG ====
+    # === ERLANGEN, MAY, 2018 ===========================================
+    # =========================================================================
+
+
+
+    ## Initial settings
+
+    GCI_relAmp=np.asarray(GCI_relAmp)
+    relAmp_wgt=np.asarray(relAmp_wgt)
+    cost = GCI_relAmp*relAmp_wgt
+    #print(cost.shape)
+    GCI_N=np.asarray(GCI_N)
+    ncands=GCI_N.shape[1]
+    nframe=GCI_N.shape[0]
+    #print(ncands, nframe, cost.shape)
+    prev=np.zeros((nframe,ncands))
+    pulseLen = int(fs/F0mean)
+
+    for n in range(1,nframe):
+        costm = get_costm_matrix(GCI_N, x, trans_wgt, ncands, pulseLen, n)
+        costm=costm+np.tile(cost[n-1,0:ncands],(ncands,1))
+        costm=np.asarray(costm)
+        costi=np.min(costm,0)
+        previ=np.argmin(costm,0)
+        cost[n,0:ncands]=cost[n,0:ncands]+costi
+        prev[n,0:ncands]=previ
+
+    best=np.zeros(n+1)
+    best[n]=np.argmin(cost[n,0:ncands])
+
+
+
+    for i in range(n-1,1,-1):
+
+        best[i-1]=prev[i,int(best[i])]
+
+    GCI_opt=np.asarray([GCI_N[n,int(best[n])] for n in range(nframe)])
+
+    return GCI_opt
+
+def se_vq_varf0(x,fs, f0=None):
+    """
+    Function to extract GCIs using an adapted version of the SEDREAMS 
+    algorithm which is optimised for non-modal voice qualities (SE-VQ). Ncand maximum
+    peaks are selected from the LP-residual signal in the interval defined by
+    the mean-based signal. 
+    
+    A dynamic programming algorithm is then used to select the optimal path of GCI locations. 
+    Then a post-processing method, using the output of a resonator applied to the residual signal, is
+    carried out to remove false positives occurring in creaky speech regions.
+    
+    Note that this method is slightly different from the standard SE-VQ
+    algorithm as the mean based signal is calculated using a variable window
+    length. 
+    
+    This is set using an f0 contour interpolated over unvoiced
+    regions and heavily smoothed. This is particularly useful for speech
+    involving large f0 excursions (i.e. very expressive speech).
+
+    :param x:  speech signal (in samples)
+    :param fs: sampling frequency (Hz)
+    :param f0: f0 contour (optional), otherwise its computed  using the RAPT algorithm
+    :returns: GCI Glottal closure instants (in samples)
+    
+    References:
+          Kane, J., Gobl, C., (2013) `Evaluation of glottal closure instant 
+          detection in a range of voice qualities', Speech Communication
+          55(2), pp. 295-314.
+    
+
+    ORIGINAL FUNCTION WAS CODED BY JOHN KANE AT THE PHONETICS AND SPEECH LAB IN 
+    TRINITY COLLEGE DUBLIN ON 2013.
+    
+    THE SEDREAMS FUNCTION WAS CODED BY THOMAS DRUGMAN OF THE UNIVERSITY OF MONS
+   
+    THE CODE WAS TRANSLATED TO PYTHON AND ADAPTED BY J. C. Vasquez-Correa
+    AT PATTERN RECOGNITION LAB UNIVERSITY OF ERLANGEN NUREMBER- GERMANY
+    AND UNIVERSTY OF ANTIOQUIA, COLOMBIA
+    JCAMILO.VASQUEZ@UDEA.EDU.CO
+    https//jcvasquezc.github.io
+    """
+    if f0 is None:
+        f0 = []
+    if len(f0)==0 or sum(f0)==0:
+        size_stepS=0.01*fs
+        voice_bias=-0.2
+        x=x-np.mean(x)
+        x=x/np.max(np.abs(x))
+        data_audiof=np.asarray(x*(2**15), dtype=np.float32)
+        f0=pysptk.sptk.rapt(data_audiof, fs, int(size_stepS), min=F0min, max=F0max, voice_bias=voice_bias, otype='f0')
+
+
+    F0nz=np.where(f0>0)[0]
+    F0mean=np.median(f0[F0nz])
+    VUV=np.zeros(len(f0))
+    VUV[F0nz]=1
+    if F0mean<70:
+        F0mean=80
+
+    # Interpolate f0 over unvoiced regions and heavily smooth the contour
+    ptos=np.linspace(0,len(x),len(VUV))
+    VUV_inter=np.interp(np.arange(len(x)), ptos, VUV)
+    VUV_inter[np.where(VUV_inter>0.5)[0]]=1
+    VUV_inter[np.where(VUV_inter<=0.5)[0]]=0
+    f0_int, f0_samp=create_continuous_smooth_f0(f0,VUV,x)
+    T0mean = fs/f0_samp
+    winLen = 25 # window length in ms
+    winShift = 5 # window shift in ms
+    LPC_ord = int((fs/1000)+2) # LPC order
+    Ncand=5 # Number of candidate GCI residual peaks to be considered in the dynamic programming
+    trans_wgt=1 # Transition cost weight
+    relAmp_wgt=0.3 # Local cost weight
+
+    #Calculate LP-residual and extract N maxima per mean-based signal determined intervals
+    res = GetLPCresidual(x,winLen*fs/1000,winShift*fs/1000,LPC_ord, VUV_inter) # Get LP residual
+    MBS = get_MBS(x,fs,T0mean) # Extract mean based signal
+    interval = get_MBS_GCI_intervals(MBS,fs,T0mean,F0max) # Define search intervals
+    [GCI_N,GCI_relAmp] = search_res_interval_peaks(res,interval,Ncand, VUV_inter) # Find residual peaks
+    if len(np.asarray(GCI_N).shape) > 1:
+        GCI = RESON_dyProg_mat(GCI_relAmp,GCI_N,F0mean,x,fs,trans_wgt,relAmp_wgt) # Do dynamic programming
+    else:
+        GCI = None
+
+    return GCI
+
+def extract_glottal_signal(x, fs):
+    """Extract the glottal flow and the glottal flow derivative signals
+
+    :param x: data from the speech signal.
+    :param fs: sampling frequency
+    :returns: glottal signal
+    :returns: derivative  of the glottal signal
+    :returns: glottal closure instants
+
+    >>> from scipy.io.wavfile import read
+    >>> glottal=Glottal()
+    >>> file_audio="../audios/001_a1_PCGITA.wav"
+    >>> fs, data_audio=read(audio)
+    >>> glottal, g_iaif, GCIs=glottal.extract_glottal_signal(data_audio, fs)
+
+    """
+    winlen = int(0.025*fs)
+    winshift = int(0.005*fs)
+    x = x-np.mean(x)
+    x = x/float(np.max(np.abs(x)))
+    GCIs = se_vq_varf0(x, fs)
+    g_iaif = np.zeros(len(x))
+    glottal = np.zeros(len(x))
+
+    if GCIs is None:
+        sys.warn("not enought voiced segments were found to compute GCI")
+        return glottal, g_iaif, GCIs
+
+    start = 0
+    stop = int(start+winlen)
+    win = np.hanning(winlen)
+
+    while stop <= len(x):
+
+        x_frame = x[start:stop]
+        pGCIt = np.where((GCIs > start) & (GCIs < stop))[0]
+        GCIt = GCIs[pGCIt]-start
+
+        g_iaif_f = iaif(x_frame, fs, GCIt)
+        glottal_f = cumtrapz(g_iaif_f, dx=1/fs)
+        glottal_f = np.hstack((glottal[start], glottal_f))
+        g_iaif[start:stop] = g_iaif[start:stop]+g_iaif_f*win
+        glottal[start:stop] = glottal[start:stop]+glottal_f*win
+        start = start+winshift
+        stop = start+winlen
+    g_iaif = g_iaif-np.mean(g_iaif)
+    g_iaif = g_iaif/max(abs(g_iaif))
+
+    glottal = glottal-np.mean(glottal)
+    glottal = glottal/max(abs(glottal))
+    glottal = glottal-np.mean(glottal)
+    glottal = glottal/max(abs(glottal))
+
+    return glottal, g_iaif, GCIs
 
 def get_vq_params(gf, gfd, fs, GCI):
     """
@@ -224,8 +491,6 @@ def extract_features_file(audio):
     >>> glottal.extract_features_file(file_audio, static=False, plots=False, fmt="kaldi", kaldi_file="./test.ark")
     """
 
-    glottal_obj = Glottal()
-
     if audio.find('.wav') == -1 and audio.find('.WAV') == -1:
         raise ValueError(audio+" is not a valid wav file")
     fs, data_audio = read(audio)
@@ -251,7 +516,7 @@ def extract_features_file(audio):
     startf0 = 0
     stopf0 = sizef0
 
-    glottal, g_iaif, GCI = glottal_obj.extract_glottal_signal(data_audio, fs)
+    glottal, g_iaif, GCI = extract_glottal_signal(data_audio, fs)
 
     avgNAQt = np.zeros(nF)
     varNAQt = np.zeros(nF)
