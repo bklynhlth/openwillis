@@ -5,6 +5,7 @@
 
 import boto3
 import urllib
+import time
 
 import json
 import logging
@@ -173,10 +174,16 @@ def transcribe_audio(s3uri, input_param):
             Settings=settings
         )
 
+        sleep_time = 0
         while True:
+
+            if sleep_time <4:
+                sleep_time += 1
             status = transcribe.get_transcription_job(TranscriptionJobName=input_param['job_name'])
+
             if status['TranscriptionJob']['TranscriptionJobStatus'] in ['COMPLETED', 'FAILED']:
                 break
+            time.sleep(sleep_time)
 
         if status['TranscriptionJob']['TranscriptionJobStatus'] == 'COMPLETED':
             read_data = urllib.request.urlopen(status['TranscriptionJob']['Transcript']['TranscriptFileUri'])
