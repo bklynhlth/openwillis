@@ -180,6 +180,9 @@ def transcribe_audio(s3uri, input_param):
             if sleep_time <50:
                 sleep_time += 5
             status = transcribe.get_transcription_job(TranscriptionJobName=input_param['job_name'])
+            print(f"sleep time is: {sleep_time}")
+            print(f"Status of transcription job {input_param['job_name']} is = {status['TranscriptionJob']['TranscriptionJobStatus']}")
+            print("............")
 
             if status['TranscriptionJob']['TranscriptionJobStatus'] in ['COMPLETED', 'FAILED']:
                 break
