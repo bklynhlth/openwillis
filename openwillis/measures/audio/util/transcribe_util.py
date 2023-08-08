@@ -177,7 +177,7 @@ def transcribe_audio(s3uri, input_param):
         sleep_time = 0
         while True:
 
-            if sleep_time <6:
+            if sleep_time <50:
                 sleep_time += 5
             status = transcribe.get_transcription_job(TranscriptionJobName=input_param['job_name'])
 
