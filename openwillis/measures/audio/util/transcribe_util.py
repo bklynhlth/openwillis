@@ -6,6 +6,7 @@
 import boto3
 import urllib
 import time
+import random
 
 import json
 import logging
@@ -151,25 +152,17 @@ def get_job_status(transcribe, input_param):
 
     ------------------------------------------------------------------------------------------------------
     """
-    sleep_time = 0
+    status = json.loads("{}")
     while True:
-
         try:
-            print("get Transcriptionjob  enters in loop .....")
 
-            if sleep_time <50:
-                sleep_time += 5
-
-            print(f"sleep time is: {sleep_time}")
+            sleep_time = int(random.uniform(5, 10))
             status = transcribe.get_transcription_job(TranscriptionJobName=input_param['job_name'])
-
-            print(f"Status of transcription job {input_param['job_name']} is = {status['TranscriptionJob']['TranscriptionJobStatus']}")
-            print("............")
 
             if status['TranscriptionJob']['TranscriptionJobStatus'] in ['COMPLETED', 'FAILED']:
                 break
-            time.sleep(sleep_time)
 
+            time.sleep(sleep_time)
         except Exception as e:
             logger.error(f"Get Transcription job failed with exception: {e}")
 
@@ -247,10 +240,7 @@ def transcribe_audio(s3uri, input_param):
             Settings=settings
         )
 
-        print("get Transcriptionjob  start.....")
         status = get_job_status(transcribe, input_param)
-        print("get Transcriptionjob  ends.....")
-
         if status['TranscriptionJob']['TranscriptionJobStatus'] == 'COMPLETED':
             response, transcript = filter_transcript_response(status, input_param)
 
