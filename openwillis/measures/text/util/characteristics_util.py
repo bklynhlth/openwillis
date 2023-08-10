@@ -641,7 +641,7 @@ def get_tag_summ(json_conf, df_list, text_indices, measures):
     return df_list
 
 
-def get_mattr(word):
+def get_mattr(text):
     """
     ------------------------------------------------------------------------------------------------------
     This function calculates the Moving Average Type-Token Ratio (MATTR)
@@ -650,8 +650,8 @@ def get_mattr(word):
 
     Parameters:
     ...........
-    word : list
-        The input text as a list of words.
+    text : str
+        The input text to be analyzed.
 
     Returns:
     ...........
@@ -660,8 +660,9 @@ def get_mattr(word):
 
     ------------------------------------------------------------------------------------------------------
     """
+    word = nltk.word_tokenize(text)
     filter_punc = list(value for value in word if value not in [".", "!", "?"])
-    filter_punc = " ".join(str(filter_punc))
+    filter_punc = " ".join(filter_punc)
     mattr = np.nan
 
     lex_richness = LexicalRichness(filter_punc)
