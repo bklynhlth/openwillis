@@ -171,7 +171,7 @@ def read_kwargs(kwargs):
     input_param['model'] = kwargs.get('model', 'pyannote')
 
     input_param['hf_token'] = kwargs.get('hf_token', '')
-    input_param['json_response'] = kwargs.get('json_response', '')
+    input_param['json_response'] = kwargs.get('json_response', json.loads("{}"))
     input_param['c_scale'] = kwargs.get('c_scale', '')
     return input_param
 

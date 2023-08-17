@@ -5,6 +5,8 @@
 
 import boto3
 import urllib
+import time
+import random
 
 import json
 import logging
@@ -130,6 +132,71 @@ def get_clinical_labels(scale, measures, content_dict, json_response):
 
     return json_response
 
+def get_job_status(transcribe, input_param):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    Get transcriptopn job status
+
+    Parameters:
+    ...........
+    transcribe : object
+        Transcription client object
+    input_param: dict
+        A dictionary containing input parameters with their corresponding values.
+
+    Returns:
+    ...........
+    status : str
+        Transcription job status
+
+    ------------------------------------------------------------------------------------------------------
+    """
+    status = json.loads("{}")
+    while True:
+        try:
+
+            sleep_time = int(random.uniform(5, 10))
+            status = transcribe.get_transcription_job(TranscriptionJobName=input_param['job_name'])
+
+            if status['TranscriptionJob']['TranscriptionJobStatus'] in ['COMPLETED', 'FAILED']:
+                break
+
+            time.sleep(sleep_time)
+        except Exception as e:
+            logger.error(f"Get Transcription job failed with exception: {e}")
+
+    return status
+
+def filter_transcript_response(status, input_param):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    Filter transcriptopn job response
+
+    Parameters:
+    ...........
+    status : object
+        Transcription job response
+    input_param: dict
+        A dictionary containing input parameters with their corresponding values.
+
+    Returns:
+    ...........
+    tuple : Two strings, the first string is the response object in JSON format, and the second string is
+    the transcript of the audio file.
+
+    ------------------------------------------------------------------------------------------------------
+    """
+    read_data = urllib.request.urlopen(status['TranscriptionJob']['Transcript']['TranscriptFileUri'])
+    response = json.loads(read_data.read().decode('utf-8'))
+
+    transcript = response['results']['transcripts'][0]['transcript']
+    if input_param['ShowSpeakerLabels'] == True:#replace speaker labels with standard names
+
+        response = replace_speaker_labels(response, ['spk_0', 'spk_1'], ['speaker0', 'speaker1'])
+    return response, transcript
+
 def transcribe_audio(s3uri, input_param):
     """
     ------------------------------------------------------------------------------------------------------
@@ -154,7 +221,7 @@ def transcribe_audio(s3uri, input_param):
 
     ------------------------------------------------------------------------------------------------------
     """
-    response = "{}"
+    response = json.loads("{}")
     transcript = ""
 
     try:
@@ -173,22 +240,12 @@ def transcribe_audio(s3uri, input_param):
             Settings=settings
         )
 
-        while True:
-            status = transcribe.get_transcription_job(TranscriptionJobName=input_param['job_name'])
-            if status['TranscriptionJob']['TranscriptionJobStatus'] in ['COMPLETED', 'FAILED']:
-                break
-
+        status = get_job_status(transcribe, input_param)
         if status['TranscriptionJob']['TranscriptionJobStatus'] == 'COMPLETED':
-            read_data = urllib.request.urlopen(status['TranscriptionJob']['Transcript']['TranscriptFileUri'])
-
-            response = json.loads(read_data.read().decode('utf-8'))
-            transcript = response['results']['transcripts'][0]['transcript']
-
-            if input_param['ShowSpeakerLabels'] == True:#replace speaker labels with standard names
-                response = replace_speaker_labels(response, ['spk_0', 'spk_1'], ['speaker0', 'speaker1'])
+            response, transcript = filter_transcript_response(status, input_param)
 
     except Exception as e:
-        logger.error(f"Transcription job failed with file: {s3uri} exception: {e}")
+        logger.error(f"AWS Transcription job failed with file: {s3uri} exception: {e}")
 
     finally:
         return response, transcript
