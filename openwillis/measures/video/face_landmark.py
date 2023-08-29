@@ -5,6 +5,7 @@
 import numpy as np
 import pandas as pd
 import cv2
+import json
 import os
 import math
 
@@ -15,6 +16,33 @@ import logging
 
 logging.basicConfig(level=logging.INFO)
 logger=logging.getLogger()
+
+def get_config(filepath, json_file):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    This function reads the configuration file containing the column names for the output dataframes,
+    and returns the contents of the file as a dictionary.
+
+    Parameters:
+    ...........
+    filepath : str
+        The path to the configuration file.
+    json_file : str
+        The name of the configuration file.
+
+    Returns:
+    ...........
+    measures: A dictionary containing the names of the columns in the output dataframes.
+
+    ------------------------------------------------------------------------------------------------------
+    """
+    dir_name = os.path.dirname(filepath)
+    measure_path = os.path.abspath(os.path.join(dir_name, f"config/{json_file}"))
+
+    file = open(measure_path)
+    measures = json.load(file)
+    return measures
 
 def init_facemesh():
     """
@@ -288,6 +316,119 @@ def get_distance(df):
     displacement_df = pd.concat(disp_list, axis=1).reset_index(drop=True)
     return displacement_df
 
+def get_mouth_height(df, measures):
+    """
+    ---------------------------------------------------------------------------------------------------
+
+    This function takes a Pandas dataframe of landmark coordinates as input, calculates the Euclidean distance
+    between the upper and lower lips, and returns an array of the displacement values.
+
+    Parameters:
+    ............
+    df : pandas.DataFrame
+        Dataframe containing landmark coordinates
+    measures : dict
+        dictionary of landmark indices
+
+    Returns:
+    ............
+    mouth_height : numpy.array
+        Array of displacement values for mouth height
+
+    ---------------------------------------------------------------------------------------------------
+    """
+
+    upper_lip_indices = measures["upper_lip_simple_landmarks"]
+    lower_lip_indices = measures["lower_lip_simple_landmarks"]
+
+    upper_lip = ['lmk' + str(col+1).zfill(3) for col in upper_lip_indices]
+    lower_lip = ['lmk' + str(col+1).zfill(3) for col in lower_lip_indices]
+
+    mouth_height = 0
+    for i in [8, 9, 10]:
+        mouth_height += np.sqrt(
+            (df[upper_lip[i] + '_x'] - df[lower_lip[18-i] + '_x'])**2
+            + (df[upper_lip[i] + '_y'] - df[lower_lip[18-i] + '_y'])**2
+        )
+    
+    return mouth_height
+
+def get_lip_height(df, lip, measures):
+    """
+    ---------------------------------------------------------------------------------------------------
+
+    This function takes a Pandas dataframe of landmark coordinates as input, calculates the Euclidean distance
+    between the upper and lower parts of a lip, and returns an array of the displacement values.
+
+    Parameters:
+    ............
+    df : pandas.DataFrame
+        Dataframe containing landmark coordinates
+    lip : str
+        lip to calculate height for; must be either 'upper' or 'lower'
+    measures : dict
+        dictionary of landmark indices
+
+    Returns:
+    ............
+    lip_height : numpy.array
+        Array of displacement values for mouth height
+
+    Raises:
+    ............
+    ValueError
+        If lip is not 'upper' or 'lower'
+
+    ---------------------------------------------------------------------------------------------------
+    """
+
+    lip = lip.lower()
+    if lip not in ['upper', 'lower']:
+        raise ValueError('lip must be either upper or lower')
+
+    lip_indices = measures[f"{lip}_lip_simple_landmarks"]
+
+    lip_landmarks = ['lmk' + str(col+1).zfill(3) for col in lip_indices]
+
+    lip_height = 0
+    for i in [2, 3, 4]:
+        lip_height += np.sqrt(
+            (df[lip_landmarks[i] + '_x'] - df[lip_landmarks[12-i] + '_x'])**2
+            + (df[lip_landmarks[i] + '_y'] - df[lip_landmarks[12-i] + '_y'])**2
+        )
+    
+    return lip_height
+
+def get_mouth_openness(df, measures):
+    """
+    ---------------------------------------------------------------------------------------------------
+
+    This function calculates whether the mouth openness as the ratio of the mouth height to the min of
+     upper lip and lower lip height.
+
+    Parameters:
+    ............
+    df : pandas.DataFrame
+        Dataframe containing landmark coordinates
+    measures : dict
+        dictionary of landmark indices
+
+    Returns:
+    ............
+    mouth_openness : numpy.array
+        Array of mouth openness values
+
+    ---------------------------------------------------------------------------------------------------
+    """
+
+    upper_lip_height = get_lip_height(df, 'upper', measures)
+    lower_lip_height = get_lip_height(df, 'lower', measures)
+    mouth_height = get_mouth_height(df, measures)
+
+    mouth_openness = mouth_height / np.minimum(upper_lip_height, lower_lip_height)
+
+    return mouth_openness
+
 def baseline(base_path):
     """
     ---------------------------------------------------------------------------------------------------
@@ -342,7 +483,7 @@ def get_empty_dataframe():
     empty_df = pd.DataFrame(columns=columns)
     return empty_df
 
-def get_displacement(lmk_df, base_path):
+def get_displacement(lmk_df, base_path, measures):
     """
     ---------------------------------------------------------------------------------------------------
 
@@ -355,6 +496,8 @@ def get_displacement(lmk_df, base_path):
         facial landmark dataframe
     base_path : str
         baseline input file path
+    measures : dict
+        dictionary of landmark indices
 
     Returns:
     ............
@@ -373,6 +516,7 @@ def get_displacement(lmk_df, base_path):
         if len(lmk_df)>1:
             disp_actual_df = get_distance(lmk_df)
             disp_actual_df['overall'] = pd.DataFrame(disp_actual_df.mean(axis=1))
+            disp_actual_df = calculate_areas_displacement(disp_actual_df, measures)
 
             if os.path.exists(base_path):
                 disp_base_df = baseline(base_path)
@@ -388,6 +532,45 @@ def get_displacement(lmk_df, base_path):
     except Exception as e:
 
         logger.error(f'Error in displacement calculation is {e}')
+    return displacement_df
+
+def calculate_areas_displacement(displacement_df, measures):
+    """
+    ---------------------------------------------------------------------------------------------------
+
+    This function calculates the summary framewise displacement for upper face,
+     lower face, lips and eyebros.
+
+    Parameters:
+    ............
+    displacement_df : pandas.DataFrame
+        euclidean displacement dataframe
+    measures : dict
+        dictionary of landmark indices
+
+    Returns:
+    ............
+    displacement_df : pandas.DataFrame
+        updated euclidean displacement dataframe
+
+    ---------------------------------------------------------------------------------------------------
+    """
+
+    lower_face_indices = measures["lower_face_landmarks"]
+    upper_face_indices = [i for i in range(0, 468) if i not in lower_face_indices]
+    lip_indices = measures["lips_landmarks"]
+    eyebrow_indices = measures["eyebrows_landmarks"]
+
+    lower_face_cols = ['lmk' + str(col+1).zfill(3) for col in lower_face_indices]
+    upper_face_cols = ['lmk' + str(col+1).zfill(3) for col in upper_face_indices]
+    lip_cols = ['lmk' + str(col+1).zfill(3) for col in lip_indices]
+    eyebrow_cols = ['lmk' + str(col+1).zfill(3) for col in eyebrow_indices]
+
+    displacement_df['lower_face'] = displacement_df[lower_face_cols].mean(axis=1)
+    displacement_df['upper_face'] = displacement_df[upper_face_cols].mean(axis=1)
+    displacement_df['lips'] = displacement_df[lip_cols].mean(axis=1)
+    displacement_df['eyebrows'] = displacement_df[eyebrow_cols].mean(axis=1)
+
     return displacement_df
 
 def get_summary(df):
@@ -459,12 +642,17 @@ def facial_expressivity(filepath, baseline_filepath=''):
 
     ---------------------------------------------------------------------------------------------------
     """
+    config = get_config(os.path.abspath(__file__), "facial.json")
 
     try:
         df_landmark = get_landmarks(filepath, 'input')
-        df_disp = get_displacement(df_landmark, baseline_filepath)
+        df_disp = get_displacement(df_landmark, baseline_filepath, config)
+
+        # use mouth height to calculate mouth openness
+        df_disp['mouth_openness'] = get_mouth_openness(df_landmark, config)
 
         df_summ = get_summary(df_disp)
+
         return df_landmark, df_disp, df_summ
 
     except Exception as e:
