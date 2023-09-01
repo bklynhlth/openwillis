@@ -204,12 +204,11 @@ def get_summary(df):
 
     df_summ = pd.DataFrame()
     if len(df)>0:
+        
+        df_mean = pd.DataFrame(df.mean()).T.iloc[:,1:].add_suffix('_mean')
+        df_std = pd.DataFrame(df.std()).T.iloc[:,1:].add_suffix('_std')
 
-        df_summ = df.mean(axis=1)
-        df_summ = pd.DataFrame({'mean': df.mean(), 'stdev': df.std()}).T
-
-        df_summ = df_summ.reset_index().rename(columns={'index': 'stats'})
-        df_summ = df_summ.drop(columns=['frame'])
+        df_summ = pd.concat([df_mean, df_std], axis =1).reset_index(drop=True)
     return df_summ
 
 def emotional_expressivity(filepath, baseline_filepath=''):
