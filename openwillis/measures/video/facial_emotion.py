@@ -206,9 +206,8 @@ def get_summary(df):
     if len(df)>0:
 
         df_summ = df.mean(axis=1)
-        df_summ = pd.DataFrame({'mean': df.mean(), 'stdev': df.std()}).T
-
-        df_summ = df_summ.reset_index().rename(columns={'index': 'stats'})
+        df_summ = pd.DataFrame({'mean': df.mean()}).T
+        
         df_summ = df_summ.drop(columns=['frame'])
     return df_summ
 
