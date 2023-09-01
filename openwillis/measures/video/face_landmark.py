@@ -594,11 +594,11 @@ def get_summary(df):
 
     df_summ = pd.DataFrame()
     if len(df.columns)>0:
-
-        df_summ = df.mean(axis=1)
-        df_summ = pd.DataFrame({'mean': df.mean()}).T
         
-        df_summ = df_summ.drop(columns=['frame'])
+        df_mean = pd.DataFrame(df.mean()).T.iloc[:,469:].add_suffix('_mean')
+        df_std = pd.DataFrame(df.std()).T.iloc[:,469:].add_suffix('_std')
+
+        df_summ = pd.concat([df_mean, df_std], axis =1).reset_index(drop=True)
     return df_summ
 
 def facial_expressivity(filepath, baseline_filepath=''):
