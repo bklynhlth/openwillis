@@ -396,7 +396,7 @@ def eye_blink_rate(video):
         summary.iloc[0] = summary_list
 
     except Exception as e:
-        logger.error(e)
+        logger.error(f'Error in eye blink rate calculation- file: {video} & Error: {e}')
 
     finally:
         if 'vs' in locals():
