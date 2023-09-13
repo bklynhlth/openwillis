@@ -151,7 +151,7 @@ def read_audio(path):
     """
     #Loading json config
     dir_name = os.path.dirname(os.path.abspath(__file__))
-    measure_path = os.path.abspath(os.path.join(dir_name, 'config/acoustic.json'))
+    measure_path = os.path.abspath(os.path.join(dir_name, '../config/acoustic.json'))
 
     file = open(measure_path)
     measures = json.load(file)
