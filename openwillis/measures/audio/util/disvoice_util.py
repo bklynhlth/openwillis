@@ -2,6 +2,9 @@
 https://github.com/jcvasquezc/DisVoice/tree/master
 and are modified for efficiency and speed
 """
+# author:    Georgios Efstathiadis
+# website:   http://www.bklynhlth.com
+
 import sys
 
 import numpy as np
