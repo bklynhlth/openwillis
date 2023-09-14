@@ -14,3 +14,4 @@ It is freely available for non-commercial use ([see license](https://github.com/
 Please report any issues using the [Issues](https://github.com/bklynhlth/openwillis/issues) tab.
 
 If you’d like to contribute to OpenWillis or have general questions, please [get in touch](mailto:openwillis@brooklyn.health).
+
