@@ -13,7 +13,7 @@ from parselmouth import Sound
 from parselmouth.praat import call, run_file
 from pydub import AudioSegment,silence
 
-from openwillis.measures.audio.util import accoustic_util as autil
+from openwillis.measures.audio.util import acoustic_util as autil
 
 logging.basicConfig(level=logging.INFO)
 logger=logging.getLogger()
