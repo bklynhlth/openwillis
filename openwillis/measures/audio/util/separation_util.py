@@ -269,7 +269,7 @@ def match_transcript(sigma_string, speech):
     ------------------------------------------------------------------------------------------------------
 
     The function uses a pre-trained BERT-based sentence transformer model to compute the similarity between
-    the speech and a list of pre-defined PANSS (Positive and Negative Syndrome Scale) script sentences. It
+    the speech and a list of pre-defined PANSS or MADRS script sentences. It
     returns the average similarity score of the top 5 matches.
 
     Parameters:
@@ -277,7 +277,7 @@ def match_transcript(sigma_string, speech):
     sigma_string : str
         a string of sigma script
     speech : str
-        a string containing the speech to be matched with the PANSS script sentences
+        a string containing the speech to be matched with the PANSS or MADRS script sentences
 
     Returns:
     ...........
@@ -288,7 +288,7 @@ def match_transcript(sigma_string, speech):
     """
     prob_list = []
 
-    model = SentenceTransformer('bert-base-nli-mean-tokens')
+    model = SentenceTransformer('sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2')
     sigma_script = sigma_string.split(',')
 
     for script in sigma_script:
