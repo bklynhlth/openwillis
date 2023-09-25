@@ -409,9 +409,9 @@ def get_patient_rater_label(df, measures, scale, signal):
         return signal
     
     score_string = scale.lower()+'_string'
-    spk1_score = match_transcript(score_string, spk1_txt)
+    spk1_score = match_transcript(measures[score_string], spk1_txt)
     
-    spk2_score = match_transcript(score_string, spk2_txt)
+    spk2_score = match_transcript(measures[score_string], spk2_txt)
     signal_label = {'clinician': signal['speaker1'], 'participant':signal['speaker0']}
 
     if spk1_score > spk2_score:
