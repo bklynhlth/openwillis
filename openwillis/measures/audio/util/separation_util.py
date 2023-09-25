@@ -264,7 +264,7 @@ def get_similarity_prob(sentence_embeddings):
     prob = pscore[0][0]
     return prob
 
-def match_transcript(measures, speech):
+def match_transcript(sigma_string, speech):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -274,8 +274,8 @@ def match_transcript(measures, speech):
 
     Parameters:
     ...........
-    measures : dict
-        a dictionary of measures containing the PANSS script sentences
+    sigma_string : str
+        a string of sigma script
     speech : str
         a string containing the speech to be matched with the PANSS script sentences
 
@@ -289,9 +289,9 @@ def match_transcript(measures, speech):
     prob_list = []
 
     model = SentenceTransformer('bert-base-nli-mean-tokens')
-    panss_script = measures['panss_string'][1:-1].split(',')#hardcode for PANSS
+    sigma_script = sigma_string.split(',')
 
-    for script in panss_script:
+    for script in sigma_script:
         sen_list = [script, speech]
 
         sentence_embeddings = model.encode(sen_list)
@@ -402,14 +402,16 @@ def get_patient_rater_label(df, measures, scale, signal):
     spk1_txt = ' '.join(df[df['speaker_label'] == 'speaker0'].reset_index(drop=True)['content'])
     spk2_txt = ' '.join(df[df['speaker_label'] == 'speaker1'].reset_index(drop=True)['content'])
 
-    if scale.lower() not in measures['scale'].strip("[]").replace(" ", "").split(","):
+    if scale.lower() not in measures['scale'].split(","):
         return signal
 
     elif spk1_txt == '' and spk2_txt == '': #Check empty text
         return signal
-
-    spk1_score = match_transcript(measures, spk1_txt)
-    spk2_score = match_transcript(measures, spk2_txt)
+    
+    score_string = scale.lower()+'_string'
+    spk1_score = match_transcript(score_string, spk1_txt)
+    
+    spk2_score = match_transcript(score_string, spk2_txt)
     signal_label = {'clinician': signal['speaker1'], 'participant':signal['speaker0']}
 
     if spk1_score > spk2_score:
