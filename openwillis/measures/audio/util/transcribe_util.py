@@ -122,8 +122,8 @@ def get_clinical_labels(scale, measures, content_dict, json_response):
             return json_response
         
         score_string = scale.lower()+'_string'
-        spk1_score = sutil.match_transcript(score_string, content_dict['speaker0'])
-        spk2_score = sutil.match_transcript(score_string, content_dict['speaker1'])
+        spk1_score = sutil.match_transcript(measures[score_string], content_dict['speaker0'])
+        spk2_score = sutil.match_transcript(measures[score_string], content_dict['speaker1'])
 
         if spk1_score > spk2_score:
             json_response = replace_speaker_labels(json_response, ['speaker0', 'speaker1'], ['clinician', 'participant'])
