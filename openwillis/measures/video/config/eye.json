@@ -12,6 +12,5 @@
     "frame": "frame",
     "ear": "ear",
     "blinks": "blinks",
-    "blink_rate": "blink_rate",
-    "value": "value"
+    "blink_rate": "blink_rate"
 }

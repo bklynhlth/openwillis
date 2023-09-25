@@ -45,7 +45,7 @@ def create_empty_dataframes(config):
 
     ear = pd.DataFrame(columns=[config['frame'], config['ear']])
     blinks = pd.DataFrame(columns=[config['peak_frame'], config['start_frame'], config['end_frame'], config['peak_time'], config['start_time'], config['end_time']])
-    summary = pd.DataFrame(columns=[config['blinks'], config['blink_rate']], index=[config['value']])
+    summary = pd.DataFrame(columns=[config['blinks'], config['blink_rate']])
 
     return ear, blinks, summary
 
