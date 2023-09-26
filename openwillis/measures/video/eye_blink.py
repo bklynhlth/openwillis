@@ -19,6 +19,37 @@ logging.basicConfig(level=logging.INFO)
 logger=logging.getLogger()
 
 
+def create_empty_dataframes(config):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    This function creates empty dataframes for the output of the measures.
+
+    Parameters:
+    ...........
+    config : dict
+        The configuration dictionary
+
+    Returns:
+    ...........
+    ear : pd.DataFrame
+        Contains the frame number and the eye aspect ratio (EAR) of each frame
+    blinks : pd.DataFrame
+        Contains for each blink the frame number and the time (in seconds)
+         start of the blink and end of the blink
+    summary : pd.DataFrame
+        The number of eye blinks and blink rate (blinks per minute)
+
+    ------------------------------------------------------------------------------------------------------
+    """
+
+    ear = pd.DataFrame(columns=[config['frame'], config['ear']])
+    blinks = pd.DataFrame(columns=[config['peak_frame'], config['start_frame'], config['end_frame'], config['peak_time'], config['start_time'], config['end_time']])
+    summary = pd.DataFrame(columns=[config['blinks'], config['blink_rate']])
+
+    return ear, blinks, summary
+
+
 def get_config(filepath, json_file):
     """
     ------------------------------------------------------------------------------------------------------
@@ -204,7 +235,7 @@ def detect_blinks(framewise, prominence, width, config):
     return troughs, left_ips, right_ips
 
 
-def convert_frame_to_time(troughs, left_ips, right_ips, fps, config):
+def convert_frame_to_time(blinks, troughs, left_ips, right_ips, fps, config):
     """
     ---------------------------------------------------------------------------------------------------
 
@@ -212,6 +243,9 @@ def convert_frame_to_time(troughs, left_ips, right_ips, fps, config):
 
     Parameters:
     ............
+    blinks : pd.DataFrame
+        Contains for each blink the frame number and the time (in seconds)
+            start of the blink and end of the blink
     troughs : array
         Array containing the frame number of each blink
     left_ips : array
@@ -235,16 +269,17 @@ def convert_frame_to_time(troughs, left_ips, right_ips, fps, config):
     left_ips_time = left_ips/fps
     right_ips_time = right_ips/fps
 
-    blinks = pd.DataFrame(
-        {
-            config['peak_frame']: troughs, config['start_frame']: left_ips, config['end_frame']: right_ips,
-            config['peak_time']: troughs_time, config['start_time']: left_ips_time, config['end_time']: right_ips_time
-        }
-    )
+    blinks[config['peak_frame']] = troughs
+    blinks[config['start_frame']] = left_ips
+    blinks[config['end_frame']] = right_ips
+    blinks[config['peak_time']] = troughs_time
+    blinks[config['start_time']] = left_ips_time
+    blinks[config['end_time']] = right_ips_time
+
     return blinks
 
 
-def calculate_framewise(vs, face_mesh, config):
+def calculate_framewise(ear_df, vs, face_mesh, config):
     """
     ---------------------------------------------------------------------------------------------------
 
@@ -252,6 +287,8 @@ def calculate_framewise(vs, face_mesh, config):
 
     Parameters:
     ............
+    ear_df : pd.DataFrame
+        Contains the frame number and the eye aspect ratio (EAR) of each frame
     vs : object
         The video capture object
     face_mesh : object
@@ -261,7 +298,7 @@ def calculate_framewise(vs, face_mesh, config):
 
     Returns:
     ............
-    framewise : pd.DataFrame
+    ear_df : pd.DataFrame
         Contains the frame number and the eye aspect ratio (EAR) of each frame
     frame_n : int
         The total number of frames
@@ -294,14 +331,15 @@ def calculate_framewise(vs, face_mesh, config):
 
         framewise.append([frame_n, ear])
 
-    framewise = pd.DataFrame(framewise, columns=[config['frame'], config['ear']])
+    ear_df[config['frame']] = [x[0] for x in framewise]
+    ear_df[config['ear']] = [x[1] for x in framewise]
 
     # z-score normalization
-    framewise[config['ear']] = (
-        framewise[config['ear']] - framewise[config['ear']].mean()
-    ) / framewise[config['ear']].std()
+    ear_df[config['ear']] = (
+        ear_df[config['ear']] - ear_df[config['ear']].mean()
+    ) / ear_df[config['ear']].std()
 
-    return framewise, frame_n
+    return ear_df, frame_n
 
 
 def eye_blink_rate(video):
@@ -327,10 +365,9 @@ def eye_blink_rate(video):
 
     ---------------------------------------------------------------------------------------------------
     """
-
-    ear, blinks, summary = None, None, None
     
     config = get_config(os.path.abspath(__file__), "eye.json")
+    ear, blinks, summary = create_empty_dataframes(config)
 
     try:
         # validate video directory exists and is a video file
@@ -346,28 +383,31 @@ def eye_blink_rate(video):
         vs, fps = get_video_capture(video)
 
         # calculate EAR of each frame
-        ear, frame_n = calculate_framewise(vs, face_mesh, config)
+        ear, frame_n = calculate_framewise(ear, vs, face_mesh, config)
 
         # detect blinks from EAR array
         troughs, left_ips, right_ips = detect_blinks(ear, prominence, width, config)
 
         # convert frame number to time and create blinks dataframe
-        blinks = convert_frame_to_time(troughs, left_ips, right_ips, fps, config)
+        blinks = convert_frame_to_time(blinks, troughs, left_ips, right_ips, fps, config)
 
         # create summary dataframe
         summary_list = [len(troughs), len(troughs)/(frame_n/fps)*60]
-        summary = pd.DataFrame(
-            summary_list,
-            index=[config['blinks'], config['blink_rate']],
-            columns=[config['value']]
-        )
+        summary.loc[0] = summary_list
 
     except Exception as e:
-        logger.error(e)
+        logger.error(f'Error in eye blink rate calculation- file: {video} & Error: {e}')
 
     finally:
         if 'vs' in locals():
             if vs is not None:
                 vs.release()
+
+        if ear.empty:
+            ear.loc[0] = np.nan
+        if blinks.empty:
+            blinks.loc[0] = np.nan
+        if summary.empty:
+            summary.loc[0] = np.nan
 
         return ear, blinks, summary

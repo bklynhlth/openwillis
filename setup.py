@@ -12,7 +12,7 @@ with open("requirements.txt", "r") as fp:
     install_requires = fp.read()
 
 setuptools.setup(name='openwillis',
-                 version='1.3',
+                 version='1.4',
                  description='digital health measurement',
                  long_description=long_description,
                  long_description_content_type="text/markdown",

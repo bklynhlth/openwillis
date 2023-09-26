@@ -246,16 +246,10 @@ def speaker_separation(filepath, **kwargs):
             return signal_label
 
         audio_signal = AudioSegment.from_file(file = filepath, format = "wav")
-        if input_param['model'] == 'aws':
+        if 'hf_token' not in kwargs:
+            return signal_label
 
-            input_param['c_scale'] = ''
-            speaker_df, speaker_count = sutil.transcribe_response_to_dataframe(input_param['json_response'])
-
-        else:
-            if 'hf_token' not in kwargs:
-                return signal_label
-
-            speaker_df, speaker_count = get_localdiart(input_param, file_name, filepath)
+        speaker_df, speaker_count = get_localdiart(input_param, file_name, filepath)
         if len(speaker_df)>0 and speaker_count>1:
             signal_label = sutil.generate_audio_signal(speaker_df , audio_signal, input_param['c_scale'], measures)
 
