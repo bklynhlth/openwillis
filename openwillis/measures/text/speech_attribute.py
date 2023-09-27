@@ -166,8 +166,7 @@ def filter_vosk(json_conf, measures):
     text = " ".join(words)
 
     # make a dictionary to map old indices to new indices
-    for i, item in enumerate(json_conf):
-        item[measures["old_index"]] = i
+    json_conf = cutil.create_index_column(json_conf, measures)
 
     return words, text
 
