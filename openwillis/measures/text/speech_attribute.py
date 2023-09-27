@@ -41,6 +41,7 @@ def get_config(filepath, json_file):
     measures = json.load(file)
     return measures
 
+
 def is_amazon_transcribe(json_conf):
     """
     ------------------------------------------------------------------------------------------------------
@@ -62,7 +63,29 @@ def is_amazon_transcribe(json_conf):
     return "jobName" in json_conf and "results" in json_conf
 
 
-def filter_transcribe(json_conf, measures, speaker_label=None):
+def is_whisper_transcribe(json_conf):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    This function checks if the json response object is from Whisper Transcribe.
+
+    Parameters:
+    ...........
+    json_conf: dict
+        JSON response object.
+
+    Returns:
+    ...........
+    bool: True if the json response object
+     is from Whisper Transcribe, False otherwise.
+
+    ------------------------------------------------------------------------------------------------------
+    """
+    # TODO
+    raise NotImplementedError
+
+
+def filter_aws(json_conf, measures, speaker_label=None):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -139,6 +162,44 @@ def filter_transcribe(json_conf, measures, speaker_label=None):
     return filter_json, text_list, text_indices
 
 
+def filter_whisper(json_conf, measures, speaker_label=None):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    This function extracts the text and filters the JSON data
+        for Whisper Transcribe json response objects.
+        Also, it filters the JSON data based on the speaker label if provided.
+
+    Parameters:
+    ...........
+    json_conf: dict
+        whisper transcribe json response.
+    measures: dict
+        A dictionary containing the names of the columns in the output dataframes.
+    speaker_label: str
+        Speaker label
+
+    Returns:
+    ...........
+    filter_json: list
+        The filtered JSON object containing
+        only the relevant data for processing.
+    text_list: list
+        List of transcribed text.
+            split into phrases, turns, and full text.
+    turn_indices: list
+        List of indices for turns.
+
+    Raises:
+    ...........
+    ValueError: If the speaker label is not found in the json response object.
+
+    ------------------------------------------------------------------------------------------------------
+    """
+    # TODO
+    raise NotImplementedError
+
+
 def filter_vosk(json_conf, measures):
     """
     ------------------------------------------------------------------------------------------------------
@@ -208,7 +269,7 @@ def speech_characteristics(json_conf, language="en-us", speaker_label=None):
             cutil.download_nltk_resources()
 
             if is_amazon_transcribe(json_conf):
-                filter_json, text_list, text_indices = filter_transcribe(
+                filter_json, text_list, text_indices = filter_aws(
                     json_conf, measures, speaker_label
                 )
 
@@ -216,6 +277,17 @@ def speech_characteristics(json_conf, language="en-us", speaker_label=None):
                     df_list = cutil.process_language_feature(
                         filter_json, df_list, text_list,
                         text_indices, language, ["start_time", "end_time"],
+                        measures,
+                    )
+            elif is_whisper_transcribe(json_conf):
+                filter_json, text_list, turn_indices = filter_whisper(
+                    json_conf, measures, speaker_label
+                )
+
+                if len(filter_json) > 0 and len(text_list[-1]) > 0:
+                    df_list = cutil.process_language_feature(
+                        filter_json, df_list, [[], *text_list],
+                        [[], turn_indices], language, ["start_time", "end_time"],
                         measures,
                     )
             else:
