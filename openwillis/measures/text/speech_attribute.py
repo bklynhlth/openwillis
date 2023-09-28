@@ -196,8 +196,34 @@ def filter_whisper(json_conf, measures, speaker_label=None):
 
     ------------------------------------------------------------------------------------------------------
     """
-    # TODO
-    raise NotImplementedError
+    item_data = json_conf["results"]["items"]
+
+    # make a dictionary to map old indices to new indices
+    item_data = cutil.create_index_column(item_data, measures)
+
+    # turn-split
+    turns = []
+    turns_idxs = []
+
+    if speaker_label is not None:
+
+        turns_idxs, turns, _, _ = cutil.filter_speaker(
+            item_data, speaker_label, turns_idxs, turns,
+        )
+
+
+    # filter json to only include items with start_time and end_time
+    filter_json = cutil.filter_json_transcribe(item_data, speaker_label, measures)
+
+    # extract phrases
+    phrases = [phrase["alternatives"][0]["content"] for phrase in filter_json]
+
+    # entire transcript - by joining all the phrases
+    text = " ".join(phrases)
+
+    text_list = [phrases, turns, text]
+
+    return filter_json, text_list, turns_idxs
 
 
 def filter_vosk(json_conf, measures):
