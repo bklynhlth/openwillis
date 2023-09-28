@@ -266,7 +266,7 @@ def filter_speaker_turn(item_data, speaker_label, turns_idxs, turns):
     return turns_idxs, turns
 
 
-def filter_speaker(item_data, speaker_label, turns_idxs, turns, phrases_idxs, phrases):
+def filter_speaker(item_data, speaker_label, turns_idxs, turns, phrases_idxs = [], phrases = []):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -321,10 +321,11 @@ def filter_speaker(item_data, speaker_label, turns_idxs, turns, phrases_idxs, ph
             "not found in the json response object."
         )
 
-    # phrase-split for the speaker label
-    phrases_idxs, phrases = filter_speaker_phrase(
-        item_data, speaker_label, phrases_idxs, phrases
-    )
+    if len(phrases) > 0:
+        # phrase-split for the speaker label
+        phrases_idxs, phrases = filter_speaker_phrase(
+            item_data, speaker_label, phrases_idxs, phrases
+        )
 
     # turn-split for the speaker label
     turns_idxs, turns = filter_speaker_turn(
