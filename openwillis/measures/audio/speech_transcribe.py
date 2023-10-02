@@ -232,7 +232,7 @@ def get_config():
     measures = json.load(file)
     return measures
 
-def run_whisperx(filepath, hf_token):
+def run_whisperx(filepath, hf_token, del_model):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -244,6 +244,8 @@ def run_whisperx(filepath, hf_token):
         The path to the audio file to be transcribed.
     hf_token : str
         The Hugging Face token for model authentication.
+    del_model: boolean
+        Boolean indicator to delete model if low on GPU resources 
 
     Returns:
     ...........
@@ -261,7 +263,7 @@ def run_whisperx(filepath, hf_token):
         return json_response, transcript
     
     from openwillis.measures.audio.util import whisperx_util as wutil #import in-case of model=whisperx
-    json_response, transcript = wutil.get_whisperx_diariazation(filepath, hf_token)
+    json_response, transcript = wutil.get_whisperx_diariazation(filepath, hf_token, del_model)
     return json_response, transcript
     
 

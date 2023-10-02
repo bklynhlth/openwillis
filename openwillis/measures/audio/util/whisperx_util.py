@@ -56,6 +56,28 @@ def get_diarization(audio, align_json, HF_TOKEN, device):
     json_response = whisperx.assign_word_speakers(diarize_segments, align_json)
     return json_response
 
+def get_transcribe_summary(json_response):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    Assign speaker labels
+    Parameters:
+    ...........
+    json_response: json
+        whisper transcribed output
+    
+    Returns:
+    ...........
+    summary : str
+        whisper transcribed test summary
+
+    ------------------------------------------------------------------------------------------------------
+    """
+    summary = ""
+    
+    if 'segments' in json_response:
+        summary = "".join([item['text'] for item in json_response["segments"] if item.get('text', '')])
+    return summary
 
 def get_whisperx_diariazation(filepath, HF_TOKEN, del_model):
     """
@@ -115,9 +137,10 @@ def get_whisperx_diariazation(filepath, HF_TOKEN, del_model):
 
         if del_model:
             delete_model(model_a)
-
-        json_response = get_diarization(audio, align_json, HF_TOKEN, device)
+            
+        json_response = get_diarization(audio, align_json, HF_TOKEN, device)    
+        transcript = get_transcribe_summary(json_response)
+    
     except Exception as e:
         logger.error(f'Error in speech Transcription: {e} & File: {filepath}')
-    
     return json_response, transcript
