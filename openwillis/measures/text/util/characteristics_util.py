@@ -1180,7 +1180,7 @@ def process_language_feature(
 
     df_list = get_pause_feature(json_conf, df_list, text_list, text_indices, measures)
 
-    if language == "en-us":
+    if language == "en":
         json_conf = get_tag(json_conf, TAG_DICT, measures)
         df_list = get_tag_summ(json_conf, df_list, text_indices, measures)
 

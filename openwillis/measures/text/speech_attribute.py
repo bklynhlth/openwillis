@@ -168,7 +168,7 @@ def filter_vosk(json_conf, measures):
     return words, text
 
 
-def speech_characteristics(json_conf, language="en-us", speaker_label=None):
+def speech_characteristics(json_conf, language="en", speaker_label=None):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -197,6 +197,8 @@ def speech_characteristics(json_conf, language="en-us", speaker_label=None):
 
     ------------------------------------------------------------------------------------------------------
     """
+    language = language[:2].lower()
+
     measures = get_config(os.path.abspath(__file__), "text.json")
     df_list = cutil.create_empty_dataframes(measures)
 
