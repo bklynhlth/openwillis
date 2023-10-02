@@ -91,8 +91,8 @@ def filter_whisper(json_conf, measures, speaker_label=None):
     text_list: list
         List of transcribed text.
             split into words, phrases, turns, and full text.
-    turn_indices: list
-        List of indices for turns.
+    text_indices: list
+        List of indices for phrases and turns.
 
     Raises:
     ...........

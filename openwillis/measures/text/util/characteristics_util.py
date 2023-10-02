@@ -163,6 +163,8 @@ def filter_turns(item_data, speaker_label, measures):
         JSON response object.
     speaker_label: str
         Speaker label
+    measures: dict
+        A dictionary containing the names of the columns in the output dataframes.
 
     Returns:
     ...........
@@ -253,7 +255,8 @@ def filter_phrases(item_data, speaker_label, measures):
         JSON response object.
     speaker_label: str
         Speaker label
-    measures
+    measures: dict
+        A dictionary containing the names of the columns in the output dataframes.
 
     Returns:
     ...........
@@ -294,13 +297,13 @@ def create_index_column(item_data, measures):
     ...........
     item_data: dict
         JSON response object.
+    measures: dict
+        A dictionary containing the names of the columns in the output dataframes.
 
     Returns:
     ...........
     item_data: dict
         The updated JSON response object.
-    measures: dict
-        A dictionary containing the names of the columns in the output dataframes.
 
     ------------------------------------------------------------------------------------------------------
     """
