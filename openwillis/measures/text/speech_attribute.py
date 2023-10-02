@@ -188,7 +188,7 @@ def filter_whisper(json_conf, measures, speaker_label=None):
         only the relevant data for processing.
     text_list: list
         List of transcribed text.
-            split into phrases, turns, and full text.
+            split into words, phrases, turns, and full text.
     turn_indices: list
         List of indices for turns.
 
@@ -198,34 +198,38 @@ def filter_whisper(json_conf, measures, speaker_label=None):
 
     ------------------------------------------------------------------------------------------------------
     """
-    item_data = json_conf["results"]["items"]
+    item_data = json_conf["segments"]
 
     # make a dictionary to map old indices to new indices
     item_data = cutil.create_index_column(item_data, measures)
 
+    # phrase-split
+    phrases_idxs, phrases = cutil.filter_phrases(
+        item_data, speaker_label, measures
+    )
+
     # turn-split
-    turns = []
-    turns_idxs = []
-
     if speaker_label is not None:
-
-        turns_idxs, turns, _, _ = cutil.filter_speaker(
-            item_data, speaker_label, turns_idxs, turns,
+        turns_idxs, turns = cutil.filter_turns(
+            item_data, speaker_label, measures
         )
+    else:
+        turns_idxs, turns = [], []
 
 
     # filter json to only include items with start_time and end_time
     filter_json = cutil.filter_json_transcribe(item_data, speaker_label, measures)
 
-    # extract phrases
-    phrases = [phrase["alternatives"][0]["content"] for phrase in filter_json]
+    # extract words
+    words = [w["word"] for w in filter_json]
 
     # entire transcript - by joining all the phrases
     text = " ".join(phrases)
 
-    text_list = [phrases, turns, text]
+    text_list = [words, phrases, turns, text]
+    text_indices = [phrases_idxs, turns_idxs]
 
-    return filter_json, text_list, turns_idxs
+    return filter_json, text_list, text_indices
 
 
 def filter_vosk(json_conf, measures):
@@ -255,7 +259,9 @@ def filter_vosk(json_conf, measures):
     text = " ".join(words)
 
     # make a dictionary to map old indices to new indices
-    json_conf = cutil.create_index_column(json_conf, measures)
+    for i, item in enumerate(json_conf):
+        item[measures["old_index"]] = i
+
 
     return words, text
 
@@ -308,14 +314,14 @@ def speech_characteristics(json_conf, language="en-us", speaker_label=None):
                         measures,
                     )
             elif is_whisper_transcribe(json_conf):
-                filter_json, text_list, turn_indices = filter_whisper(
+                filter_json, text_list, text_indices = filter_whisper(
                     json_conf, measures, speaker_label
                 )
 
                 if len(filter_json) > 0 and len(text_list[-1]) > 0:
                     df_list = cutil.process_language_feature(
-                        filter_json, df_list, [[], *text_list],
-                        [[], turn_indices], language, ["start_time", "end_time"],
+                        filter_json, df_list, text_list,
+                        text_indices, language, ["start", "end"],
                         measures,
                     )
             else:
