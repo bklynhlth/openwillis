@@ -81,8 +81,10 @@ def is_whisper_transcribe(json_conf):
 
     ------------------------------------------------------------------------------------------------------
     """
-    # TODO
-    raise NotImplementedError
+    if "segments" in json_conf:
+        if "words" in json_conf["segments"][0]:
+            return True
+    return False
 
 
 def filter_aws(json_conf, measures, speaker_label=None):
