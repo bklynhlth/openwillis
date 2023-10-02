@@ -42,27 +42,6 @@ def get_config(filepath, json_file):
     return measures
 
 
-def is_amazon_transcribe(json_conf):
-    """
-    ------------------------------------------------------------------------------------------------------
-
-    This function checks if the json response object is from Amazon Transcribe.
-
-    Parameters:
-    ...........
-    json_conf: dict
-        JSON response object.
-
-    Returns:
-    ...........
-    bool: True if the json response object
-     is from Amazon Transcribe, False otherwise.
-
-    ------------------------------------------------------------------------------------------------------
-    """
-    return "jobName" in json_conf and "results" in json_conf
-
-
 def is_whisper_transcribe(json_conf):
     """
     ------------------------------------------------------------------------------------------------------
@@ -85,83 +64,6 @@ def is_whisper_transcribe(json_conf):
         if "words" in json_conf["segments"][0]:
             return True
     return False
-
-
-def filter_aws(json_conf, measures, speaker_label=None):
-    """
-    ------------------------------------------------------------------------------------------------------
-
-    This function extracts the text and filters the JSON data
-     for Amazon Transcribe json response objects.
-     Also, it filters the JSON data based on the speaker label if provided.
-
-    Parameters:
-    ...........
-    json_conf: dict
-        aws transcribe json response.
-    measures: dict
-        A dictionary containing the names of the columns in the output dataframes.
-    speaker_label: str
-        Speaker label
-
-    Returns:
-    ...........
-    filter_json: list
-        The filtered JSON object containing
-        only the relevant data for processing.
-    text_list: list
-        List of transcribed text.
-         split into words, phrases, turns, and full text.
-    text_indices: list
-        List of indices for text_list.
-         for phrases and turns.
-
-    Raises:
-    ...........
-    ValueError: If the speaker label is not found in the json response object.
-
-    ------------------------------------------------------------------------------------------------------
-    """
-    item_data = json_conf["results"]["items"]
-
-    # make a dictionary to map old indices to new indices
-    item_data = cutil.create_index_column(item_data, measures)
-    
-    # extract text
-    text = " ".join(
-        [
-            item["alternatives"][0]["content"]
-            for item in item_data
-            if "alternatives" in item
-        ]
-    )
-
-    # phrase-split
-    phrases, phrases_idxs = cutil.phrase_split(text)
-
-    # turn-split
-    turns = []
-    turns_idxs = []
-
-    if speaker_label is not None:
-
-        turns_idxs, turns, phrases_idxs, phrases = cutil.filter_speaker(
-            item_data, speaker_label, turns_idxs, turns, phrases_idxs, phrases
-        )
-
-    # entire transcript - by joining all the phrases
-    text = " ".join(phrases)
-
-    # filter json to only include items with start_time and end_time
-    filter_json = cutil.filter_json_transcribe(item_data, speaker_label, measures)
-
-    # extract words
-    words = [word["alternatives"][0]["content"] for word in filter_json]
-
-    text_list = [words, phrases, turns, text]
-    text_indices = [phrases_idxs, turns_idxs]
-
-    return filter_json, text_list, text_indices
 
 
 def filter_whisper(json_conf, measures, speaker_label=None):
@@ -302,18 +204,7 @@ def speech_characteristics(json_conf, language="en-us", speaker_label=None):
         if bool(json_conf):
             cutil.download_nltk_resources()
 
-            if is_amazon_transcribe(json_conf):
-                filter_json, text_list, text_indices = filter_aws(
-                    json_conf, measures, speaker_label
-                )
-
-                if len(filter_json) > 0 and len(text_list[-1]) > 0:
-                    df_list = cutil.process_language_feature(
-                        filter_json, df_list, text_list,
-                        text_indices, language, ["start_time", "end_time"],
-                        measures,
-                    )
-            elif is_whisper_transcribe(json_conf):
+            if is_whisper_transcribe(json_conf):
                 filter_json, text_list, text_indices = filter_whisper(
                     json_conf, measures, speaker_label
                 )
@@ -321,16 +212,14 @@ def speech_characteristics(json_conf, language="en-us", speaker_label=None):
                 if len(filter_json) > 0 and len(text_list[-1]) > 0:
                     df_list = cutil.process_language_feature(
                         filter_json, df_list, text_list,
-                        text_indices, language, ["start", "end"],
-                        measures,
+                        text_indices, language, measures,
                     )
             else:
                 words, text = filter_vosk(json_conf, measures)
                 if len(text) > 0:
                     df_list = cutil.process_language_feature(
                         json_conf, df_list, [words, [], [], text],
-                        [[], []], language, ["start", "end"],
-                        measures,
+                        [[], []], language, measures,
                     )
             
     except Exception as e:
