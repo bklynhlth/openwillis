@@ -12,6 +12,7 @@ import logging
 
 from pydub import AudioSegment
 from openwillis.measures.audio.util import util as ut
+from openwillis.measures.audio.util import transcribe_util as tutil
 
 logging.basicConfig(level=logging.INFO)
 logger=logging.getLogger()
@@ -264,6 +265,10 @@ def run_whisperx(filepath, hf_token, del_model):
     
     from openwillis.measures.audio.util import whisperx_util as wutil #import in-case of model=whisperx
     json_response, transcript = wutil.get_whisperx_diariazation(filepath, hf_token, del_model)
+    
+    if str(json_response) != '{}':
+        json_response = tutil.replace_whisperx_speaker_labels(json_response, ['SPEAKER_00', 'SPEAKER_01'], 
+                                                              ['speaker0', 'speaker1'])
     return json_response, transcript
     
 
@@ -294,8 +299,12 @@ def speech_transcription(filepath, **kwargs):
 
     ------------------------------------------------------------------------------------------------------
     """
+
+    measures = get_config()
     model = kwargs.get('model', 'vosk')
+    
     language = kwargs.get('language', 'en-us')
+    scale = kwargs.get('c_scale', '')
     
     transcribe_interval = kwargs.get('transcribe_interval', [])
     hf_token = kwargs.get('hf_token', '')
@@ -303,6 +312,10 @@ def speech_transcription(filepath, **kwargs):
     
     if model == 'whisperx':
         json_response, transcript = run_whisperx(filepath, hf_token, del_model)
+        
+        if scale.lower() in measures['scale'].split(','):
+            content_dict = tutil.get_whisperx_content(json_response)
+            json_response = tutil.get_whisperx_clinical_labels(scale, measures, content_dict, json_response)
         
     else:
         json_response, transcript = run_vosk(filepath, language, transcribe_interval)
