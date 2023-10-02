@@ -10,7 +10,6 @@ import wave
 import json
 import logging
 
-from vosk import Model, KaldiRecognizer
 from pydub import AudioSegment
 from openwillis.measures.audio.util import util as ut
 
@@ -146,6 +145,9 @@ def get_vosk(audio_path, lang):
 
     ------------------------------------------------------------------------------------------------------
     """
+    #import in-case of model=vosk
+    from vosk import Model, KaldiRecognizer
+    
     model = Model(lang=lang)
     wf = wave.open(audio_path, "rb")
 
@@ -230,11 +232,44 @@ def get_config():
     measures = json.load(file)
     return measures
 
+def run_whisperx(filepath, hf_token):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    Transcribe audio data using the WhisperX model.
+
+    Parameters:
+    ...........
+    filepath : str
+        The path to the audio file to be transcribed.
+    hf_token : str
+        The Hugging Face token for model authentication.
+
+    Returns:
+    ...........
+    json_response : JSON Object
+        A transcription response object in JSON format
+    transcript : str
+        The transcript of the recording.
+
+    ------------------------------------------------------------------------------------------------------
+    """
+    json_response = '{}'
+    transcript = ''
+    
+    if os.path.exists(filepath)== False or hf_token == '':
+        return json_response, transcript
+    
+    from openwillis.measures.audio.util import whisperx_util as wutil #import in-case of model=whisperx
+    json_response, transcript = wutil.get_whisperx_diariazation(filepath, hf_token)
+    return json_response, transcript
+    
+
 def speech_transcription(filepath, **kwargs):
     """
     ------------------------------------------------------------------------------------------------------
 
-    Speech transcription function that transcribes an audio file using Vosk.
+    Speech transcription function that transcribes an audio file using vosk/whisperx.
 
     Parameters:
     ...........
@@ -259,7 +294,14 @@ def speech_transcription(filepath, **kwargs):
     """
     model = kwargs.get('model', 'vosk')
     language = kwargs.get('language', 'en-us')
+    
     transcribe_interval = kwargs.get('transcribe_interval', [])
-
-    json_response, transcript = run_vosk(filepath, language, transcribe_interval)
+    hf_token = kwargs.get('hf_token', '')
+    del_model = kwargs.get('del_model', False)
+    
+    if model == 'whisperx':
+        json_response, transcript = run_whisperx(filepath, hf_token, del_model)
+        
+    else:
+        json_response, transcript = run_vosk(filepath, language, transcribe_interval)
     return json_response, transcript

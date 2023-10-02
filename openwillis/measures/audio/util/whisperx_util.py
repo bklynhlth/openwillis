@@ -1,0 +1,123 @@
+# author:    Vijay Yadav
+# website:   http://www.bklynhlth.com
+
+import whisperx
+import gc 
+import torch
+
+import json
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger=logging.getLogger()
+
+def delete_model(model):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    delete model if low on GPU resources
+    Parameters:
+    ...........
+    model : object
+        loaded model object
+    
+    ------------------------------------------------------------------------------------------------------
+    """
+    gc.collect()
+    torch.cuda.empty_cache()
+    del model
+
+def get_diarization(audio, align_json, HF_TOKEN, device):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    Assign speaker labels
+    Parameters:
+    ...........
+    audio : object
+        audio signal object
+    align_json: json
+        aligned whisper transcribed output
+    HF_TOKEN : str
+        The Hugging Face token for model authentication.
+    device : str
+        device type
+    
+    Returns:
+    ...........
+    json_response : JSON Object
+        A transcription response object in JSON format
+
+    ------------------------------------------------------------------------------------------------------
+    """
+    # Assign speaker labels
+    diarize_model = whisperx.DiarizationPipeline(use_auth_token=HF_TOKEN, device=device)
+    diarize_segments = diarize_model(audio, max_speakers=2)
+    json_response = whisperx.assign_word_speakers(diarize_segments, align_json)
+    return json_response
+
+
+def get_whisperx_diariazation(filepath, HF_TOKEN, del_model):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    Transcribe an audio file using Whisperx.
+
+    Parameters:
+    ...........
+    filepath : str
+        The path to the audio file to be transcribed.
+    HF_TOKEN : str
+        The Hugging Face token for model authentication.
+    del_model: boolean
+        Boolean indicator to delete model if low on GPU resources 
+
+    Returns:
+    ...........
+    json_response : JSON Object
+        A transcription response object in JSON format
+    transcript : str
+        The transcript of the recording.
+
+    ------------------------------------------------------------------------------------------------------
+    """
+    device = 'cpu'
+    compute_type = "int8"
+    model = 'tiny'
+    
+    json_response = '{}'
+    transcript = ''
+    
+    try:
+        if torch.cuda.is_available():
+            device = 'cuda'
+            
+            model = 'large-v2'
+            batch_size = 16
+            compute_type = "float16"
+
+        #Transcribe with original whisper (batched)
+        model = whisperx.load_model(model, device, compute_type=compute_type)
+        audio = whisperx.load_audio(filepath)
+        
+        if torch.cuda.is_available():
+            transcribe_json = model.transcribe(audio, batch_size=batch_size)
+
+        else:
+            transcribe_json = model.transcribe(audio)
+
+        if del_model:
+            delete_model(model)
+
+        # Align whisper output
+        model_a, metadata = whisperx.load_align_model(language_code=transcribe_json["language"], device=device)
+        align_json = whisperx.align(transcribe_json["segments"], model_a, metadata, audio, device, return_char_alignments=False)
+
+        if del_model:
+            delete_model(model_a)
+
+        json_response = get_diarization(audio, align_json, HF_TOKEN, device)
+    except Exception as e:
+        logger.error(f'Error in speech Transcription: {e} & File: {filepath}')
+    
+    return json_response, transcript
