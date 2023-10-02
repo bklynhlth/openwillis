@@ -194,7 +194,7 @@ def filter_speaker_phrase(item_data, speaker_label, phrases_idxs, phrases):
     return phrases_idxs2, phrases2
 
 
-def filter_turns(item_data, speaker_label, turns_idxs, turns):
+def filter_turns(item_data, speaker_label, measures):
     """
     ------------------------------------------------------------------------------------------------------
     
@@ -207,11 +207,6 @@ def filter_turns(item_data, speaker_label, turns_idxs, turns):
         JSON response object.
     speaker_label: str
         Speaker label
-    turns_idxs: list
-        A list of tuples containing
-            the start and end indices of the turns in the JSON object.
-    turns: list
-        A list of turns extracted from the JSON object.
 
     Returns:
     ...........
@@ -238,9 +233,11 @@ def filter_turns(item_data, speaker_label, turns_idxs, turns):
             f"Speaker label {speaker_label} "
             "not found in the json response object."
         )
-
+    
+    turns_idxs, turns = [], []
 
     start_idx = 0
+    start_idx2 = 0
     for i, item in enumerate(item_data):
         try:
             if (
@@ -249,18 +246,21 @@ def filter_turns(item_data, speaker_label, turns_idxs, turns):
                 and item_data[i - 1].get("speaker", "") != speaker_label
             ):
                 start_idx = i
+                start_idx2 = item["words"][0][measures["old_index"]]
             elif (
                 i > 0
                 and item.get("speaker", "") != speaker_label
                 and item_data[i - 1].get("speaker", "") == speaker_label
             ):
-                turns_idxs.append((start_idx, i - 1))
+                end_idx = i-1
+                end_idx2 = item["words"][-1][measures["old_index"]]
+                turns_idxs.append((start_idx2, end_idx2))
                 # create turns texts
                 turns.append(
                     " ".join(
                         [
                             item["text"]
-                            for item in item_data[start_idx:i]
+                            for item in item_data[start_idx:(end_idx+1)]
                         ]
                     )
                 )
@@ -270,7 +270,8 @@ def filter_turns(item_data, speaker_label, turns_idxs, turns):
 
     # if the last item is the speaker label
     if start_idx not in [item[0] for item in turns_idxs]:
-        turns_idxs.append((start_idx, len(item_data) - 1))
+        end_idx2 = item_data[-1]["words"][-1][measures["old_index"]]
+        turns_idxs.append((start_idx2, end_idx2))
         turns.append(
             " ".join(
                 [
@@ -281,6 +282,50 @@ def filter_turns(item_data, speaker_label, turns_idxs, turns):
         )
 
     return turns_idxs, turns
+
+
+def filter_phrases(item_data, speaker_label, measures):
+    """
+    ------------------------------------------------------------------------------------------------------
+    
+    This function updates the phrases list
+        to only include the speaker label provided.
+
+    Parameters:
+    ...........
+    item_data: dict
+        JSON response object.
+    speaker_label: str
+        Speaker label
+    measures
+
+    Returns:
+    ...........
+    phrases_idxs: list
+        A list of tuples containing
+            the start and end indices of the phrases in the JSON object.
+    phrases: list
+        A list of phrases extracted from the JSON object.
+
+    ------------------------------------------------------------------------------------------------------
+    """
+
+
+    phrases_idxs, phrases = [], []
+    for item in item_data:
+
+        start_idx = item["words"][0][measures["old_index"]]
+        end_idx = item["words"][-1][measures["old_index"]]
+
+        if speaker_label is not None:
+            if item["speaker"] == speaker_label:
+                phrases.append(item["text"])
+                phrases_idxs.append((start_idx, end_idx))
+        else:
+            phrases.append(item["text"])
+            phrases_idxs.append((start_idx, end_idx))
+
+    return phrases_idxs, phrases
 
 
 def create_index_column(item_data, measures):
@@ -303,8 +348,16 @@ def create_index_column(item_data, measures):
 
     ------------------------------------------------------------------------------------------------------
     """
-    for i, item in enumerate(item_data):
-        item[measures["old_index"]] = i
+    i = 0
+    i_p = 0
+    while True:
+        for j, word in enumerate(item_data[i_p]["words"]):
+            item_data[i_p]["words"][j][measures["old_index"]] = i
+            i += 1
+        
+        i_p += 1
+        if i_p >= len(item_data):
+            break
     
     return item_data
 
@@ -373,38 +426,6 @@ def pause_calculation(filter_json, measures):
     return filter_json
 
 
-def word_pause_calculation(words, measures):
-    """
-    ------------------------------------------------------------------------------------------------------
-
-    This function calculates the pause duration between each word.
-
-    Parameters:
-    ...........
-    words: dict
-        A dict of words extracted from the JSON response object.
-    measures: dict
-        A dictionary containing the names of the columns in the output dataframes.
-
-    Returns:
-    ...........
-    words: dict
-        The updated dict of words.
-
-    ------------------------------------------------------------------------------------------------------
-    """
-
-    filter_json = [
-        item for item in words
-        if "start" in item and "end" in item
-    ]
-
-    # calculate time difference between each word
-    filter_json = pause_calculation(filter_json, measures)
-
-    return filter_json
-
-
 def filter_json_transcribe(item_data, speaker_label, measures):
     """
     ------------------------------------------------------------------------------------------------------
@@ -428,23 +449,30 @@ def filter_json_transcribe(item_data, speaker_label, measures):
     ------------------------------------------------------------------------------------------------------
     """
     # phrase filtering
+    item_data2 = []
+    for item in item_data:
+        speaker = item["speaker"]
+        words = item["words"]
+
+        # update speaker labels
+        for j, w in enumerate(words):
+            words[j]["speaker"] = speaker
+        
+        item_data2 += words
+    
     filter_json = [
-        item for item in item_data
+        item for item in item_data2
         if "start" in item and "end" in item
     ]
 
     # calculate time difference between each word
     filter_json = pause_calculation(filter_json, measures)
 
-    # word filtering
-    for i, item in enumerate(filter_json):
-        filter_json[i]['words'] = word_pause_calculation(item['words'], measures)
-
     if speaker_label is not None:
         filter_json = [
             item
             for item in filter_json
-            if item.get("speaker_label", "") == speaker_label
+            if item.get("speaker", "") == speaker_label
         ]
 
     return filter_json
