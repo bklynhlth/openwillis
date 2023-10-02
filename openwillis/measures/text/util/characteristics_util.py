@@ -150,50 +150,6 @@ def create_empty_dataframes(measures):
     return word_df, phrase_df, turn_df, summ_df
 
 
-def filter_speaker_phrase(item_data, speaker_label, phrases_idxs, phrases):
-    """
-    ------------------------------------------------------------------------------------------------------
-
-    This function updates the phrases list
-        to only include the speaker label provided.
-
-    Parameters:
-    ...........
-    item_data: dict
-        JSON response object.
-    speaker_label: str
-        Speaker label
-    phrases_idxs: list
-        A list of tuples containing
-            the start and end indices of the phrases in the JSON object.
-    phrases: list
-        A list of phrases extracted from the JSON object.
-
-    Returns:
-    ...........
-    phrases_idxs: list
-        A list of tuples containing
-            the start and end indices of the phrases in the JSON object.
-    phrases: list
-        A list of phrases extracted from the JSON object.
-
-    ------------------------------------------------------------------------------------------------------
-    """
-    phrases_idxs2 = []
-    phrases2 = []
-    for i, phrase in enumerate(phrases_idxs):
-        try:
-            start_idx = phrase[0]
-            if item_data[start_idx].get("speaker_label", "") == speaker_label:
-                phrases_idxs2.append(phrase)
-                phrases2.append(phrases[i])
-        except Exception as e:
-            logger.error(f"Error in phrase-split for speaker {speaker_label}: {e}")
-            continue
-
-    return phrases_idxs2, phrases2
-
-
 def filter_turns(item_data, speaker_label, measures):
     """
     ------------------------------------------------------------------------------------------------------
@@ -360,39 +316,6 @@ def create_index_column(item_data, measures):
             break
     
     return item_data
-
-
-def phrase_split(text):
-    """
-    ------------------------------------------------------------------------------------------------------
-
-    This function splits the input text into phrases.
-
-    Parameters:
-    ...........
-    text: str
-        The input text.
-
-    Returns:
-    ...........
-    phrases: list
-        A list of phrases extracted from the input text.
-    phrases_idxs: list
-        A list of tuples containing
-            the start and end indices of the phrases in the input text.
-
-    ------------------------------------------------------------------------------------------------------
-    """
-    phrases = nltk.tokenize.sent_tokenize(text)
-    phrases_idxs = []
-
-    start_idx = 0
-    for phrase in phrases:
-        end_idx = start_idx + len(phrase.split()) - 1
-        phrases_idxs.append((start_idx, end_idx))
-        start_idx = end_idx + 1
-
-    return phrases, phrases_idxs
 
 
 def pause_calculation(filter_json, measures):
@@ -1139,7 +1062,7 @@ def get_pause_feature_turn(turn_df, df_diff, turn_list, turn_index, time_index, 
     return turn_df
 
 
-def get_pause_feature(json_conf, df_list, text_list, text_indices, time_index, measures):
+def get_pause_feature(json_conf, df_list, text_list, text_indices, measures):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -1159,9 +1082,6 @@ def get_pause_feature(json_conf, df_list, text_list, text_indices, time_index, m
     text_indices: list
         List of indices for text_list.
             for phrases and turns.
-    time_index: list
-        A list containing the names of the columns
-         in json that contain the start and end times of each word.
     measures: dict
         A dictionary containing the names of the columns in the output dataframes.
 
@@ -1183,6 +1103,8 @@ def get_pause_feature(json_conf, df_list, text_list, text_indices, time_index, m
 
     # Convert json_conf to a pandas DataFrame
     df_diff = pd.DataFrame(json_conf)
+
+    time_index = ["start", "end"]
 
     # Calculate the pause time between
     # each word and add the results to pause_list
@@ -1217,7 +1139,7 @@ def get_pause_feature(json_conf, df_list, text_list, text_indices, time_index, m
 
 def process_language_feature(
     json_conf, df_list, text_list,
-    text_indices, language, time_index, measures,
+    text_indices, language, measures,
 ):
     """
     ------------------------------------------------------------------------------------------------------
@@ -1239,9 +1161,6 @@ def process_language_feature(
          for phrases and turns.
     language: str
         Language of the transcribed text.
-    time_index: list
-        A list containing the names of the columns in json that contain the
-         start and end times of each word.
     measures: dict
         A dictionary containing the names of the columns in the output dataframes.
 
@@ -1259,7 +1178,7 @@ def process_language_feature(
     ------------------------------------------------------------------------------------------------------
     """
 
-    df_list = get_pause_feature(json_conf, df_list, text_list, text_indices, time_index, measures)
+    df_list = get_pause_feature(json_conf, df_list, text_list, text_indices, measures)
 
     if language == "en-us":
         json_conf = get_tag(json_conf, TAG_DICT, measures)
