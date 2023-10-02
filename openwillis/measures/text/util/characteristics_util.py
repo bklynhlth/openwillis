@@ -194,7 +194,7 @@ def filter_speaker_phrase(item_data, speaker_label, phrases_idxs, phrases):
     return phrases_idxs2, phrases2
 
 
-def filter_speaker_turn(item_data, speaker_label, turns_idxs, turns):
+def filter_turns(item_data, speaker_label, turns_idxs, turns):
     """
     ------------------------------------------------------------------------------------------------------
     
@@ -221,28 +221,45 @@ def filter_speaker_turn(item_data, speaker_label, turns_idxs, turns):
     turns: list
         A list of turns extracted from the JSON object.
 
+    Raises:
+    ...........
+        ValueError: If the speaker label is not found in the json response object.
+
     ------------------------------------------------------------------------------------------------------
     """
+
+    speaker_labels = [
+        item["speaker"] for item
+        in item_data if "speaker" in item
+    ]
+
+    if speaker_label not in speaker_labels:
+        raise ValueError(
+            f"Speaker label {speaker_label} "
+            "not found in the json response object."
+        )
+
+
     start_idx = 0
     for i, item in enumerate(item_data):
         try:
             if (
                 i > 0
-                and item.get("speaker_label", "") == speaker_label
-                and item_data[i - 1].get("speaker_label", "") != speaker_label
+                and item.get("speaker", "") == speaker_label
+                and item_data[i - 1].get("speaker", "") != speaker_label
             ):
                 start_idx = i
             elif (
                 i > 0
-                and item.get("speaker_label", "") != speaker_label
-                and item_data[i - 1].get("speaker_label", "") == speaker_label
+                and item.get("speaker", "") != speaker_label
+                and item_data[i - 1].get("speaker", "") == speaker_label
             ):
                 turns_idxs.append((start_idx, i - 1))
                 # create turns texts
                 turns.append(
                     " ".join(
                         [
-                            item["alternatives"][0]["content"]
+                            item["text"]
                             for item in item_data[start_idx:i]
                         ]
                     )
@@ -257,82 +274,13 @@ def filter_speaker_turn(item_data, speaker_label, turns_idxs, turns):
         turns.append(
             " ".join(
                 [
-                    item["alternatives"][0]["content"]
+                    item["text"]
                     for item in item_data[start_idx:]
                 ]
             )
         )
 
     return turns_idxs, turns
-
-
-def filter_speaker(item_data, speaker_label, turns_idxs, turns, phrases_idxs = [], phrases = []):
-    """
-    ------------------------------------------------------------------------------------------------------
-
-    This function updates the turns and phrases lists
-        to only include the speaker label provided.
-
-    Parameters:
-    ...........
-    item_data: dict
-        JSON response object.
-    speaker_label: str
-        Speaker label
-    turns_idxs: list
-        A list of tuples containing
-            the start and end indices of the turns in the JSON object.
-    turns: list
-        A list of turns extracted from the JSON object.
-    phrases_idxs: list
-        A list of tuples containing
-            the start and end indices of the phrases in the JSON object.
-    phrases: list
-        A list of phrases extracted from the JSON object.
-
-    Returns:
-    ...........
-    turns_idxs: list
-        A list of tuples containing
-            the start and end indices of the turns in the JSON object.
-    turns: list
-        A list of turns extracted from the JSON object.
-    phrases_idxs: list
-        A list of tuples containing
-            the start and end indices of the phrases in the JSON object.
-    phrases: list
-        A list of phrases extracted from the JSON object.
-
-    Raises:
-    ...........
-        ValueError: If the speaker label is not found in the json response object.
-
-    ------------------------------------------------------------------------------------------------------
-    """
-
-    speaker_labels = [
-        item["speaker_label"] for item
-        in item_data if "speaker_label" in item
-    ]
-
-    if speaker_label not in speaker_labels:
-        raise ValueError(
-            f"Speaker label {speaker_label} "
-            "not found in the json response object."
-        )
-
-    if len(phrases) > 0:
-        # phrase-split for the speaker label
-        phrases_idxs, phrases = filter_speaker_phrase(
-            item_data, speaker_label, phrases_idxs, phrases
-        )
-
-    # turn-split for the speaker label
-    turns_idxs, turns = filter_speaker_turn(
-        item_data, speaker_label, turns_idxs, turns
-    )
-
-    return turns_idxs, turns, phrases_idxs, phrases
 
 
 def create_index_column(item_data, measures):
