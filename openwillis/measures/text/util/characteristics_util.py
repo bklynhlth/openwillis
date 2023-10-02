@@ -346,7 +346,7 @@ def pause_calculation(filter_json, measures):
     """
     ------------------------------------------------------------------------------------------------------
 
-    This function calculates the pause duration between each word.
+    This function calculates the pause duration between each item.
 
     Parameters:
     ...........
@@ -364,8 +364,8 @@ def pause_calculation(filter_json, measures):
     """
     for i, item in enumerate(filter_json):
         if i > 0:
-            item[measures["pause"]] = float(item["start_time"]) - float(
-                filter_json[i - 1]["end_time"]
+            item[measures["pause"]] = float(item["start"]) - float(
+                filter_json[i - 1]["end"]
             )
         else:
             item[measures["pause"]] = np.nan
@@ -373,11 +373,43 @@ def pause_calculation(filter_json, measures):
     return filter_json
 
 
+def word_pause_calculation(words, measures):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    This function calculates the pause duration between each word.
+
+    Parameters:
+    ...........
+    words: dict
+        A dict of words extracted from the JSON response object.
+    measures: dict
+        A dictionary containing the names of the columns in the output dataframes.
+
+    Returns:
+    ...........
+    words: dict
+        The updated dict of words.
+
+    ------------------------------------------------------------------------------------------------------
+    """
+
+    filter_json = [
+        item for item in words
+        if "start" in item and "end" in item
+    ]
+
+    # calculate time difference between each word
+    filter_json = pause_calculation(filter_json, measures)
+
+    return filter_json
+
+
 def filter_json_transcribe(item_data, speaker_label, measures):
     """
     ------------------------------------------------------------------------------------------------------
 
-    This function filters the JSON response object to only include items with start_time and end_time.
+    This function filters the JSON response object to only include items with start and end time.
 
     Parameters:
     ...........
@@ -395,13 +427,18 @@ def filter_json_transcribe(item_data, speaker_label, measures):
 
     ------------------------------------------------------------------------------------------------------
     """
+    # phrase filtering
     filter_json = [
         item for item in item_data
-        if "start_time" in item and "end_time" in item
+        if "start" in item and "end" in item
     ]
 
     # calculate time difference between each word
     filter_json = pause_calculation(filter_json, measures)
+
+    # word filtering
+    for i, item in enumerate(filter_json):
+        filter_json[i]['words'] = word_pause_calculation(item['words'], measures)
 
     if speaker_label is not None:
         filter_json = [
