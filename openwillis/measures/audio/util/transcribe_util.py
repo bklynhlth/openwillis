@@ -305,13 +305,17 @@ def replace_whisperx_speaker_labels(json_data, check_label, replace_label):
     ------------------------------------------------------------------------------------------------------
     """
     updated_data = json_data.copy()
-    for segment in updated_data['segments']:
+    if 'segments' in updated_data:
         
-        if segment['speaker'] == check_label[0]:
-            segment['speaker'] = replace_label[0]
-
-        elif segment['speaker'] == check_label[1]:
-            segment['speaker'] = replace_label[1]
+        for segment in updated_data['segments']:
+            if 'speaker' not in segment:
+                continue
+                
+            if segment['speaker'] == check_label[0]:
+                segment['speaker'] = replace_label[0]
+    
+            elif segment['speaker'] == check_label[1]:
+                segment['speaker'] = replace_label[1]
 
     return updated_data
 
