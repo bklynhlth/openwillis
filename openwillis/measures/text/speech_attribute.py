@@ -42,6 +42,23 @@ def get_config(filepath, json_file):
     return measures
 
 
+def is_amazon_transcribe(json_conf):
+    """
+    ------------------------------------------------------------------------------------------------------
+    This function checks if the json response object is from Amazon Transcribe.
+    Parameters:
+    ...........
+    json_conf: dict
+        JSON response object.
+    Returns:
+    ...........
+    bool: True if the json response object
+     is from Amazon Transcribe, False otherwise.
+    ------------------------------------------------------------------------------------------------------
+    """
+    return "jobName" in json_conf and "results" in json_conf
+
+
 def is_whisper_transcribe(json_conf):
     """
     ------------------------------------------------------------------------------------------------------
