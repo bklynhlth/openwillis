@@ -66,6 +66,78 @@ def is_whisper_transcribe(json_conf):
     return False
 
 
+def filter_transcribe(json_conf, measures, speaker_label=None):
+    """
+    ------------------------------------------------------------------------------------------------------
+    This function extracts the text and filters the JSON data
+     for Amazon Transcribe json response objects.
+     Also, it filters the JSON data based on the speaker label if provided.
+    Parameters:
+    ...........
+    json_conf: dict
+        aws transcribe json response.
+    measures: dict
+        A dictionary containing the names of the columns in the output dataframes.
+    speaker_label: str
+        Speaker label
+    Returns:
+    ...........
+    filter_json: list
+        The filtered JSON object containing
+        only the relevant data for processing.
+    text_list: list
+        List of transcribed text.
+         split into words, phrases, turns, and full text.
+    text_indices: list
+        List of indices for text_list.
+         for phrases and turns.
+    Raises:
+    ...........
+    ValueError: If the speaker label is not found in the json response object.
+    ------------------------------------------------------------------------------------------------------
+    """
+    item_data = json_conf["results"]["items"]
+
+    # make a dictionary to map old indices to new indices
+    item_data = cutil.create_index_column(item_data, measures)
+
+    # extract text
+    text = " ".join(
+        [
+            item["alternatives"][0]["content"]
+            for item in item_data
+            if "alternatives" in item
+        ]
+    )
+
+    # phrase-split
+    phrases, phrases_idxs = cutil.phrase_split(text)
+
+    # turn-split
+    turns = []
+    turns_idxs = []
+
+    if speaker_label is not None:
+
+        turns_idxs, turns, phrases_idxs, phrases = cutil.filter_speaker(
+            item_data, speaker_label, turns_idxs, turns, phrases_idxs, phrases
+        )
+
+    # entire transcript - by joining all the phrases
+    text = " ".join(phrases)
+
+    # filter json to only include items with start_time and end_time
+    filter_json = cutil.filter_json_transcribe(item_data, speaker_label, measures)
+
+    # extract words
+    words = [word["alternatives"][0]["content"] for word in filter_json]
+
+    text_list = [words, phrases, turns, text]
+    text_indices = [phrases_idxs, turns_idxs]
+
+    return filter_json, text_list, text_indices
+
+
 def filter_whisper(json_conf, measures, speaker_label=None):
     """
     ------------------------------------------------------------------------------------------------------
