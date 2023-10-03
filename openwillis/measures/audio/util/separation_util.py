@@ -340,7 +340,7 @@ def transcribe_response_to_dataframe(response):
                 df = df[["start_time", "end_time", "confidence", "speaker_label", "content"]]
     return df, speakers
 
-def extract_data(word_info, segment_info):
+def extract_data(segment_info):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -348,23 +348,23 @@ def extract_data(word_info, segment_info):
 
     Parameters:
     ----------
-    word_info : object
-        The response object containing the transcribed data.
     segment_info : object
-        The response object containing the transcribed data.
+        The phrase level transcribed data.
 
     Returns:
     -------
     df : pandas series
-        The words wise transcribed data in a pandas series.
+        The phrase level transcribed data in a pandas series.
 
     ------------------------------------------------------------------------------------------------------
     """
-    word = word_info.get("word", "")
-    start = word_info.get("start", segment_info["start"])
-    end = word_info.get("end", segment_info["end"])
-    score = word_info.get("score", "")
-    return pd.Series([start, end, word, score], index=["start", "end", "word", "score"])
+    phrase = segment_info["text"]
+    start = segment_info["start"]
+    end = segment_info["end"]
+    
+    score = segment_info["words"][0]["score"] if segment_info["words"] and len(segment_info["words"]) > 0 else 0
+    speaker = segment_info["speaker"]
+    return pd.Series([start, end, phrase, score, speaker], index=["start", "end", "phrase", "score", "speaker"])
 
 def whisperx_to_dataframe(json_response):
     """
@@ -387,20 +387,15 @@ def whisperx_to_dataframe(json_response):
     ------------------------------------------------------------------------------------------------------
     """
     # Initialize an empty DataFrame
-    df = pd.DataFrame(columns=["start", "end", "word", "score", "speaker"])
-    if 'segments' in json_response:  
+    df = pd.DataFrame(columns=["start", "end", "phrase", "score", "speaker"])
+    if 'segments' in json_response:
         
         for segment_info in json_response["segments"]:
-            phrase_speaker = segment_info["speaker"]
-            
-            word_segments = segment_info["words"]
-            segment_df = pd.DataFrame(word_segments).apply(extract_data, args=(segment_info,), axis=1)
-
-            segment_df['speaker'] = phrase_speaker
+            segment_df = extract_data(segment_info)
             df = df.append(segment_df, ignore_index=True)
-        
+
     df = df.rename(columns={"start": "start_time", "end": "end_time", "score":"confidence", "speaker":"speaker_label", 
-                            "word":"content"})
+                            "phrase":"content"})
     
     df['speaker_label'] = df['speaker_label'].replace({'SPEAKER_00': 'speaker0', 'SPEAKER_01': 'speaker1'})
     df = df[df["confidence"] > 0].reset_index(drop=True)
