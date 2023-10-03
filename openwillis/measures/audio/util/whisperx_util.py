@@ -27,7 +27,7 @@ def delete_model(model):
     torch.cuda.empty_cache()
     del model
 
-def get_diarization(audio, align_json, HF_TOKEN, device):
+def get_diarization(audio, align_json, HF_TOKEN, device, num_speakers):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -42,6 +42,8 @@ def get_diarization(audio, align_json, HF_TOKEN, device):
         The Hugging Face token for model authentication.
     device : str
         device type
+    num_speakers: int
+        Number of speaker
     
     Returns:
     ...........
@@ -52,7 +54,7 @@ def get_diarization(audio, align_json, HF_TOKEN, device):
     """
     # Assign speaker labels
     diarize_model = whisperx.DiarizationPipeline(use_auth_token=HF_TOKEN, device=device)
-    diarize_segments = diarize_model(audio, max_speakers=2)
+    diarize_segments = diarize_model(audio, min_speakers=num_speakers, max_speakers=num_speakers)
     json_response = whisperx.assign_word_speakers(diarize_segments, align_json)
     return json_response
 
@@ -79,7 +81,7 @@ def get_transcribe_summary(json_response):
         summary = "".join([item['text'] for item in json_response["segments"] if item.get('text', '')])
     return summary
 
-def get_whisperx_diariazation(filepath, HF_TOKEN, del_model):
+def get_whisperx_diariazation(filepath, HF_TOKEN, del_model, num_speakers):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -93,6 +95,8 @@ def get_whisperx_diariazation(filepath, HF_TOKEN, del_model):
         The Hugging Face token for model authentication.
     del_model: boolean
         Boolean indicator to delete model if low on GPU resources 
+    num_speakers: int
+        Number of speaker
 
     Returns:
     ...........
@@ -138,7 +142,7 @@ def get_whisperx_diariazation(filepath, HF_TOKEN, del_model):
         if del_model:
             delete_model(model_a)
             
-        json_response = get_diarization(audio, align_json, HF_TOKEN, device)    
+        json_response = get_diarization(audio, align_json, HF_TOKEN, device, num_speakers)    
         transcript = get_transcribe_summary(json_response)
     
     except Exception as e:

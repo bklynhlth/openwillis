@@ -233,7 +233,7 @@ def get_config():
     measures = json.load(file)
     return measures
 
-def run_whisperx(filepath, hf_token, del_model):
+def run_whisperx(filepath, hf_token, del_model, num_speakers):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -247,6 +247,8 @@ def run_whisperx(filepath, hf_token, del_model):
         The Hugging Face token for model authentication.
     del_model: boolean
         Boolean indicator to delete model if low on GPU resources 
+    num_speakers: int
+        Number of speaker
 
     Returns:
     ...........
@@ -264,7 +266,7 @@ def run_whisperx(filepath, hf_token, del_model):
         return json_response, transcript
     
     from openwillis.measures.audio.util import whisperx_util as wutil #import in-case of model=whisperx
-    json_response, transcript = wutil.get_whisperx_diariazation(filepath, hf_token, del_model)
+    json_response, transcript = wutil.get_whisperx_diariazation(filepath, hf_token, del_model, num_speakers)
     
     if str(json_response) != '{}':
         json_response = tutil.replace_whisperx_speaker_labels(json_response, ['SPEAKER_00', 'SPEAKER_01'], 
@@ -305,13 +307,14 @@ def speech_transcription(filepath, **kwargs):
     
     language = kwargs.get('language', 'en-us')
     scale = kwargs.get('c_scale', '')
+    num_speakers = kwargs.get('num_speakers', '2')
     
     transcribe_interval = kwargs.get('transcribe_interval', [])
     hf_token = kwargs.get('hf_token', '')
     del_model = kwargs.get('del_model', False)
     
     if model == 'whisperx':
-        json_response, transcript = run_whisperx(filepath, hf_token, del_model)
+        json_response, transcript = run_whisperx(filepath, hf_token, del_model, num_speakers)
         
         if scale.lower() in measures['scale'].split(','):
             content_dict = tutil.get_whisperx_content(json_response)
