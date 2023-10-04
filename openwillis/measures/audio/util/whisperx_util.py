@@ -55,10 +55,10 @@ def get_diarization(audio, align_json, HF_TOKEN, device, num_speakers):
     # Assign speaker labels
     diarize_model = whisperx.DiarizationPipeline(use_auth_token=HF_TOKEN, device=device)
     if num_speakers == None:
-        diarize_segments = diarize_model(audio, min_speakers=num_speakers, max_speakers=num_speakers)
+        diarize_segments = diarize_model(audio)
     
     else:
-        diarize_segments = diarize_model(audio)
+        diarize_segments = diarize_model(audio, min_speakers=num_speakers, max_speakers=num_speakers)
     json_response = whisperx.assign_word_speakers(diarize_segments, align_json)
     return json_response
 
