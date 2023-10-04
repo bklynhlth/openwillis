@@ -113,8 +113,7 @@ def get_whisperx_diariazation(filepath, HF_TOKEN, del_model, num_speakers):
     """
     device = 'cpu'
     compute_type = "int16"
-
-    model = 'tiny'
+    
     model = 'large-v2'
     batch_size = 16
     
@@ -128,13 +127,9 @@ def get_whisperx_diariazation(filepath, HF_TOKEN, del_model, num_speakers):
 
         #Transcribe with original whisper (batched)
         model = whisperx.load_model(model, device, compute_type=compute_type)
-        audio = whisperx.load_audio(filepath)
         
-        if torch.cuda.is_available():
-            transcribe_json = model.transcribe(audio, batch_size=batch_size)
-
-        else:
-            transcribe_json = model.transcribe(audio)
+        audio = whisperx.load_audio(filepath)
+        transcribe_json = model.transcribe(audio, batch_size=batch_size)
 
         if del_model:
             delete_model(model)
