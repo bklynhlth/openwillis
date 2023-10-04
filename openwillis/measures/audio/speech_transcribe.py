@@ -307,7 +307,7 @@ def speech_transcription(filepath, **kwargs):
     
     language = kwargs.get('language', 'en-us')
     scale = kwargs.get('c_scale', '')
-    num_speakers = kwargs.get('num_speakers', 2)
+    num_speakers = kwargs.get('num_speakers', None)
     
     transcribe_interval = kwargs.get('transcribe_interval', [])
     hf_token = kwargs.get('hf_token', '')

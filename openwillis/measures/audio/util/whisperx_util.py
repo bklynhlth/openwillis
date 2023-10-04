@@ -54,7 +54,11 @@ def get_diarization(audio, align_json, HF_TOKEN, device, num_speakers):
     """
     # Assign speaker labels
     diarize_model = whisperx.DiarizationPipeline(use_auth_token=HF_TOKEN, device=device)
-    diarize_segments = diarize_model(audio, min_speakers=num_speakers, max_speakers=num_speakers)
+    if num_speakers == None:
+        diarize_segments = diarize_model(audio, min_speakers=num_speakers, max_speakers=num_speakers)
+    
+    else:
+        diarize_segments = diarize_model(audio)
     json_response = whisperx.assign_word_speakers(diarize_segments, align_json)
     return json_response
 
@@ -108,8 +112,11 @@ def get_whisperx_diariazation(filepath, HF_TOKEN, del_model, num_speakers):
     ------------------------------------------------------------------------------------------------------
     """
     device = 'cpu'
-    compute_type = "int8"
+    compute_type = "int16"
+
     model = 'tiny'
+    model = 'large-v2'
+    batch_size = 16
     
     json_response = '{}'
     transcript = ''
@@ -117,9 +124,6 @@ def get_whisperx_diariazation(filepath, HF_TOKEN, del_model, num_speakers):
     try:
         if torch.cuda.is_available():
             device = 'cuda'
-            
-            model = 'large-v2'
-            batch_size = 16
             compute_type = "float16"
 
         #Transcribe with original whisper (batched)
