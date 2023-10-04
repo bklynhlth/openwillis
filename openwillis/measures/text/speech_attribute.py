@@ -291,7 +291,14 @@ def speech_characteristics(json_conf, language="en", speaker_label=None):
     df_list = cutil.create_empty_dataframes(measures)
 
     try:
-        language = language[:2].lower()
+        if not isinstance(language, str):
+            raise ValueError("Language should be a string")
+        if len(language) < 2:
+            # if language is not specified, then set it to "xx"
+            # run speech characteristics as not english
+            language = "xx"
+        else:
+            language = language[:2].lower()
 
         if bool(json_conf):
             cutil.download_nltk_resources()
