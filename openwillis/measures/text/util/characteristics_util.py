@@ -153,10 +153,8 @@ def create_empty_dataframes(measures):
 def filter_speaker_phrase(item_data, speaker_label, phrases_idxs, phrases):
     """
     ------------------------------------------------------------------------------------------------------
-
     This function updates the phrases list
         to only include the speaker label provided.
-
     Parameters:
     ...........
     item_data: dict
@@ -168,7 +166,6 @@ def filter_speaker_phrase(item_data, speaker_label, phrases_idxs, phrases):
             the start and end indices of the phrases in the JSON object.
     phrases: list
         A list of phrases extracted from the JSON object.
-
     Returns:
     ...........
     phrases_idxs: list
@@ -176,7 +173,6 @@ def filter_speaker_phrase(item_data, speaker_label, phrases_idxs, phrases):
             the start and end indices of the phrases in the JSON object.
     phrases: list
         A list of phrases extracted from the JSON object.
-
     ------------------------------------------------------------------------------------------------------
     """
     phrases_idxs2 = []
@@ -200,7 +196,6 @@ def filter_speaker_turn(item_data, speaker_label, turns_idxs, turns):
     
     This function updates the turns list
         to only include the speaker label provided.
-
     Parameters:
     ...........
     item_data: dict
@@ -212,7 +207,6 @@ def filter_speaker_turn(item_data, speaker_label, turns_idxs, turns):
             the start and end indices of the turns in the JSON object.
     turns: list
         A list of turns extracted from the JSON object.
-
     Returns:
     ...........
     turns_idxs: list
@@ -220,7 +214,6 @@ def filter_speaker_turn(item_data, speaker_label, turns_idxs, turns):
             the start and end indices of the turns in the JSON object.
     turns: list
         A list of turns extracted from the JSON object.
-
     ------------------------------------------------------------------------------------------------------
     """
     start_idx = 0
@@ -262,17 +255,14 @@ def filter_speaker_turn(item_data, speaker_label, turns_idxs, turns):
                 ]
             )
         )
-
     return turns_idxs, turns
 
 
 def filter_speaker(item_data, speaker_label, turns_idxs, turns, phrases_idxs, phrases):
     """
     ------------------------------------------------------------------------------------------------------
-
     This function updates the turns and phrases lists
         to only include the speaker label provided.
-
     Parameters:
     ...........
     item_data: dict
@@ -289,7 +279,6 @@ def filter_speaker(item_data, speaker_label, turns_idxs, turns, phrases_idxs, ph
             the start and end indices of the phrases in the JSON object.
     phrases: list
         A list of phrases extracted from the JSON object.
-
     Returns:
     ...........
     turns_idxs: list
@@ -302,11 +291,9 @@ def filter_speaker(item_data, speaker_label, turns_idxs, turns, phrases_idxs, ph
             the start and end indices of the phrases in the JSON object.
     phrases: list
         A list of phrases extracted from the JSON object.
-
     Raises:
     ...........
         ValueError: If the speaker label is not found in the json response object.
-
     ------------------------------------------------------------------------------------------------------
     """
 
@@ -334,43 +321,14 @@ def filter_speaker(item_data, speaker_label, turns_idxs, turns, phrases_idxs, ph
     return turns_idxs, turns, phrases_idxs, phrases
 
 
-def create_index_column(item_data, measures):
-    """
-    ------------------------------------------------------------------------------------------------------
-
-    This function creates an index column in the JSON response object.
-
-    Parameters:
-    ...........
-    item_data: dict
-        JSON response object.
-
-    Returns:
-    ...........
-    item_data: dict
-        The updated JSON response object.
-    measures: dict
-        A dictionary containing the names of the columns in the output dataframes.
-
-    ------------------------------------------------------------------------------------------------------
-    """
-    for i, item in enumerate(item_data):
-        item[measures["old_index"]] = i
-    
-    return item_data
-
-
 def phrase_split(text):
     """
     ------------------------------------------------------------------------------------------------------
-
     This function splits the input text into phrases.
-
     Parameters:
     ...........
     text: str
         The input text.
-
     Returns:
     ...........
     phrases: list
@@ -378,7 +336,6 @@ def phrase_split(text):
     phrases_idxs: list
         A list of tuples containing
             the start and end indices of the phrases in the input text.
-
     ------------------------------------------------------------------------------------------------------
     """
     phrases = nltk.tokenize.sent_tokenize(text)
@@ -393,11 +350,182 @@ def phrase_split(text):
     return phrases, phrases_idxs
 
 
+def filter_turns(item_data, speaker_label, measures):
+    """
+    ------------------------------------------------------------------------------------------------------
+    
+    This function updates the turns list
+        to only include the speaker label provided.
+
+    Parameters:
+    ...........
+    item_data: dict
+        JSON response object.
+    speaker_label: str
+        Speaker label
+    measures: dict
+        A dictionary containing the names of the columns in the output dataframes.
+
+    Returns:
+    ...........
+    turns_idxs: list
+        A list of tuples containing
+            the start and end indices of the turns in the JSON object.
+    turns: list
+        A list of turns extracted from the JSON object.
+
+    Raises:
+    ...........
+        ValueError: If the speaker label is not found in the json response object.
+
+    ------------------------------------------------------------------------------------------------------
+    """
+
+    speaker_labels = [
+        item["speaker"] for item
+        in item_data if "speaker" in item
+    ]
+
+    if speaker_label not in speaker_labels:
+        raise ValueError(
+            f"Speaker label {speaker_label} "
+            "not found in the json response object."
+        )
+    
+    turns_idxs, turns = [], []
+
+    start_idx = 0
+    start_idx2 = 0
+    for i, item in enumerate(item_data):
+        try:
+            if (
+                i > 0
+                and item.get("speaker", "") == speaker_label
+                and item_data[i - 1].get("speaker", "") != speaker_label
+            ):
+                start_idx = i
+                start_idx2 = item["words"][0][measures["old_index"]]
+            elif (
+                i > 0
+                and item.get("speaker", "") != speaker_label
+                and item_data[i - 1].get("speaker", "") == speaker_label
+            ):
+                end_idx = i-1
+                end_idx2 = item["words"][-1][measures["old_index"]]
+                turns_idxs.append((start_idx2, end_idx2))
+                # create turns texts
+                turns.append(
+                    " ".join(
+                        [
+                            item["text"]
+                            for item in item_data[start_idx:(end_idx+1)]
+                        ]
+                    )
+                )
+        except Exception as e:
+            logger.error(f"Error in turn-split for speaker {speaker_label}: {e}")
+            continue
+
+    # if the last item is the speaker label
+    if start_idx not in [item[0] for item in turns_idxs]:
+        end_idx2 = item_data[-1]["words"][-1][measures["old_index"]]
+        turns_idxs.append((start_idx2, end_idx2))
+        turns.append(
+            " ".join(
+                [
+                    item["text"]
+                    for item in item_data[start_idx:]
+                ]
+            )
+        )
+
+    return turns_idxs, turns
+
+
+def filter_phrases(item_data, speaker_label, measures):
+    """
+    ------------------------------------------------------------------------------------------------------
+    
+    This function updates the phrases list
+        to only include the speaker label provided.
+
+    Parameters:
+    ...........
+    item_data: dict
+        JSON response object.
+    speaker_label: str
+        Speaker label
+    measures: dict
+        A dictionary containing the names of the columns in the output dataframes.
+
+    Returns:
+    ...........
+    phrases_idxs: list
+        A list of tuples containing
+            the start and end indices of the phrases in the JSON object.
+    phrases: list
+        A list of phrases extracted from the JSON object.
+
+    ------------------------------------------------------------------------------------------------------
+    """
+
+
+    phrases_idxs, phrases = [], []
+    for item in item_data:
+
+        start_idx = item["words"][0][measures["old_index"]]
+        end_idx = item["words"][-1][measures["old_index"]]
+
+        if speaker_label is not None:
+            if item["speaker"] == speaker_label:
+                phrases.append(item["text"])
+                phrases_idxs.append((start_idx, end_idx))
+        else:
+            phrases.append(item["text"])
+            phrases_idxs.append((start_idx, end_idx))
+
+    return phrases_idxs, phrases
+
+
+def create_index_column(item_data, measures):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    This function creates an index column in the JSON response object.
+
+    Parameters:
+    ...........
+    item_data: dict
+        JSON response object.
+    measures: dict
+        A dictionary containing the names of the columns in the output dataframes.
+
+    Returns:
+    ...........
+    item_data: dict
+        The updated JSON response object.
+
+    ------------------------------------------------------------------------------------------------------
+    """
+    i = 0
+    i_p = 0
+    while True:
+        for j, word in enumerate(item_data[i_p]["words"]):
+            item_data[i_p]["words"][j][measures["old_index"]] = i
+            i += 1
+        
+        i_p += 1
+        if i_p >= len(item_data):
+            break
+    
+    return item_data
+
+
 def pause_calculation(filter_json, measures):
     """
     ------------------------------------------------------------------------------------------------------
 
-    This function calculates the pause duration between each word.
+    This function calculates the pause duration between each item.
 
     Parameters:
     ...........
@@ -415,8 +543,8 @@ def pause_calculation(filter_json, measures):
     """
     for i, item in enumerate(filter_json):
         if i > 0:
-            item[measures["pause"]] = float(item["start_time"]) - float(
-                filter_json[i - 1]["end_time"]
+            item[measures["pause"]] = float(item["start"]) - float(
+                filter_json[i - 1]["end"]
             )
         else:
             item[measures["pause"]] = np.nan
@@ -428,7 +556,7 @@ def filter_json_transcribe(item_data, speaker_label, measures):
     """
     ------------------------------------------------------------------------------------------------------
 
-    This function filters the JSON response object to only include items with start_time and end_time.
+    This function filters the JSON response object to only include items with start and end time.
 
     Parameters:
     ...........
@@ -446,9 +574,21 @@ def filter_json_transcribe(item_data, speaker_label, measures):
 
     ------------------------------------------------------------------------------------------------------
     """
+    # phrase filtering
+    item_data2 = []
+    for item in item_data:
+        speaker = item["speaker"]
+        words = item["words"]
+
+        # update speaker labels
+        for j, w in enumerate(words):
+            words[j]["speaker"] = speaker
+        
+        item_data2 += words
+    
     filter_json = [
-        item for item in item_data
-        if "start_time" in item and "end_time" in item
+        item for item in item_data2
+        if "start" in item and "end" in item
     ]
 
     # calculate time difference between each word
@@ -458,7 +598,7 @@ def filter_json_transcribe(item_data, speaker_label, measures):
         filter_json = [
             item
             for item in filter_json
-            if item.get("speaker_label", "") == speaker_label
+            if item.get("speaker", "") == speaker_label
         ]
 
     return filter_json
@@ -1125,7 +1265,7 @@ def get_pause_feature_turn(turn_df, df_diff, turn_list, turn_index, time_index, 
     return turn_df
 
 
-def get_pause_feature(json_conf, df_list, text_list, text_indices, time_index, measures):
+def get_pause_feature(json_conf, df_list, text_list, text_indices, measures):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -1145,9 +1285,6 @@ def get_pause_feature(json_conf, df_list, text_list, text_indices, time_index, m
     text_indices: list
         List of indices for text_list.
             for phrases and turns.
-    time_index: list
-        A list containing the names of the columns
-         in json that contain the start and end times of each word.
     measures: dict
         A dictionary containing the names of the columns in the output dataframes.
 
@@ -1169,6 +1306,8 @@ def get_pause_feature(json_conf, df_list, text_list, text_indices, time_index, m
 
     # Convert json_conf to a pandas DataFrame
     df_diff = pd.DataFrame(json_conf)
+
+    time_index = ["start", "end"]
 
     # Calculate the pause time between
     # each word and add the results to pause_list
@@ -1203,7 +1342,7 @@ def get_pause_feature(json_conf, df_list, text_list, text_indices, time_index, m
 
 def process_language_feature(
     json_conf, df_list, text_list,
-    text_indices, language, time_index, measures,
+    text_indices, language, measures,
 ):
     """
     ------------------------------------------------------------------------------------------------------
@@ -1225,9 +1364,6 @@ def process_language_feature(
          for phrases and turns.
     language: str
         Language of the transcribed text.
-    time_index: list
-        A list containing the names of the columns in json that contain the
-         start and end times of each word.
     measures: dict
         A dictionary containing the names of the columns in the output dataframes.
 
@@ -1245,9 +1381,9 @@ def process_language_feature(
     ------------------------------------------------------------------------------------------------------
     """
 
-    df_list = get_pause_feature(json_conf, df_list, text_list, text_indices, time_index, measures)
+    df_list = get_pause_feature(json_conf, df_list, text_list, text_indices, measures)
 
-    if language == "en-us":
+    if language == "en":
         json_conf = get_tag(json_conf, TAG_DICT, measures)
         df_list = get_tag_summ(json_conf, df_list, text_indices, measures)
 

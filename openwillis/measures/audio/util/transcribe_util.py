@@ -250,3 +250,112 @@ def transcribe_audio(s3uri, input_param):
 
     finally:
         return response, transcript
+
+def get_whisperx_content(data):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    Extracts content from a nested dictionary and returns it in a speaker-based dictionary.
+
+    Parameters:
+    ...........
+    data: json
+        Speech transcription response
+
+    Returns:
+    ...........
+    content_dict : dict
+        A dictionary where the keys are speaker labels and the values are the corresponding content spoken by each
+
+    ------------------------------------------------------------------------------------------------------
+    """
+    content_dict = {}
+
+    if 'segments' in data:           # Check if 'segments' key is present
+        item_data = data['segments']
+        
+        spk_0_text = [item['text'] for item in item_data if item.get('speaker', '') == 'speaker0']
+        spk_1_text = [item['text'] for item in item_data if item.get('speaker', '') == 'speaker1']
+
+        content_dict['speaker0'] = " ".join(spk_0_text)
+        content_dict['speaker1'] = " ".join(spk_1_text)
+
+    return content_dict
+
+def replace_whisperx_speaker_labels(json_data, check_label, replace_label):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    Replaces speaker labels in json response.
+
+    Parameters:
+    ...........
+    data : json
+        The json containing speaker labels.
+    check_labels: list
+        Check on input speaker labels
+    speaker_labels: list
+        Expected speaker labels
+
+    Returns:
+    ...........
+    data : json
+        The modified json with replaced speaker labels.
+
+    ------------------------------------------------------------------------------------------------------
+    """
+    updated_data = json_data.copy()
+    if 'segments' in updated_data:
+        
+        for segment in updated_data['segments']:
+            if 'speaker' not in segment:
+                continue
+                
+            if segment['speaker'] == check_label[0]:
+                segment['speaker'] = replace_label[0]
+    
+            elif segment['speaker'] == check_label[1]:
+                segment['speaker'] = replace_label[1]
+
+    return updated_data
+
+def get_whisperx_clinical_labels(scale, measures, content_dict, json_response):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    Replaces speaker labels in a JSON response based on clinical measures.
+
+    Parameters:
+    ...........
+    scale : str
+        Clinical scale
+    measures : object
+        A configuration object.
+    content_dict: dict
+        A dictionary containing speaker-based content.
+    json_response: json
+        Speech transcription response
+
+    Returns:
+    ...........
+    json_response : json
+        The modified JSON response with replaced speaker labels.
+
+    ------------------------------------------------------------------------------------------------------
+    """
+    #Check if content is available for all the speaker
+    if content_dict and content_dict['speaker0'] and content_dict['speaker1']:
+        if scale.lower() not in measures['scale'].split(","):
+            return json_response
+    
+    score_string = scale.lower()+'_string'
+    spk1_score = sutil.match_transcript(measures[score_string], content_dict['speaker0'])
+    spk2_score = sutil.match_transcript(measures[score_string], content_dict['speaker1'])
+    
+    if spk1_score > spk2_score:
+        json_response = replace_whisperx_speaker_labels(json_response, ['speaker0', 'speaker1'], ['clinician', 'participant'])
+
+    else:
+        json_response = replace_whisperx_speaker_labels(json_response, ['speaker0', 'speaker1'], ['participant', 'clinician'])
+
+    return json_response
