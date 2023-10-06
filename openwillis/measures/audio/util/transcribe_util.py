@@ -344,8 +344,7 @@ def get_whisperx_clinical_labels(scale, measures, content_dict, json_response):
     ------------------------------------------------------------------------------------------------------
     """
     #Check if content is available for all the speaker
-    if content_dict and content_dict['speaker0'] and content_dict['speaker1']:
-        if scale.lower() not in measures['scale'].split(","):
+    if len(content_dict) <2:
             return json_response
     
     score_string = scale.lower()+'_string'
