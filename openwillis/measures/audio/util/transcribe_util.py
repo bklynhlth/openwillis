@@ -345,7 +345,7 @@ def get_whisperx_clinical_labels(scale, measures, content_dict, json_response):
     """
     #Check if content is available for all the speaker
     if len(content_dict) <2:
-            return json_response
+        return json_response
     
     score_string = scale.lower()+'_string'
     spk1_score = sutil.match_transcript(measures[score_string], content_dict['speaker0'])
