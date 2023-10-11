@@ -363,7 +363,7 @@ def extract_data(segment_info):
     end = segment_info["end"]
     
     score = segment_info["words"][0]["score"] if segment_info["words"] and len(segment_info["words"]) > 0 else 0
-    speaker = segment_info["speaker"]
+    speaker = segment_info["speaker"] if "speaker" in segment_info else "no_speaker"
     return pd.Series([start, end, phrase, score, speaker], index=["start", "end", "phrase", "score", "speaker"])
 
 def whisperx_to_dataframe(json_response):
@@ -391,14 +391,18 @@ def whisperx_to_dataframe(json_response):
     if 'segments' in json_response:
         
         for segment_info in json_response["segments"]:
-            segment_df = extract_data(segment_info)
-            df = df.append(segment_df, ignore_index=True)
-
+            try:
+                
+                segment_df = extract_data(segment_info)
+                df = df.append(segment_df, ignore_index=True)
+                
+            except Exception as e:
+                logger.info("Some segments have no speaker labels.")
+    
+    df = df[df["score"] > 0].reset_index(drop=True)
+    df = df[df["speaker"] != "no_speaker"].reset_index(drop=True)
     df = df.rename(columns={"start": "start_time", "end": "end_time", "score":"confidence", "speaker":"speaker_label", 
                             "phrase":"content"})
-    
-    df['speaker_label'] = df['speaker_label'].replace({'SPEAKER_00': 'speaker0', 'SPEAKER_01': 'speaker1'})
-    df = df[df["confidence"] > 0].reset_index(drop=True)
     
     speakers = df['speaker_label'].nunique()
     return df, speakers

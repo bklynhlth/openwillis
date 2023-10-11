@@ -191,6 +191,12 @@ def filter_whisper(json_conf, measures, speaker_label=None):
     """
     item_data = json_conf["segments"]
 
+    if speaker_label is not None:
+        # filter out segments that do not have speaker labels
+        item_data = [
+            segment for segment in item_data if "speaker" in segment
+        ]
+
     # make a dictionary to map old indices to new indices
     item_data = cutil.create_index_column(item_data, measures)
 
