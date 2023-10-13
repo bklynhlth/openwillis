@@ -580,14 +580,18 @@ def filter_json_transcribe(item_data, speaker_label, measures):
     # phrase filtering
     item_data2 = []
     for item in item_data:
-        speaker = item["speaker"]
-        words = item["words"]
-
-        # update speaker labels
-        for j, w in enumerate(words):
-            words[j]["speaker"] = speaker
-        
-        item_data2 += words
+        try:
+            
+            speaker = item["speaker"]
+            words = item["words"]
+    
+            # update speaker labels
+            for j, w in enumerate(words):
+                words[j]["speaker"] = speaker
+            
+            item_data2 += words
+        except Exception as e:
+            logger.error(f"Failed to filter word: {e}")
     
     filter_json = [
         item for item in item_data2
