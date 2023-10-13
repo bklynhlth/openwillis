@@ -233,7 +233,7 @@ def get_config():
     measures = json.load(file)
     return measures
 
-def run_whisperx(filepath, hf_token, del_model, num_speakers):
+def run_whisperx(filepath, hf_token, del_model, num_speakers, infra_model):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -249,6 +249,8 @@ def run_whisperx(filepath, hf_token, del_model, num_speakers):
         Boolean indicator to delete model if low on GPU resources 
     num_speakers: int
         Number of speaker
+    infra_model:list
+        whisper model artifacts (this is optional param: to optimize willisInfra) 
 
     Returns:
     ...........
@@ -266,7 +268,7 @@ def run_whisperx(filepath, hf_token, del_model, num_speakers):
         return json_response, transcript
     
     from openwillis.measures.audio.util import whisperx_util as wutil #import in-case of model=whisperx
-    json_response, transcript = wutil.get_whisperx_diariazation(filepath, hf_token, del_model, num_speakers)
+    json_response, transcript = wutil.get_whisperx_diariazation(filepath, hf_token, del_model, num_speakers, infra_model)
     
     if str(json_response) != '{}':
         json_response = tutil.replace_whisperx_speaker_labels(json_response, ['SPEAKER_00', 'SPEAKER_01'], 
@@ -312,9 +314,10 @@ def speech_transcription(filepath, **kwargs):
     transcribe_interval = kwargs.get('transcribe_interval', [])
     hf_token = kwargs.get('hf_token', '')
     del_model = kwargs.get('del_model', False)
+    infra_model = kwargs.get('infra_model', [True, None, None])
     
     if model == 'whisperx':
-        json_response, transcript = run_whisperx(filepath, hf_token, del_model, num_speakers)
+        json_response, transcript = run_whisperx(filepath, hf_token, del_model, num_speakers, infra_model)
         
         if scale.lower() in measures['scale'].split(','):
             content_dict = tutil.get_whisperx_content(json_response)

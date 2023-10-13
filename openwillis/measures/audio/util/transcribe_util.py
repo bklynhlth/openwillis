@@ -276,9 +276,13 @@ def get_whisperx_content(data):
         
         spk_0_text = [item['text'] for item in item_data if item.get('speaker', '') == 'speaker0']
         spk_1_text = [item['text'] for item in item_data if item.get('speaker', '') == 'speaker1']
+        
+        spk0_check = any(not char.isspace() for char in spk_0_text)
+        spk1_check = any(not char.isspace() for char in spk_1_text)
 
-        content_dict['speaker0'] = " ".join(spk_0_text)
-        content_dict['speaker1'] = " ".join(spk_1_text)
+        if spk0_check and spk1_check:
+            content_dict['speaker0'] = " ".join(spk_0_text)
+            content_dict['speaker1'] = " ".join(spk_1_text)
 
     return content_dict
 

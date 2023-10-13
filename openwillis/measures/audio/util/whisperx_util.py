@@ -27,7 +27,7 @@ def delete_model(model):
     torch.cuda.empty_cache()
     del model
 
-def get_diarization(audio, align_json, HF_TOKEN, device, num_speakers):
+def get_diarization(audio, align_json, HF_TOKEN, device, num_speakers, infra_model):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -53,7 +53,12 @@ def get_diarization(audio, align_json, HF_TOKEN, device, num_speakers):
     ------------------------------------------------------------------------------------------------------
     """
     # Assign speaker labels
-    diarize_model = whisperx.DiarizationPipeline(use_auth_token=HF_TOKEN, device=device)
+    if infra_model[0]:
+        diarize_model = whisperx.DiarizationPipeline(use_auth_token=HF_TOKEN, device=device)
+    
+    else:
+        diarize_model = infra_model[2]
+
     if num_speakers == None:
         diarize_segments = diarize_model(audio)
     
@@ -85,7 +90,41 @@ def get_transcribe_summary(json_response):
         summary = "".join([item['text'] for item in json_response["segments"] if item.get('text', '')])
     return summary
 
-def get_whisperx_diariazation(filepath, HF_TOKEN, del_model, num_speakers):
+def transcribe_whisper(filepath, model, device, compute_type, batch_size, infra_model):
+    """
+    ------------------------------------------------------------------------------------------------------
+   
+    Transcribe with whisper (batched)
+    
+    Parameters:
+    ...........
+    filepath : str
+        The path to the audio file to be transcribed.
+    model: str
+        name of the pretrained model
+    device: str
+        cpu vs gpu
+    compute_type: str
+        computation format
+    batch_size: str
+        batch size
+    infra_model:list
+        whisper model artifacts (this is optional param: to optimize willisInfra) 
+
+        
+    ------------------------------------------------------------------------------------------------------
+    """
+    if infra_model[0]:
+        model_whisp = whisperx.load_model(model, device, compute_type=compute_type)
+    
+    else:
+        model_whisp = infra_model[1] #passing param from willismeansure
+    audio = whisperx.load_audio(filepath)
+
+    transcribe_json = model_whisp.transcribe(audio, batch_size=batch_size)
+    return transcribe_json, audio
+
+def get_whisperx_diariazation(filepath, HF_TOKEN, del_model, num_speakers, infra_model):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -101,6 +140,8 @@ def get_whisperx_diariazation(filepath, HF_TOKEN, del_model, num_speakers):
         Boolean indicator to delete model if low on GPU resources 
     num_speakers: int
         Number of speaker
+    infra_model: list
+        whisper model artifacts (this is optional param: to optimize willisInfra) 
 
     Returns:
     ...........
@@ -125,14 +166,7 @@ def get_whisperx_diariazation(filepath, HF_TOKEN, del_model, num_speakers):
             device = 'cuda'
             compute_type = "float16"
 
-        #Transcribe with original whisper (batched)
-        model = whisperx.load_model(model, device, compute_type=compute_type)
-        
-        audio = whisperx.load_audio(filepath)
-        transcribe_json = model.transcribe(audio, batch_size=batch_size)
-
-        if del_model:
-            delete_model(model)
+        transcribe_json, audio = transcribe_whisper(filepath, model, device, compute_type, batch_size, infra_model)
 
         # Align whisper output
         model_a, metadata = whisperx.load_align_model(language_code=transcribe_json["language"], device=device)
@@ -141,7 +175,7 @@ def get_whisperx_diariazation(filepath, HF_TOKEN, del_model, num_speakers):
         if del_model:
             delete_model(model_a)
             
-        json_response = get_diarization(audio, align_json, HF_TOKEN, device, num_speakers)    
+        json_response = get_diarization(audio, align_json, HF_TOKEN, device, num_speakers, infra_model)    
         transcript = get_transcribe_summary(json_response)
     
     except Exception as e:
