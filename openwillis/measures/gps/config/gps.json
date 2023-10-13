@@ -1,8 +1,5 @@
 {
-    "year": "year",
-    "month": "month",
-    "day": "day",
-    "hour": "hour",
+    "datetime": "datetime",
     "observed_time": "observed_time",
     "observed_time_day": "observed_time_day",
     "observed_time_night": "observed_time_night",

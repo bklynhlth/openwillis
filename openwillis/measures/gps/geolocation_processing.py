@@ -22,10 +22,7 @@ def create_empty_dataframes(config):
 
     hourly = pd.DataFrame(
         columns=[
-            config["year"],
-            config["month"],
-            config["day"],
-            config["hour"],
+            config["datetime"],
             config["observed_time"],
             config["move_time"],
             config["pause_time"],
@@ -37,9 +34,7 @@ def create_empty_dataframes(config):
     )
     daily = pd.DataFrame(
         columns=[
-            config["year"],
-            config["month"],
-            config["day"],
+            config["datetime"],
             config["observed_time"],
             config["observed_time_day"],
             config["observed_time_night"],

@@ -137,12 +137,16 @@ def gps_stats(traj, df, frequency, timezone):
 
         current_time_list = stamp2datetime(start_time, timezone)
         year, month, day, hour = current_time_list[:4]
+        if frequency == "daily":
+            date_str = f"{year:04}-{month:02}-{day:02}"
+        else:
+            date_str = f"{year:04}-{month:02}-{day:02} {hour:02}:00:00"
 
         index_rows = (traj[:, 3] < end_time) * (traj[:, 6] > start_time)
 
         if sum(index_rows) == 0:
             res = [pd.NA for _ in df.columns[4:]]
-            res = [year, month, day, hour] + res
+            res = [date_str] + res
             df.append(pd.Series(res, index=df.columns), ignore_index=True)
             continue
 
@@ -202,10 +206,7 @@ def gps_stats(traj, df, frequency, timezone):
 
         if frequency == "hourly":
             res = [
-                year,
-                month,
-                day,
-                hour,
+                date_str,
                 obs_dur,
                 move_time,
                 pause_time,
@@ -217,9 +218,7 @@ def gps_stats(traj, df, frequency, timezone):
             df.append(pd.Series(res, index=df.columns), ignore_index=True)
         else:
             res = [
-                year,
-                month,
-                day,
+                date_str,
                 obs_dur,
                 obs_dur_day,
                 obs_dur_night,
