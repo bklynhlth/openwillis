@@ -181,6 +181,14 @@ def gps_stats(traj, df, frequency, timezone):
         )
         dist_traveled = sum(mov_vec)
 
+        # pause time + movement time
+        pause_time = sum(
+            (current_traj[:, 6] - current_traj[:, 3])[current_traj[:, 0] == 2]
+        )
+        move_time = sum(
+            (current_traj[:, 6] - current_traj[:, 3])[current_traj[:, 0] == 1]
+        )
+
         # home time + max dist from home
         d_home_1 = great_circle_dist(*home_coords, temp[:, 1], temp[:, 2])
         d_home_2 = great_circle_dist(*home_coords, temp[:, 4], temp[:, 5])
@@ -199,6 +207,8 @@ def gps_stats(traj, df, frequency, timezone):
                 day,
                 hour,
                 obs_dur,
+                move_time,
+                pause_time,
                 dist_traveled,
                 time_at_home,
                 max_dist_home,
@@ -213,6 +223,8 @@ def gps_stats(traj, df, frequency, timezone):
                 obs_dur,
                 obs_dur_day,
                 obs_dur_night,
+                move_time,
+                pause_time,
                 dist_traveled,
                 time_at_home,
                 max_dist_home,
@@ -345,6 +357,16 @@ def summary_stats(daily, summary):
     # total observed time
     total_observed_time = sum(daily.observed_time)
 
+    # mean movement time
+    mean_move_time = np.mean(daily.move_time)
+    # sd movement time
+    sd_move_time = np.std(daily.move_time)
+
+    # mean pause time
+    mean_pause_time = np.mean(daily.pause_time)
+    # sd pause time
+    sd_pause_time = np.std(daily.pause_time)
+
     # mean distance travelled
     mean_dist_travelled = np.mean(daily.dist_travelled)
     # sd distance travelled
@@ -368,6 +390,10 @@ def summary_stats(daily, summary):
     summary.loc[0] = [
         no_days,
         total_observed_time,
+        mean_move_time,
+        sd_move_time,
+        mean_pause_time,
+        sd_pause_time,
         mean_dist_travelled,
         sd_dist_travelled,
         mean_home_time,
