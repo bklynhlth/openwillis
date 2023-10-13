@@ -188,7 +188,9 @@ def gps_stats(traj, df, frequency, timezone):
 
         time_at_home = sum((current_traj[:, 6] - current_traj[:, 3])[d_home <= 50])
 
-        max_dist_home = max(np.concatenate((d_home_1, d_home_2)))
+        home_distances = np.concatenate((d_home_1, d_home_2))
+        max_dist_home = max(home_distances)
+        mean_dist_home = np.mean(home_distances)
 
         if frequency == "hourly":
             res = [
@@ -200,6 +202,7 @@ def gps_stats(traj, df, frequency, timezone):
                 dist_traveled,
                 time_at_home,
                 max_dist_home,
+                mean_dist_home,
             ]
             df.append(pd.Series(res, index=df.columns), ignore_index=True)
         else:
@@ -213,6 +216,7 @@ def gps_stats(traj, df, frequency, timezone):
                 dist_traveled,
                 time_at_home,
                 max_dist_home,
+                mean_dist_home,
             ]
             df.append(pd.Series(res, index=df.columns), ignore_index=True)
 
@@ -343,21 +347,23 @@ def summary_stats(daily, summary):
 
     # mean distance travelled
     mean_dist_travelled = np.mean(daily.dist_travelled)
-
     # sd distance travelled
     sd_dist_travelled = np.std(daily.dist_travelled)
 
     # mean home time
     mean_home_time = np.mean(daily.home_time)
-
     # sd home time
     sd_home_time = np.std(daily.home_time)
 
     # mean home max dist
     mean_home_max_dist = np.mean(daily.home_max_dist)
-
     # sd home max dist
     sd_home_max_dist = np.std(daily.home_max_dist)
+
+    # mean home mean dist
+    mean_home_mean_dist = np.mean(daily.home_mean_dist)
+    # sd home mean dist
+    sd_home_mean_dist = np.std(daily.home_mean_dist)
 
     summary.loc[0] = [
         no_days,
@@ -368,6 +374,8 @@ def summary_stats(daily, summary):
         sd_home_time,
         mean_home_max_dist,
         sd_home_max_dist,
+        mean_home_mean_dist,
+        sd_home_mean_dist,
     ]
 
     return summary

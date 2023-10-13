@@ -30,6 +30,7 @@ def create_empty_dataframes(config):
             config["dist_travelled"],
             config["home_time"],
             config["home_max_dist"],
+            config["home_mean_dist"],
         ]
     )
     daily = pd.DataFrame(
@@ -43,6 +44,7 @@ def create_empty_dataframes(config):
             config["dist_travelled"],
             config["home_time"],
             config["home_max_dist"],
+            config["home_mean_dist"],
         ]
     )
     summary = pd.DataFrame(
@@ -55,6 +57,8 @@ def create_empty_dataframes(config):
             config["sd_home_time"],
             config["mean_home_max_dist"],
             config["sd_home_max_dist"],
+            config["mean_home_mean_dist"],
+            config["sd_home_mean_dist"],
         ]
     )
 
