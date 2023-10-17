@@ -173,7 +173,7 @@ def get_whisperx_diariazation(filepath, HF_TOKEN, del_model, num_speakers, infra
     transcribe_json, audio = transcribe_whisper(filepath, model, device, compute_type, batch_size, infra_model, language)
 
     # Align whisper output
-    model_a, metadata = whisperx.load_align_model(language_code=transcribe_json["language"], device=device)
+    model_a, metadata = whisperx.load_align_model(language_code=language, device=device)
     align_json = whisperx.align(transcribe_json["segments"], model_a, metadata, audio, device, return_char_alignments=False)
 
     if del_model:
