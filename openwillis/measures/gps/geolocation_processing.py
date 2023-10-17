@@ -112,7 +112,7 @@ def gps_analysis(filepath, timezone):
         gutil.gps_quality(data)
         mean_acc = np.mean(data.accuracy)
 
-        mobmat1 = gps_to_mobmat(data, 10, 51, 51, mean_acc, 51)
+        mobmat1 = gps_to_mobmat(data, 10, 51, 10, mean_acc, 10)
         mobmat2 = infer_mobmat(mobmat1, 10, 51)
         out_dict = bv_select(
             mobmat2,
