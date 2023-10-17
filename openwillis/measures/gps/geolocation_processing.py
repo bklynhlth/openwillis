@@ -108,9 +108,18 @@ def gps_analysis(filepath, timezone):
         if data.shape == (0, 0):
             raise ValueError("No data available.")
 
+        if not ["timestamp", "latitude", "longitude", "accuracy"] == data.columns.tolist():
+            raise ValueError("Data does not have correct columns.")
+
         # quality check
         gutil.gps_quality(data)
         mean_acc = np.mean(data.accuracy)
+
+        # change format for forest imputation by creating empty columns
+        data["UTC time"] = pd.NA
+        data["altitude"] = pd.NA
+
+        data = data[["timestamp", "UTC time", "latitude", "longitude", "altitude", "accuracy"]]
 
         mobmat1 = gps_to_mobmat(data, 10, 51, 10, mean_acc, 10)
         mobmat2 = infer_mobmat(mobmat1, 10, 51)
