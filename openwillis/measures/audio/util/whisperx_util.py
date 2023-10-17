@@ -165,23 +165,23 @@ def get_whisperx_diariazation(filepath, HF_TOKEN, del_model, num_speakers, infra
     json_response = '{}'
     transcript = ''
     
-    #try:
-    if torch.cuda.is_available():
-        device = 'cuda'
-        compute_type = "float16"
-
-    transcribe_json, audio = transcribe_whisper(filepath, model, device, compute_type, batch_size, infra_model, language)
-
-    # Align whisper output
-    model_a, metadata = whisperx.load_align_model(language_code=language, device=device)
-    align_json = whisperx.align(transcribe_json["segments"], model_a, metadata, audio, device, return_char_alignments=False)
-
-    if del_model:
-        delete_model(model_a)
-        
-    json_response = get_diarization(audio, align_json, HF_TOKEN, device, num_speakers, infra_model)    
-    transcript = get_transcribe_summary(json_response)
+    try:
+        if torch.cuda.is_available():
+            device = 'cuda'
+            compute_type = "float16"
     
-    #except Exception as e:
-        #logger.error(f'Error in speech Transcription: {e} & File: {filepath}')
+        transcribe_json, audio = transcribe_whisper(filepath, model, device, compute_type, batch_size, infra_model, language)
+    
+        # Align whisper output
+        model_a, metadata = whisperx.load_align_model(language_code=language, device=device)
+        align_json = whisperx.align(transcribe_json["segments"], model_a, metadata, audio, device, return_char_alignments=False)
+    
+        if del_model:
+            delete_model(model_a)
+            
+        json_response = get_diarization(audio, align_json, HF_TOKEN, device, num_speakers, infra_model)    
+        transcript = get_transcribe_summary(json_response)
+    
+    except Exception as e:
+        logger.error(f'Error in speech Transcription: {e} & File: {filepath}')
     return json_response, transcript
