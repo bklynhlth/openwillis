@@ -90,7 +90,7 @@ def get_transcribe_summary(json_response):
         summary = "".join([item['text'] for item in json_response["segments"] if item.get('text', '')])
     return summary
 
-def transcribe_whisper(filepath, model, device, compute_type, batch_size, infra_model):
+def transcribe_whisper(filepath, model, device, compute_type, batch_size, infra_model, language):
     """
     ------------------------------------------------------------------------------------------------------
    
@@ -110,6 +110,8 @@ def transcribe_whisper(filepath, model, device, compute_type, batch_size, infra_
         batch size
     infra_model:list
         whisper model artifacts (this is optional param: to optimize willisInfra) 
+    language: str
+        language code
 
         
     ------------------------------------------------------------------------------------------------------
@@ -121,10 +123,10 @@ def transcribe_whisper(filepath, model, device, compute_type, batch_size, infra_
         model_whisp = infra_model[1] #passing param from willismeansure
     audio = whisperx.load_audio(filepath)
 
-    transcribe_json = model_whisp.transcribe(audio, batch_size=batch_size)
+    transcribe_json = model_whisp.transcribe(audio, batch_size=batch_size, language=language)
     return transcribe_json, audio
 
-def get_whisperx_diariazation(filepath, HF_TOKEN, del_model, num_speakers, infra_model):
+def get_whisperx_diariazation(filepath, HF_TOKEN, del_model, num_speakers, infra_model, language):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -142,6 +144,8 @@ def get_whisperx_diariazation(filepath, HF_TOKEN, del_model, num_speakers, infra
         Number of speaker
     infra_model: list
         whisper model artifacts (this is optional param: to optimize willisInfra) 
+    language: str
+        language code
 
     Returns:
     ...........
@@ -165,13 +169,13 @@ def get_whisperx_diariazation(filepath, HF_TOKEN, del_model, num_speakers, infra
         if torch.cuda.is_available():
             device = 'cuda'
             compute_type = "float16"
-
-        transcribe_json, audio = transcribe_whisper(filepath, model, device, compute_type, batch_size, infra_model)
-
+    
+        transcribe_json, audio = transcribe_whisper(filepath, model, device, compute_type, batch_size, infra_model, language)
+    
         # Align whisper output
-        model_a, metadata = whisperx.load_align_model(language_code=transcribe_json["language"], device=device)
+        model_a, metadata = whisperx.load_align_model(language_code=language, device=device)
         align_json = whisperx.align(transcribe_json["segments"], model_a, metadata, audio, device, return_char_alignments=False)
-
+    
         if del_model:
             delete_model(model_a)
             
