@@ -134,7 +134,7 @@ def gps_analysis(filepath, timezone):
         )
         imp_table = impute_gps(
             mobmat2,
-            bv_set,
+            out_dict["BV_set"],
             "GLC",
             3,
             10,
