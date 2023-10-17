@@ -36,14 +36,14 @@ def gps_quality(data):
     start_time = data.timestamp.iloc[0]
 
     # calculate number of hours
-    num_hours = int((end_time - start_time) / 3600) + 1
+    num_hours = int((end_time - start_time) / 3600 / 1000) + 1
 
     # check if there are at least 10 observations per hour
     quality_check = 0
     for hour in range(num_hours):
         hour_data = data[
-            (data.timestamp >= start_time + hour * 3600)
-            & (data.timestamp < start_time + (hour + 1) * 3600)
+            (data.timestamp >= start_time + hour * 3600 * 1000)
+            & (data.timestamp < start_time + (hour + 1) * 3600 * 1000)
         ]
         if hour_data.shape[0] > 60:
             quality_check += 1
