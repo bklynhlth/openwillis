@@ -6,6 +6,7 @@ import logging
 import numpy as np
 import pandas as pd
 
+from forest.jasmine.data2mobmat import great_circle_dist
 from forest.jasmine.mobmat2traj import locate_home
 from forest.poplar.legacy.common_funcs import datetime2stamp, stamp2datetime
 
