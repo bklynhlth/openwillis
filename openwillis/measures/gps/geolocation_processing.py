@@ -12,7 +12,7 @@ from forest.jasmine.data2mobmat import gps_to_mobmat, infer_mobmat
 from forest.jasmine.mobmat2traj import imp_to_traj, impute_gps
 from forest.jasmine.sogp_gps import bv_select
 
-import util.gps_util as gutil
+from openwillis.measures.gps.util import gps_util as gutil
 
 logging.basicConfig(level=logging.INFO)
 logger=logging.getLogger()
