@@ -122,25 +122,25 @@ def gps_analysis(filepath, timezone):
         data = data[["timestamp", "UTC time", "latitude", "longitude", "altitude", "accuracy"]]
 
         mobmat1 = gps_to_mobmat(data, 10, 51, 10, mean_acc, 10)
-        mobmat2 = infer_mobmat(mobmat1, 10, 51)
+        mobmat2 = infer_mobmat(mobmat1, 10, 10)
         out_dict = bv_select(
-            mobmat2,
-            0.01,
-            0.05,
-            100,
-            [60 * 60 * 24 * 10, 60 * 60 * 24 * 30, 0.002, 5, 1, 0.3, 0.2, 0.5],
+            mobmat2, 0.01, 0.05, 100,
+            [
+                60 * 60 * 24 * 10, 60 * 60 * 24 * 30,
+                0.002, 5, 1, 0.3, 0.2, 0.5
+            ],
             None,
             None,
         )
         imp_table = impute_gps(
             mobmat2,
             out_dict["BV_set"],
-            "GLC",
-            3,
-            10,
-            2,
+            "GLC", 3, 10, 2,
             timezone,
-            [60 * 60 * 24 * 10, 60 * 60 * 24 * 30, 5, 1, 0.3, 0.2, 0.5, 200],
+            [
+                60 * 60 * 24 * 10, 60 * 60 * 24 * 30,
+                5, 1, 0.3, 0.2, 0.5, 200
+            ],
         )
         traj = imp_to_traj(imp_table, mobmat2, mean_acc)
         # raise error if traj coordinates are not in the range of
