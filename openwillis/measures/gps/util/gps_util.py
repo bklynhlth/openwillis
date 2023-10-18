@@ -49,7 +49,7 @@ def gps_quality(data):
         if hour_data.shape[0] > 60:
             quality_check += 1
 
-    if quality_check < 0.5 * num_hours:
+    if quality_check < 0.05 * num_hours:
         raise ValueError("Data does not have enough observations per hour.")
 
 
@@ -120,11 +120,13 @@ def gps_stats(traj, df, frequency, timezone):
     if frequency == "hourly":
         start_time_list[4:6] = [0, 0]
         end_time_list[4:6] = [0, 0]
+        offset = 3600
     else:
         start_time_list[3:6] = [0, 0, 0]
         end_time_list[3:6] = [0, 0, 0]
+        offset = 3600 * 24
     start_stamp = datetime2stamp(start_time_list, timezone)
-    end_stamp = datetime2stamp(end_time_list, timezone)
+    end_stamp = datetime2stamp(end_time_list, timezone) + offset
 
     window = 3600
     if frequency == "daily":
@@ -156,7 +158,7 @@ def gps_stats(traj, df, frequency, timezone):
         # observed time
         obs_dur = sum(
             (current_traj[:, 6] - current_traj[:, 3])[current_traj[:, 7] == 1]
-        )
+        ) / 3600
 
         if frequency == "daily":
             day_index, night_index = day_night_split(current_traj, timezone)
@@ -166,13 +168,13 @@ def gps_stats(traj, df, frequency, timezone):
                 (current_traj[day_index, 6] - current_traj[day_index, 3])[
                     current_traj[day_index, 7] == 1
                 ]
-            )
+            ) / 3600
             # observed time night
             obs_dur_night = sum(
                 (current_traj[night_index, 6] - current_traj[night_index, 3])[
                     current_traj[night_index, 7] == 1
                 ]
-            )
+            ) / 3600
 
         # distance travelled
         mov_vec = np.round(
@@ -184,26 +186,26 @@ def gps_stats(traj, df, frequency, timezone):
             ),
             0,
         )
-        dist_traveled = sum(mov_vec)
+        dist_traveled = sum(mov_vec) / 1000
 
         # pause time + movement time
         pause_time = sum(
             (current_traj[:, 6] - current_traj[:, 3])[current_traj[:, 0] == 2]
-        )
+        ) / 3600
         move_time = sum(
             (current_traj[:, 6] - current_traj[:, 3])[current_traj[:, 0] == 1]
-        )
+        ) / 3600
 
         # home time + max dist from home
-        d_home_1 = great_circle_dist(*home_coords, temp[:, 1], temp[:, 2])
-        d_home_2 = great_circle_dist(*home_coords, temp[:, 4], temp[:, 5])
+        d_home_1 = great_circle_dist(*home_coords, current_traj[:, 1], current_traj[:, 2])
+        d_home_2 = great_circle_dist(*home_coords, current_traj[:, 4], current_traj[:, 5])
         d_home = (d_home_1 + d_home_2) / 2
 
-        time_at_home = sum((current_traj[:, 6] - current_traj[:, 3])[d_home <= 50])
+        time_at_home = sum((current_traj[:, 6] - current_traj[:, 3])[d_home <= 50]) / 3600
 
         home_distances = np.concatenate((d_home_1, d_home_2))
-        max_dist_home = max(home_distances)
-        mean_dist_home = np.mean(home_distances)
+        max_dist_home = max(home_distances) / 1000
+        mean_dist_home = np.mean(home_distances) / 1000
 
         if frequency == "hourly":
             res = [
@@ -216,7 +218,6 @@ def gps_stats(traj, df, frequency, timezone):
                 max_dist_home,
                 mean_dist_home,
             ]
-            df.append(pd.Series(res, index=df.columns), ignore_index=True)
         else:
             res = [
                 date_str,
@@ -230,7 +231,8 @@ def gps_stats(traj, df, frequency, timezone):
                 max_dist_home,
                 mean_dist_home,
             ]
-            df.append(pd.Series(res, index=df.columns), ignore_index=True)
+
+        df = pd.concat([df, pd.DataFrame([res], columns=df.columns)], ignore_index=True)
 
     return df
 
