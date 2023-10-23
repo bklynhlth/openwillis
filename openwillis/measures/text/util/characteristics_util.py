@@ -472,18 +472,21 @@ def filter_phrases(item_data, speaker_label, measures):
 
     phrases_idxs, phrases = [], []
     for item in item_data:
+        try:
 
-        start_idx = item["words"][0][measures["old_index"]]
-        end_idx = item["words"][-1][measures["old_index"]]
+            start_idx = item["words"][0][measures["old_index"]]
+            end_idx = item["words"][-1][measures["old_index"]]
 
-        if speaker_label is not None:
-            if item["speaker"] == speaker_label:
+            if speaker_label is not None:
+                if item["speaker"] == speaker_label:
+                    phrases.append(item["text"])
+                    phrases_idxs.append((start_idx, end_idx))
+            else:
                 phrases.append(item["text"])
                 phrases_idxs.append((start_idx, end_idx))
-        else:
-            phrases.append(item["text"])
-            phrases_idxs.append((start_idx, end_idx))
 
+        except Exception as e:
+            logger.error(f"Failed to filter phrases: {e}")
     return phrases_idxs, phrases
 
 
@@ -577,14 +580,18 @@ def filter_json_transcribe(item_data, speaker_label, measures):
     # phrase filtering
     item_data2 = []
     for item in item_data:
-        speaker = item["speaker"]
-        words = item["words"]
-
-        # update speaker labels
-        for j, w in enumerate(words):
-            words[j]["speaker"] = speaker
-        
-        item_data2 += words
+        try:
+            
+            speaker = item["speaker"]
+            words = item["words"]
+    
+            # update speaker labels
+            for j, w in enumerate(words):
+                words[j]["speaker"] = speaker
+            
+            item_data2 += words
+        except Exception as e:
+            logger.error(f"Failed to filter word: {e}")
     
     filter_json = [
         item for item in item_data2
