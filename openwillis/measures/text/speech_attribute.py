@@ -203,7 +203,8 @@ def speech_characteristics(json_conf, language="en-us", speaker_label=None):
     """
     measures = get_config(os.path.abspath(__file__), "text.json")
     df_list = cutil.create_empty_dataframes(measures)
-
+    language = language.lower()
+    
     try:
         if bool(json_conf):
             cutil.download_nltk_resources()
