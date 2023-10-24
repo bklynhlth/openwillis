@@ -449,12 +449,14 @@ def transcribe_response_to_dataframe(response):
                 items = response['results']["items"]
                 df = pd.DataFrame(items)
 
-                df["confidence"] = df["alternatives"].apply(lambda x: x[0]["confidence"])
-                df["content"] = df["alternatives"].apply(lambda x: x[0]["content"])
+                df["confidence"] = df["alternatives"].apply(lambda x: x[0].get("confidence", 0))
+                df["content"] = df["alternatives"].apply(lambda x: x[0].get("content", ""))
                 df["confidence"] = df["confidence"].astype(float)
 
                 df = df[df["confidence"] > 0].reset_index(drop=True)
                 df = df[["start_time", "end_time", "confidence", "speaker_label", "content"]]
+                df = df.dropna()
+                
     return df, speakers
 
 def get_segment_signal(audio_signal, df):
