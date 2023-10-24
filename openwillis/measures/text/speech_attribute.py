@@ -105,9 +105,9 @@ def filter_transcribe(json_conf, measures, speaker_label=None):
     # extract text
     text = " ".join(
         [
-            item["alternatives"][0]["content"]
+            item["alternatives"][0].get("content", "")
             for item in item_data
-            if "alternatives" in item
+            if "alternatives" in item and len(item["alternatives"]) > 0
         ]
     )
 
