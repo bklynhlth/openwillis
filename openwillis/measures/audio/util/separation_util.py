@@ -455,7 +455,7 @@ def transcribe_response_to_dataframe(response):
 
                 df = df[df["confidence"] > 0].reset_index(drop=True)
                 df = df[["start_time", "end_time", "confidence", "speaker_label", "content"]]
-                df = df.dropna()
+                df = df.dropna().reset_index(drop=true)
                 
     return df, speakers
 
