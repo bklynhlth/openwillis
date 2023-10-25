@@ -288,7 +288,7 @@ def match_transcript(measures, speech):
     """
     prob_list = []
 
-    model = SentenceTransformer('bert-base-nli-mean-tokens')
+    model = SentenceTransformer('sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2')
     panss_script = measures['panss_string'][1:-1].split(',')#hardcode for PANSS
 
     for script in panss_script:
