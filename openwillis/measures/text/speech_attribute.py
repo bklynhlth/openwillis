@@ -10,7 +10,6 @@ import nltk
 import numpy as np
 import pandas as pd
 from openwillis.measures.text.util import characteristics_util as cutil
-from util import characteristics_util as cutil
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger()
@@ -230,7 +229,7 @@ def filter_vosk(json_conf, measures):
         
     return words, text
 
-def common_summary_feature(df_summ, json_data, model):
+def common_summary_feature(df_summ, json_data, model, speaker_label):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -244,6 +243,8 @@ def common_summary_feature(df_summ, json_data, model):
         A dataframe containing summary information on the speech
     model: str
         model name
+    speaker_label: str
+        Speaker label
 
     Returns:
     ...........
@@ -262,12 +263,13 @@ def common_summary_feature(df_summ, json_data, model):
         else:
             if model == 'aws':
                 json_data = json_data["results"]
-                fl_length, spk_pct = cutil.calculate_file_feature(json_data, model)
+                fl_length, spk_pct = cutil.calculate_file_feature(json_data, model, speaker_label)
 
             else:
-                fl_length, spk_pct = cutil.calculate_file_feature(json_data, model)
+                fl_length, spk_pct = cutil.calculate_file_feature(json_data, model, speaker_label)
+            
             df_summ['file_length'] = [fl_length]
-            df_summ['speaker_percentage'] = [spk_pct]
+            df_summ['speaker_percentage'] = [spk_pct]# if speaker_label is not None else df_summ['speaker_percentage']
             
     except Exception as e:
         logger.error("Error in file length calculation")
@@ -303,7 +305,7 @@ def process_transcript(df_list, json_conf, measures, min_turn_length, speaker_la
     
     ------------------------------------------------------------------------------------------------------
     """
-    common_summary_feature(df_list[2], json_conf, source)
+    common_summary_feature(df_list[2], json_conf, source, speaker_label)
 
     if source == 'whisper':
         info = filter_whisper(json_conf, measures, min_turn_length, speaker_label)

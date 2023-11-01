@@ -886,7 +886,7 @@ def get_sentiment(df_list, text_list, measures):
     df_list = [word_df, turn_df, summ_df]
     return df_list
 
-def calculate_file_feature(json_data, model):
+def calculate_file_feature(json_data, model, speakers):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -903,17 +903,22 @@ def calculate_file_feature(json_data, model):
 
     ------------------------------------------------------------------------------------------------------
     """
-    speakers = ['clinician', 'speaker0']
     
     if model == 'aws':
         segments = json_data.get('items', [])
         file_length = max(float(segment.get("end_time", "0")) for segment in segments)
+        
+        if speakers is None:
+            return file_length, np.NaN
 
         speaking_time = sum(float(segment.get("end_time", "0") or "0") - float(segment.get("start_time", "0") or "0")
                            for segment in segments if segment.get("speaker_label", "") in speakers)
     else:
         segments = json_data.get('segments', [])
         file_length = max(segment.get('end', 0) for segment in segments)
+        
+        if speakers is None:
+            return file_length, np.NaN
         speaking_time = sum(segment['end'] - segment['start'] for segment in segments if segment.get('speaker', '') in speakers)
 
     speaking_pct = (speaking_time / file_length) * 100
