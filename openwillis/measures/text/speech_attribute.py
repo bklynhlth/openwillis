@@ -9,7 +9,7 @@ import logging
 import nltk
 import numpy as np
 import pandas as pd
-#from openwillis.measures.text.util import characteristics_util as cutil
+from openwillis.measures.text.util import characteristics_util as cutil
 from util import characteristics_util as cutil
 
 logging.basicConfig(level=logging.INFO)
@@ -83,7 +83,6 @@ def is_whisper_transcribe(json_conf):
             return True
     return False
 
-
 def filter_transcribe(json_conf, measures, speaker_label=None):
     """
     ------------------------------------------------------------------------------------------------------
@@ -115,44 +114,25 @@ def filter_transcribe(json_conf, measures, speaker_label=None):
     ------------------------------------------------------------------------------------------------------
     """
     item_data = json_conf["results"]["items"]
-
-    # make a dictionary to map old indices to new indices
-    item_data = cutil.create_index_column(item_data, measures)
+    
+    for i, item in enumerate(item_data): # create_index_column
+        item[measures["old_index"]] = i
 
     # extract text
-    text = " ".join(
-        [
-            item["alternatives"][0]["content"]
-            for item in item_data
-            if "alternatives" in item
-        ]
-    )
-
-    # phrase-split
+    text = " ".join([item["alternatives"][0]["content"] for item in item_data if "alternatives" in item])
     phrases, phrases_idxs = cutil.phrase_split(text)
 
-    # turn-split
-    turns = []
-    turns_idxs = []
-
     if speaker_label is not None:
+        turns_idxs, turns = cutil.filter_speaker_aws(item_data, speaker_label)
+    else:
+        turns_idxs, turns = [], []
 
-        turns_idxs, turns, phrases_idxs, phrases = cutil.filter_speaker(
-            item_data, speaker_label, turns_idxs, turns, phrases_idxs, phrases
-        )
-
-    # entire transcript - by joining all the phrases
     text = " ".join(phrases)
-
-    # filter json to only include items with start_time and end_time
-    filter_json = cutil.filter_json_transcribe(item_data, speaker_label, measures)
-
-    # extract words
+    filter_json = cutil.filter_json_transcribe_aws(item_data, speaker_label, measures)
     words = [word["alternatives"][0]["content"] for word in filter_json]
 
-    text_list = [words, phrases, turns, text]
+    text_list = [words, turns, text]
     text_indices = [phrases_idxs, turns_idxs]
-
     return filter_json, text_list, text_indices
 
 
@@ -250,6 +230,118 @@ def filter_vosk(json_conf, measures):
         
     return words, text
 
+def common_summary_feature(df_summ, json_data, model):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    Calculate file features based on JSON data.
+
+    Parameters:
+    ...........
+    json_conf: list
+        JSON response object.
+    summ_df: pandas dataframe
+        A dataframe containing summary information on the speech
+    model: str
+        model name
+
+    Returns:
+    ...........
+    summ_df: pandas dataframe
+        A dataframe containing summary information on the speech
+
+    ------------------------------------------------------------------------------------------------------
+    """
+    try:
+        if model == 'vosk':
+            if len(json_data) > 0 and 'end' in json_data[-1]:
+
+                last_dict = json_data[-1]
+                df_summ['file_length'] = [last_dict['end']]
+
+        else:
+            if model == 'aws':
+                json_data = json_data["results"]
+                fl_length, spk_pct = cutil.calculate_file_feature(json_data, model)
+
+            else:
+                fl_length, spk_pct = cutil.calculate_file_feature(json_data, model)
+            df_summ['file_length'] = [fl_length]
+            df_summ['speaker_percentage'] = [spk_pct]
+            
+    except Exception as e:
+        logger.error("Error in file length calculation")
+    return df_summ
+
+def process_transcript(df_list, json_conf, measures, min_turn_length, speaker_label, source, language):
+    """
+    ------------------------------------------------------------------------------------------------------
+    
+    Process transcript
+    
+    Parameters:
+    ...........
+    df_list: list, :
+        contains pandas dataframe
+    json_conf: dict
+        Transcribed json file
+    measures: dict
+        A dictionary containing the names of the columns in the output dataframes.
+    min_turn_length: int
+        minimum words required in each turn
+    speaker_label: str
+        Speaker label
+    source: str
+        model name
+    language: str
+        Language type
+    
+    Returns:
+    ...........
+    df_list: list
+        contains pandas dataframe
+    
+    ------------------------------------------------------------------------------------------------------
+    """
+    common_summary_feature(df_list[2], json_conf, source)
+
+    if source == 'whisper':
+        info = filter_whisper(json_conf, measures, min_turn_length, speaker_label)
+        
+    elif source == 'aws':
+        info = filter_transcribe(json_conf, measures, speaker_label)
+        
+    else:
+        words, text = filter_vosk(json_conf, measures)
+        info = (json_conf, [words, [], text], [[], []])
+
+    if len(info[0]) > 0 and len(info[1][-1]) > 0:
+        df_list = cutil.process_language_feature(df_list, info, language, get_time_columns(source), measures)
+    return df_list
+
+def get_time_columns(source):
+    """
+    ------------------------------------------------------------------------------------------------------
+    
+    get time columns
+    
+    Parameters:
+    ...........
+    source: str
+        model name
+    
+    Returns:
+    ...........
+    object: list
+        time index name
+        
+    ------------------------------------------------------------------------------------------------------
+    """
+    if source == 'aws':
+        return ["start_time", "end_time"]
+    else:
+        return ["start", "end"]
+
 def speech_characteristics(json_conf, language="en", speaker_label=None, min_turn_length=1):
     """
     ------------------------------------------------------------------------------------------------------
@@ -272,8 +364,6 @@ def speech_characteristics(json_conf, language="en", speaker_label=None, min_tur
     df_list: list, contains:
         word_df: pandas dataframe
             A dataframe containing word summary information
-        phrase_df: pandas dataframe
-            A dataframe containing phrase summary information
         turn_df: pandas dataframe
             A dataframe containing turn summary information
         summ_df: pandas dataframe
@@ -281,34 +371,31 @@ def speech_characteristics(json_conf, language="en", speaker_label=None, min_tur
 
     ------------------------------------------------------------------------------------------------------
     """
-
-    measures = get_config(os.path.abspath(__file__), "text.json")
-    df_list = cutil.create_empty_dataframes(measures)
-    
     try:
+        # Load configuration measures
+        measures = get_config(os.path.abspath(__file__), "text.json")
+        df_list = cutil.create_empty_dataframes(measures)
+
         if bool(json_conf):
-            language = "na" if language is None or len(language) < 2 else language[:2].lower()
+            language = language[:2].lower() if (language and len(language) >= 2) else "na"
 
             if language == 'en':
                 cutil.download_nltk_resources()
 
             if is_whisper_transcribe(json_conf):
-                filter_json, text_list, text_indices = filter_whisper(json_conf, measures, min_turn_length, speaker_label)
+                df_list = process_transcript(df_list, json_conf, measures, min_turn_length, speaker_label, 'whisper', language)
 
-                if len(filter_json) > 0 and len(text_list[-1]) > 0:
-                    df_list = cutil.process_language_feature(filter_json, df_list, text_list, text_indices, language, measures)
+            elif is_amazon_transcribe(json_conf):
+                df_list = process_transcript(df_list, json_conf, measures, min_turn_length, speaker_label, 'aws', language)
 
             else:
-                words, text = filter_vosk(json_conf, measures)
-                if len(text) > 0:
-                    df_list = cutil.process_language_feature(json_conf, df_list, [words,[],[],text],[[],[]], language, measures)
-        
-        
+                df_list = process_transcript(df_list, json_conf, measures, min_turn_length, speaker_label, 'vosk', language)
+
     except Exception as e:
         logger.error(f"Error in Speech Characteristics {e}")
 
     finally:
         for df in df_list:
             df.loc[0] = np.nan if df.empty else df.loc[0]
-    
+
     return df_list

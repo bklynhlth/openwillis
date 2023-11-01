@@ -33,6 +33,8 @@
   "speech_words": "speech_length_words",
   "turn_minutes": "turn_length_minutes",
   "turn_words": "turn_length_words",
+  "file_length": "file_length",
+  "speaker_percentage": "speaker_percentage",
   "word_rate": "words_per_min",
   "syllable_rate": "syllables_per_min",
   "pause_rate": "pauses_per_min",
