@@ -376,7 +376,7 @@ def pause_calculation(filter_json, measures, time_index):
     """
     for i, item in enumerate(filter_json):
         if i > 0:
-            item[measures["pause"]] = float(item[time_index[0]]) - float(filter_json[i - 1][time_index[0]])
+            item[measures["pause"]] = float(item[time_index[0]]) - float(filter_json[i - 1][time_index[1]])
         
         else:
             item[measures["pause"]] = np.nan
