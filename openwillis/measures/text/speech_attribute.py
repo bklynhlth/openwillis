@@ -170,15 +170,15 @@ def filter_whisper(json_conf, measures, min_turn_length, speaker_label=None):
     ------------------------------------------------------------------------------------------------------
     """
     item_data = json_conf["segments"]
-
-    text = " ".join(item["text"] for item in item_data)
+    text = " ".join(item.get("text", "") for item in item_data)
 
     if speaker_label is not None:
         item_data = [segment for segment in item_data if "speaker" in segment]
         
     item_data = cutil.create_index_column(item_data, measures)
-    if speaker_label is not None:
+    if speaker_label is not None:    
         turns_idxs, turns = cutil.filter_turns(item_data, speaker_label, measures, min_turn_length)
+        
         text = " ".join(turns)
     else:
         turns_idxs, turns = [], []
