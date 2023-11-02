@@ -121,10 +121,11 @@ def filter_transcribe(json_conf, measures, min_turn_length, speaker_label=None):
 
     if speaker_label is not None:
         turns_idxs, turns = cutil.filter_speaker_aws(item_data, min_turn_length, speaker_label)
+        text = " ".join(turns)
+        
     else:
         turns_idxs, turns = [], []
 
-    text = " ".join(turns)
     filter_json = cutil.filter_json_transcribe_aws(item_data, speaker_label, measures)
     words = [word["alternatives"][0]["content"] for word in filter_json]
 
@@ -183,7 +184,7 @@ def filter_whisper(json_conf, measures, min_turn_length, speaker_label=None):
     # filter json to only include items with start_time and end_time
     filter_json = cutil.filter_json_transcribe(item_data, speaker_label, measures)
     words = [value["word"] for value in filter_json]
-    text = " ".join(turns)
+    text = " ".join(words)
     
     text_list = [words, turns, text]
     return filter_json, text_list, turns_idxs
