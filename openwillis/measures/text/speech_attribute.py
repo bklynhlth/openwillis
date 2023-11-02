@@ -85,9 +85,8 @@ def is_whisper_transcribe(json_conf):
 def filter_transcribe(json_conf, measures, speaker_label=None):
     """
     ------------------------------------------------------------------------------------------------------
-    This function extracts the text and filters the JSON data
-     for Amazon Transcribe json response objects.
-     Also, it filters the JSON data based on the speaker label if provided.
+    This function extracts the text and filters the JSON data for Amazon Transcribe json response objects.
+    Also, it filters the JSON data based on the speaker label if provided.
     Parameters:
     ...........
     json_conf: dict
@@ -103,13 +102,9 @@ def filter_transcribe(json_conf, measures, speaker_label=None):
         only the relevant data for processing.
     text_list: list
         List of transcribed text.
-         split into words, phrases, turns, and full text.
+         split into words, turns, and full text.
     text_indices: list
         List of indices for text_list.
-         for phrases and turns.
-    Raises:
-    ...........
-    ValueError: If the speaker label is not found in the json response object.
     ------------------------------------------------------------------------------------------------------
     """
     item_data = json_conf["results"]["items"]
