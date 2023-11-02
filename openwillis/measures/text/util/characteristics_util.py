@@ -922,7 +922,7 @@ def calculate_file_feature(json_data, model, speakers):
         speaking_time = sum(segment['end'] - segment['start'] for segment in segments if segment.get('speaker', '') in speakers)
 
     speaking_pct = (speaking_time / file_length) * 100
-    return file_length, speaking_pct
+    return file_length/60, speaking_pct
 
 def process_language_feature(df_list, transcribe_info, language, time_index, measures):
     """
