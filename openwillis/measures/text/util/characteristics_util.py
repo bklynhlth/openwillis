@@ -95,41 +95,8 @@ def download_nltk_resources():
         nltk.data.find("averaged_perceptron_tagger")
     except LookupError:
         nltk.download("averaged_perceptron_tagger")
-        
-def phrase_split(text):
-    """
-    ------------------------------------------------------------------------------------------------------
 
-    This function splits the input text into phrases.
-
-    Parameters:
-    ...........
-    text: str
-        The input text.
-
-    Returns:
-    ...........
-    phrases: list
-        A list of phrases extracted from the input text.
-    phrases_idxs: list
-        A list of tuples containing
-            the start and end indices of the phrases in the input text.
-
-    ------------------------------------------------------------------------------------------------------
-    """
-    phrases = nltk.tokenize.sent_tokenize(text)
-    phrases_idxs = []
-
-    start_idx = 0
-    for phrase in phrases:
-        end_idx = start_idx + len(phrase.split()) - 1
-        
-        phrases_idxs.append((start_idx, end_idx))
-        start_idx = end_idx + 1
-
-    return phrases, phrases_idxs
-
-def filter_turn_aws(item_data, speaker_label):
+def filter_turn_aws(item_data, min_turn_length, speaker_label):
     """
     ------------------------------------------------------------------------------------------------------
     
@@ -140,6 +107,8 @@ def filter_turn_aws(item_data, speaker_label):
     ...........
     item_data: dict
         JSON response object.
+    min_turn_length: int
+        minimum words required in each turn
     speaker_label: str
         Speaker label
         
@@ -160,38 +129,46 @@ def filter_turn_aws(item_data, speaker_label):
         try:
             if (i > 0 and item.get("speaker_label", "") == speaker_label and item_data[i - 1].get("speaker_label", "") != speaker_label):
                 start_idx = i
+            
             elif (i > 0 and item.get("speaker_label", "") != speaker_label and item_data[i - 1].get("speaker_label", "") == speaker_label):
-                turns_idxs.append((start_idx, i - 1))
-                turns.append(" ".join([item["alternatives"][0]["content"] for item in item_data[start_idx:i]]))
+                turn_text = " ".join([item["alternatives"][0]["content"] for item in item_data[start_idx:i]])
+
+                if len(turn_text.split(" ")) >= min_turn_length:
+                    turns_idxs.append((start_idx, i - 1))
+                    turns.append(turn_text)
                 
         except Exception as e:
             logger.error(f"Error in turn-split for speaker {speaker_label}: {e}")
             continue
 
     if start_idx not in [item[0] for item in turns_idxs]:
-        turns_idxs.append((start_idx, len(item_data) - 1))
-        
-        turns.append(" ".join([item["alternatives"][0]["content"] for item in item_data[start_idx:]]))
+        turn_text = " ".join([item["alternatives"][0]["content"] for item in item_data[start_idx:]])
+
+        if len(turn_text.split(" ")) >= min_turn_length:
+            turns_idxs.append((start_idx, len(item_data) - 1))
+
+            turns.append(turn_text)
     return turns_idxs, turns
 
-def filter_speaker_aws(item_data, speaker_label):
+def filter_speaker_aws(item_data, min_turn_length, speaker_label):
     """
     ------------------------------------------------------------------------------------------------------
 
-    This function updates the turns and phrases lists
-        to only include the speaker label provided.
+    This function updates the turns lists to only include the speaker label provided.
 
     Parameters:
     ...........
     item_data: dict
         JSON response object.
+    min_turn_length: int
+        minimum words required in each turn
     speaker_label: str
         Speaker label
+
     Returns:
     ...........
     turns_idxs: list
-        A list of tuples containing
-            the start and end indices of the turns in the JSON object.
+        A list of tuples containing the start and end indices of the turns in the JSON object.
     turns: list
         A list of turns extracted from the JSON object.
 
@@ -203,7 +180,7 @@ def filter_speaker_aws(item_data, speaker_label):
     if speaker_label not in speaker_labels:
         logger.error(f"Speaker label {speaker_label} not found in the json response object.")
 
-    turns_idxs, turns = filter_turn_aws(item_data, speaker_label)
+    turns_idxs, turns = filter_turn_aws(item_data, min_turn_length, speaker_label)
     return turns_idxs, turns
 
 def filter_json_transcribe_aws(item_data, speaker_label, measures):
@@ -235,53 +212,6 @@ def filter_json_transcribe_aws(item_data, speaker_label, measures):
         filter_json = [item for item in filter_json if item.get("speaker_label", "") == speaker_label]
 
     return filter_json
-        
-def filter_phrases(item_data, speaker_label, measures):
-    """
-    ------------------------------------------------------------------------------------------------------
-    
-    This function updates the phrases list
-        to only include the speaker label provided.
-
-    Parameters:
-    ...........
-    item_data: dict
-        JSON response object.
-    speaker_label: str
-        Speaker label
-    measures: dict
-        A dictionary containing the names of the columns in the output dataframes.
-
-    Returns:
-    ...........
-    phrases_idxs: list
-        A list of tuples containing
-            the start and end indices of the phrases in the JSON object.
-    phrases: list
-        A list of phrases extracted from the JSON object.
-
-    ------------------------------------------------------------------------------------------------------
-    """
-
-
-    phrases_idxs, phrases = [], []
-    for item in item_data:
-        try:
-
-            start_idx = item["words"][0][measures["old_index"]]
-            end_idx = item["words"][-1][measures["old_index"]]
-
-            if speaker_label is not None:
-                if item["speaker"] == speaker_label:
-                    phrases.append(item["text"])
-                    phrases_idxs.append((start_idx, end_idx))
-            else:
-                phrases.append(item["text"])
-                phrases_idxs.append((start_idx, end_idx))
-
-        except Exception as e:
-            logger.error(f"Failed to filter phrases: {e}")
-    return phrases_idxs, phrases
 
 def filter_turns(item_data, speaker_label, measures, min_turn_length):
     """
@@ -323,15 +253,17 @@ def filter_turns(item_data, speaker_label, measures, min_turn_length):
                     
                 else:
                     if current_turn is not None:
-
-                        start_idx2 = current_turn[0]["words"][0][measures["old_index"]]
-                        end_idx2 = current_turn[-1]["words"][-1][measures["old_index"]]
-                        turn_text = " ".join(item["text"] for item in current_turn)
                         
-                        if len(turn_text.split(" ")) >= min_turn_length:
-                            turns_idxs.append((start_idx2, end_idx2))
+                        if len(current_turn)>0 and len(current_turn[0]["words"])>0: 
+                            start_idx2 = current_turn[0]["words"][0][measures["old_index"]]
                             
-                            turns.append(turn_text)
+                            end_idx2 = current_turn[-1]["words"][-1][measures["old_index"]]
+                            turn_text = " ".join(item["text"] for item in current_turn)
+                            
+                            if len(turn_text.split(" ")) >= min_turn_length:
+                                turns_idxs.append((start_idx2, end_idx2))
+
+                                turns.append(turn_text)
                         current_turn = None
                         
         except Exception as e:
@@ -447,7 +379,7 @@ def get_num_of_syllables(text):
 
     return syllable_count
 
-def get_pause_feature_word(word_df, df_diff, word_list, phrase_index, measures):
+def get_pause_feature_word(word_df, df_diff, word_list, turn_index, measures):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -463,9 +395,8 @@ def get_pause_feature_word(word_df, df_diff, word_list, phrase_index, measures):
             from the JSON response.
     word_list: list
         List of transcribed text at the word level.
-    phrase_index: list
+    turn_index: list
         A list containing the indices of the first and last word
-            in each phrase or turn.
     measures: dict
         A dictionary containing the names of the columns in the output dataframes.
 
@@ -476,8 +407,8 @@ def get_pause_feature_word(word_df, df_diff, word_list, phrase_index, measures):
 
     ------------------------------------------------------------------------------------------------------
     """
-    phrase_starts = [pindex[0] for pindex in phrase_index]
-    word_df[measures["word_pause"]] = df_diff[measures["pause"]].where(~df_diff[measures["old_index"]].isin(phrase_starts), np.nan)
+    turn_starts = [pindex[0] for pindex in turn_index]
+    word_df[measures["word_pause"]] = df_diff[measures["pause"]].where(~df_diff[measures["old_index"]].isin(turn_starts), np.nan)
     
     word_df[measures["num_syllables"]] = [get_num_of_syllables(word) for word in word_list]
     return word_df
@@ -487,26 +418,24 @@ def process_pause_feature(df_diff, df, text_level, index_list, time_index, level
     ------------------------------------------------------------------------------------------------------
 
     This function calculates various pause-related speech
-     characteristic features at the phrase or turn
+     characteristic features at the turn
      level and adds them to the output dataframe df.
 
     Parameters:
     ...........
     df_diff: pandas dataframe
-        A dataframe containing the word-level information
-         from the JSON response.
+        A dataframe containing the word-level information from the JSON response.
     df: pandas dataframe
-        A dataframe containing phrase or turn summary information
+        A dataframe containing turn summary information
     text_level: list
-        List of transcribed text at the phrase or turn level.
+        List of transcribed text at the turn level.
     index_list: list
-        A list containing the indices of the first and last word
-         in each phrase or turn.
+        A list containing the indices of the first and last word in each turn.
     time_index: list
         A list containing the names of the columns in json that contain
          the start and end times of each word.
     level_name: str
-        The name of the level being analyzed (phrase or turn).
+        The name of the level being analyzed turn.
     measures: dict
         A dictionary containing the names of the columns in the output dataframes.
 
@@ -518,8 +447,8 @@ def process_pause_feature(df_diff, df, text_level, index_list, time_index, level
     ------------------------------------------------------------------------------------------------------
     """
 
-    if level_name not in [measures["phrase"], measures["turn"]]:
-        logger.error(f"level_name must be either in phrase or turn")
+    if level_name not in [measures["turn"]]:
+        logger.error(f"level_name must be turn")
         return df
 
     for j, index in enumerate(index_list):
@@ -648,9 +577,7 @@ def update_summ_df(df_diff, summ_df, full_text, time_index, word_df, turn_df, me
         
         summ_df[measures["word_rate"]] = (summ_df[measures["speech_words"]] / summ_df[measures["speech_minutes"]])
         summ_df[measures["syllable_rate"]] = (get_num_of_syllables(full_text) / summ_df[measures["speech_minutes"]])
-        
-        summ_df[measures["speech_percentage"]] = 100 * (
-        1 - df_diff.loc[1:, measures["pause"]].sum()/ (60 * summ_df[measures["speech_minutes"]]))
+        summ_df[measures["speech_percentage"]] = 100 * (summ_df[measures["speech_minutes"]] / summ_df[measures["file_length"]])
 
     if len(word_df[measures["word_pause"]]) > 1:
         summ_df[measures["word_pause_mean"]] = word_df[measures["word_pause"]].mean(skipna=True)
@@ -668,7 +595,7 @@ def update_summ_df(df_diff, summ_df, full_text, time_index, word_df, turn_df, me
 
     return summ_df
 
-def get_pause_feature(json_conf, df_list, text_list, text_indices, measures, time_index, language):
+def get_pause_feature(json_conf, df_list, text_list, turn_index, measures, time_index, language):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -680,16 +607,17 @@ def get_pause_feature(json_conf, df_list, text_list, text_indices, measures, tim
     json_conf: list
         JSON response object.
     df_list: list
-        List of pandas dataframes.
-            word_df, phrase_df, turn_df, summ_df
+        List of pandas dataframes: word_df, turn_df, summ_df
     text_list: list
-        List of transcribed text.
-            split into words, phrases, turns, and full text.
-    text_indices: list
+        List of transcribed text: split into words, turns, and full text.
+    turn_index: list
         List of indices for text_list.
-            for phrases and turns.
     measures: dict
         A dictionary containing the names of the columns in the output dataframes.
+    time_index: list
+        timepoint index (start/end)
+    language: str
+        Language of the transcribed text.
 
     Returns:
     ...........
@@ -703,17 +631,14 @@ def get_pause_feature(json_conf, df_list, text_list, text_indices, measures, tim
 
     word_df, turn_df, summ_df = df_list
     word_list, turn_list, full_text = text_list
-    phrase_index, turn_index = text_indices
-
     df_diff = pd.DataFrame(json_conf)
-    time_index = [time_index[0], time_index[1]]
 
     # Calculate the pause time between; each word and add the results to pause_list
     if measures["pause"] not in df_diff.columns:
         df_diff[measures["pause"]] = df_diff[time_index[0]].astype(float) - df_diff[time_index[1]].astype(float).shift(1)
 
     # word-level analysis
-    word_df = get_pause_feature_word(word_df, df_diff, word_list, phrase_index, measures)
+    word_df = get_pause_feature_word(word_df, df_diff, word_list, turn_index, measures)
 
     # turn-level analysis
     if len(turn_index) > 0:
@@ -797,7 +722,7 @@ def get_tag(json_conf, tag_dict, measures):
             json_conf[i][measures["tag"]] = "Other"
     return json_conf
 
-def get_tag_summ(json_conf, df_list, text_indices, measures):
+def get_tag_summ(json_conf, df_list, measures):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -810,11 +735,7 @@ def get_tag_summ(json_conf, df_list, text_indices, measures):
     json_conf: list
         JSON response object.
     df_list: list
-        List of pandas dataframes.
-            word_df, phrase_df, turn_df, summ_df
-    text_indices: list
-        List of indices for text_list.
-            for phrases and turns.
+        List of pandas dataframes: word_df, turn_df, summ_df
     measures: dict
         A dictionary containing the names of the columns in the output dataframes.
 
@@ -825,10 +746,7 @@ def get_tag_summ(json_conf, df_list, text_indices, measures):
 
     ------------------------------------------------------------------------------------------------------
     """
-
     word_df, turn_df, summ_df = df_list
-    _ , turn_index = text_indices
-
     df_conf = pd.DataFrame(json_conf)
     word_df[measures["part_of_speech"]] = df_conf[measures["tag"]]
     
@@ -846,10 +764,8 @@ def get_sentiment(df_list, text_list, measures):
     ...........
     df_list: list
         List of pandas dataframes.
-            word_df, phrase_df, turn_df, summ_df
     text_list: list
         List of transcribed text.
-            split into words, phrases, turns, and full text.
     measures: dict
         A dictionary containing the names of the columns in the output dataframes.
 
@@ -911,7 +827,7 @@ def calculate_file_feature(json_data, model, speakers):
         file_length = max(float(segment.get("end_time", "0")) for segment in segments)
         
         if speakers is None:
-            return file_length, np.NaN
+            return file_length/60, np.NaN
 
         speaking_time = sum(float(segment.get("end_time", "0") or "0") - float(segment.get("start_time", "0") or "0")
                            for segment in segments if segment.get("speaker_label", "") in speakers)
@@ -920,7 +836,7 @@ def calculate_file_feature(json_data, model, speakers):
         file_length = max(segment.get('end', 0) for segment in segments)
         
         if speakers is None:
-            return file_length, np.NaN
+            return file_length/60, np.NaN
         speaking_time = sum(segment['end'] - segment['start'] for segment in segments if segment.get('speaker', '') in speakers)
 
     speaking_pct = (speaking_time / file_length) * 100
@@ -952,12 +868,12 @@ def process_language_feature(df_list, transcribe_info, language, time_index, mea
 
     ------------------------------------------------------------------------------------------------------
     """
-    json_conf, text_list, text_indices = transcribe_info
-    df_list = get_pause_feature(json_conf, df_list, text_list, text_indices, measures, time_index, language)
+    json_conf, text_list, turn_indices = transcribe_info
+    df_list = get_pause_feature(json_conf, df_list, text_list, turn_indices, measures, time_index, language)
 
     if language == "en":
         json_conf = get_tag(json_conf, TAG_DICT, measures)
-        df_list = get_tag_summ(json_conf, df_list, text_indices, measures)
+        df_list = get_tag_summ(json_conf, df_list, measures)
 
         df_list = get_sentiment(df_list, text_list, measures)
     return df_list
