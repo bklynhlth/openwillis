@@ -142,12 +142,7 @@ def filter_turn_aws(item_data, speaker_label):
         JSON response object.
     speaker_label: str
         Speaker label
-    turns_idxs: list
-        A list of tuples containing
-            the start and end indices of the turns in the JSON object.
-    turns: list
-        A list of turns extracted from the JSON object.
-
+        
     Returns:
     ...........
     turns_idxs: list
@@ -899,6 +894,10 @@ def calculate_file_feature(json_data, model, speakers):
     ...........
     json_conf: list
         JSON response object.
+    model: str
+        model name (vosk/aws/whisper)
+    speakers: str
+        speakers label
 
     Returns:
     ...........
@@ -939,6 +938,8 @@ def process_language_feature(df_list, transcribe_info, language, time_index, mea
         List of pandas dataframes.
     transcribe_info: list
         transcribed info
+    time_index: list
+        timepoint index (start/end)
     language: str
         Language of the transcribed text.
     measures: dict
