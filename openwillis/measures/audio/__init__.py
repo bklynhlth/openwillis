@@ -18,4 +18,8 @@ from openwillis.measures.audio.speech_transcribe_cloud import (
     speech_transcription_cloud,
 )
 
-__all__ = ["vocal_acoustics", "speech_transcription", "speaker_separation", "speaker_separation_cloud", "speech_transcription_cloud"]
+from openwillis.measures.audio.speech_transcribe_vosk import (
+    speech_transcription_vosk,
+)
+
+__all__ = ["vocal_acoustics", "speech_transcription", "speaker_separation", "speaker_separation_cloud", "speech_transcription_cloud", "speech_transcription_vosk"]

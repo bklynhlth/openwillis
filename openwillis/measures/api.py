@@ -13,6 +13,7 @@ from openwillis.measures.audio import (
     speaker_separation,
     speaker_separation_cloud,
     speech_transcription_cloud,
+    speech_transcription_vosk
 )
 from openwillis.measures.text import (
     speech_characteristics
