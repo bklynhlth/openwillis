@@ -8,7 +8,7 @@ from openwillis.measures.api import (
     emotional_expressivity,
     eye_blink_rate,
     vocal_acoustics,
-    speech_transcription,
+    speech_transcription_whisper,
     speech_characteristics,
     speaker_separation,
     speaker_separation_cloud,
@@ -17,4 +17,4 @@ from openwillis.measures.api import (
     to_audio
 )
 
-__all__ = ["facial_expressivity", "vocal_acoustics", "emotional_expressivity", "eye_blink_rate", "speech_transcription", "speech_characteristics", "speaker_separation", "speaker_separation_cloud", "speech_transcription_cloud", "speech_transcription_vosk", "to_audio"]
+__all__ = ["facial_expressivity", "vocal_acoustics", "emotional_expressivity", "eye_blink_rate", "speech_transcription_whisper", "speech_characteristics", "speaker_separation", "speaker_separation_cloud", "speech_transcription_cloud", "speech_transcription_vosk", "to_audio"]

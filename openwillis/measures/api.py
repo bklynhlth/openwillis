@@ -9,7 +9,7 @@ from openwillis.measures.video import (
 )
 from openwillis.measures.audio import (
     vocal_acoustics,
-    speech_transcription,
+    speech_transcription_whisper,
     speaker_separation,
     speaker_separation_cloud,
     speech_transcription_cloud,

@@ -2,8 +2,8 @@ from openwillis.measures.audio.acoustic import (
     vocal_acoustics,
 )
 
-from openwillis.measures.audio.speech_transcribe import (
-    speech_transcription,
+from openwillis.measures.audio.speech_transcribe_whisper import (
+    speech_transcription_whisper,
 )
 
 from openwillis.measures.audio.speech_separation import (
@@ -22,4 +22,4 @@ from openwillis.measures.audio.speech_transcribe_vosk import (
     speech_transcription_vosk,
 )
 
-__all__ = ["vocal_acoustics", "speech_transcription", "speaker_separation", "speaker_separation_cloud", "speech_transcription_cloud", "speech_transcription_vosk"]
+__all__ = ["vocal_acoustics", "speech_transcription_whisper", "speaker_separation", "speaker_separation_cloud", "speech_transcription_cloud", "speech_transcription_vosk"]
