@@ -1,5 +1,5 @@
 # author:    Vijay Yadav
-# website:   http://www.bklynhlth.com
+# website:   http://www.brooklyn.health
 
 # import the required packages
 from openwillis.measures.video import (
@@ -9,10 +9,11 @@ from openwillis.measures.video import (
 )
 from openwillis.measures.audio import (
     vocal_acoustics,
-    speech_transcription,
+    speech_transcription_whisper,
     speaker_separation,
     speaker_separation_cloud,
-    speech_transcription_cloud,
+    speech_transcription_aws,
+    speech_transcription_vosk
 )
 from openwillis.measures.text import (
     speech_characteristics

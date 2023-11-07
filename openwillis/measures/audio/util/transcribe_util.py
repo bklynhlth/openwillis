@@ -1,5 +1,5 @@
 # author:    Vijay Yadav
-# website:   http://www.bklynhlth.com
+# website:   http://www.brooklyn.health
 
 # import the required packages
 
@@ -117,20 +117,19 @@ def get_clinical_labels(scale, measures, content_dict, json_response):
     ------------------------------------------------------------------------------------------------------
     """
     #Check if content is available for all the speaker
-    if content_dict and content_dict['speaker0'] and content_dict['speaker1']:
-        if scale.lower() not in measures['scale'].split(","):
-            return json_response
+    if len(content_dict) <2:
+        return json_response
         
-        score_string = scale.lower()+'_string'
-        spk1_score = sutil.match_transcript(measures[score_string], content_dict['speaker0'])
-        spk2_score = sutil.match_transcript(measures[score_string], content_dict['speaker1'])
+    score_string = scale.lower()+'_string'
+    spk1_score = sutil.match_transcript(measures[score_string], content_dict['speaker0'])
+    spk2_score = sutil.match_transcript(measures[score_string], content_dict['speaker1'])
 
-        if spk1_score > spk2_score:
-            json_response = replace_speaker_labels(json_response, ['speaker0', 'speaker1'], ['clinician', 'participant'])
+    if spk1_score > spk2_score:
+        json_response = replace_speaker_labels(json_response, ['speaker0', 'speaker1'], ['clinician', 'participant'])
 
-        else:
-            json_response = replace_speaker_labels(json_response, ['speaker0', 'speaker1'], ['participant', 'clinician'])
-
+    else:
+        json_response = replace_speaker_labels(json_response, ['speaker0', 'speaker1'], ['participant', 'clinician'])
+    
     return json_response
 
 def get_job_status(transcribe, input_param):
@@ -193,7 +192,7 @@ def filter_transcript_response(status, input_param):
     response = json.loads(read_data.read().decode('utf-8'))
 
     transcript = response['results']['transcripts'][0]['transcript']
-    if input_param['ShowSpeakerLabels'] == True:#replace speaker labels with standard names
+    if input_param['speaker_labels'] == True:#replace speaker labels with standard names
 
         response = replace_speaker_labels(response, ['spk_0', 'spk_1'], ['speaker0', 'speaker1'])
     return response, transcript
@@ -222,24 +221,26 @@ def transcribe_audio(s3uri, input_param):
 
     ------------------------------------------------------------------------------------------------------
     """
-    response = json.loads("{}")
+    response = json.dumps({})
+    settings = {}
     transcript = ""
 
     try:
         if input_param['access_key'] and input_param['secret_key']:
-            transcribe = boto3.client('transcribe', region_name = input_param['region'], aws_access_key_id = input_param['access_key'], aws_secret_access_key = input_param['secret_key'])
+            transcribe = boto3.client('transcribe', region_name = input_param['region'], 
+                                      aws_access_key_id = input_param['access_key'], 
+                                      aws_secret_access_key = input_param['secret_key'])
         else:
             transcribe = boto3.client('transcribe', region_name = input_param['region'])
 
-        settings = {'ShowSpeakerLabels': input_param['ShowSpeakerLabels'], 'MaxSpeakerLabels': input_param['MaxSpeakerLabels']}
+        if input_param['speaker_labels'] == True and input_param['max_speakers']>=2:
+            settings = {'ShowSpeakerLabels': input_param['speaker_labels'], 'MaxSpeakerLabels': input_param['max_speakers']}
+
         transcribe.start_transcription_job(
             TranscriptionJobName=input_param['job_name'],
             Media={'MediaFileUri': s3uri},
-
-            #IdentifyMultipleLanguages=True,
             LanguageCode=input_param['language'],
-            Settings=settings
-        )
+            Settings=settings)
 
         status = get_job_status(transcribe, input_param)
         if status['TranscriptionJob']['TranscriptionJobStatus'] == 'COMPLETED':
