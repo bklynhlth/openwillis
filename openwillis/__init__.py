@@ -1,5 +1,5 @@
 # author:    Vijay Yadav
-# website:   http://www.bklynhlth.com
+# website:   http://www.brooklyn.health
 
 # import the required packages
 
@@ -12,9 +12,9 @@ from openwillis.measures.api import (
     speech_characteristics,
     speaker_separation,
     speaker_separation_cloud,
-    speech_transcription_cloud,
+    speech_transcription_aws,
     speech_transcription_vosk,
     to_audio
 )
 
-__all__ = ["facial_expressivity", "vocal_acoustics", "emotional_expressivity", "eye_blink_rate", "speech_transcription_whisper", "speech_characteristics", "speaker_separation", "speaker_separation_cloud", "speech_transcription_cloud", "speech_transcription_vosk", "to_audio"]
+__all__ = ["facial_expressivity", "vocal_acoustics", "emotional_expressivity", "eye_blink_rate", "speech_transcription_whisper", "speech_characteristics", "speaker_separation", "speaker_separation_cloud", "speech_transcription_aws", "speech_transcription_vosk", "to_audio"]
