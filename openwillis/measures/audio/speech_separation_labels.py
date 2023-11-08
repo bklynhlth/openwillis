@@ -87,8 +87,7 @@ def speaker_separation_labels(filepath, transcript_json):
             speaker_df, speaker_count = sutil.whisperx_to_dataframe(transcript_json)
         else:
             speaker_df, speaker_count = sutil.transcribe_response_to_dataframe(transcript_json)
-        print(speaker_df)
-        print(speaker_count)
+            
         if len(speaker_df)>0 and speaker_count>1:
             signal_label = sutil.generate_audio_signal(speaker_df , audio_signal, '', measures)
 
