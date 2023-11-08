@@ -322,7 +322,7 @@ def transcribe_response_to_dataframe(response):
     speakers = 0
     df = pd.DataFrame()
 
-    if 'segments' in response:
+    if 'results' in response:
         if 'speaker_labels' in response['results']:
 
             if 'speakers' in response['results']['speaker_labels']:
@@ -338,6 +338,7 @@ def transcribe_response_to_dataframe(response):
 
                 df = df[df["confidence"] > 0].reset_index(drop=True)
                 df = df[["start_time", "end_time", "confidence", "speaker_label", "content"]]
+                
     return df, speakers
 
 def extract_data(segment_info):

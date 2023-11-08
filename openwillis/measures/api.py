@@ -11,7 +11,7 @@ from openwillis.measures.audio import (
     vocal_acoustics,
     speech_transcription_whisper,
     speaker_separation_nolabels,
-    speaker_separation_cloud,
+    speaker_separation_labels,
     speech_transcription_aws,
     speech_transcription_vosk
 )
