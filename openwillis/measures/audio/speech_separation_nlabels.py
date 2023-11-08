@@ -3,13 +3,11 @@
 
 # import the required packages
 from pyannote.audio import Pipeline
-from openwillis.measures.audio.util import util as ut
 from openwillis.measures.audio.util import separation_util as sutil
 from pydub import AudioSegment
 
 import os
 import json
-import shutil
 import pandas as pd
 import logging
 
@@ -89,11 +87,10 @@ def read_kwargs(kwargs):
     ------------------------------------------------------------------------------------------------------
     """
     input_param = {}
-    input_param['model'] = kwargs.get('model', 'pyannote')
-
     input_param['hf_token'] = kwargs.get('hf_token', '')
-    input_param['json_response'] = kwargs.get('json_response', json.loads("{}"))
-    input_param['c_scale'] = kwargs.get('c_scale', '')
+    
+    input_param['transcript_json'] = kwargs.get('transcript_json', json.dumps({}))
+    input_param['context'] = kwargs.get('context', '')
     return input_param
 
 def get_pyannote(input_param, file_name, filepath):
@@ -122,12 +119,12 @@ def get_pyannote(input_param, file_name, filepath):
     """
     
     diart_df = run_pyannote(filepath, input_param['hf_token'])
-    transcribe_df = pd.DataFrame(input_param['json_response'])
+    transcribe_df = pd.DataFrame(input_param['transcript_json'])
 
     speaker_df, speaker_count = sutil.get_speaker_identification(diart_df, transcribe_df)
     return speaker_df, speaker_count
 
-def speaker_separation(filepath, **kwargs):
+def speaker_separation_nolabels(filepath, **kwargs):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -137,14 +134,12 @@ def speaker_separation(filepath, **kwargs):
     ...........
     filepath : str
         Path to the input audio file.
+    transcript_json : json
+        Speech transcription json response.
     hf_token : str
         Access token for HuggingFace to access pre-trained models.
-    json_response : json
-        Speech transcription json response.
-    model : str, optional
-        Model to use for speech diarization, default is 'pyannote'.
-    c_scale : str, optional
-        Clinical scale to use for slicing the separated audio files, if any.
+    context : str, optional
+        scale to use for slicing the separated audio files, if any.
 
     Returns:
     ...........
@@ -160,18 +155,14 @@ def speaker_separation(filepath, **kwargs):
     measures = get_config()
 
     try:
-        if not os.path.exists(filepath) or 'json_response' not in kwargs:
+        if not os.path.exists(filepath) or 'transcript_json' not in kwargs:
             return signal_label
 
-        if input_param['model'] == 'whisperx': 
-            input_param['c_scale'] = ''
-            speaker_df, speaker_count = sutil.whisperx_to_dataframe(input_param['json_response'])
-        else:
-            speaker_df, speaker_count = get_pyannote(input_param, file_name, filepath)
-
+        speaker_df, speaker_count = get_pyannote(input_param, file_name, filepath)
         audio_signal = AudioSegment.from_file(file = filepath, format = "wav")
+
         if len(speaker_df)>0 and speaker_count>1:
-            signal_label = sutil.generate_audio_signal(speaker_df , audio_signal, input_param['c_scale'], measures)
+            signal_label = sutil.generate_audio_signal(speaker_df , audio_signal, input_param['context'], measures)
 
     except Exception as e:
         logger.error(f'Error in diard processing: {e} & File: {filepath}')
