@@ -359,12 +359,18 @@ def extract_data(segment_info):
 
     ------------------------------------------------------------------------------------------------------
     """
-    phrase = segment_info["text"]
-    start = segment_info["start"]
-    end = segment_info["end"]
+    phrase = segment_info.get("text", "")
+    start = segment_info.get("start", np.nan)
     
-    score = segment_info["words"][0]["score"] if segment_info["words"] and len(segment_info["words"]) > 0 else 0
-    speaker = segment_info["speaker"] if "speaker" in segment_info else "no_speaker"
+    end = segment_info.get("end", np.nan)
+    words = segment_info.get("words", None)
+
+    if words is not None and len(words) > 0:
+        score = words[0].get("score", 0)
+    else:
+        score = 0
+
+    speaker = segment_info.get("speaker", "no_speaker")
     return pd.Series([start, end, phrase, score, speaker], index=["start", "end", "phrase", "score", "speaker"])
 
 def whisperx_to_dataframe(json_response):
@@ -387,23 +393,17 @@ def whisperx_to_dataframe(json_response):
 
     ------------------------------------------------------------------------------------------------------
     """
-    # Initialize an empty DataFrame
-    df = pd.DataFrame(columns=["start", "end", "phrase", "score", "speaker"])
+    df = pd.DataFrame(columns=["start_time", "end_time", "content", "confidence", "speaker_label"])
     if 'segments' in json_response:
         
-        for segment_info in json_response["segments"]:
-            try:
-                
-                segment_df = extract_data(segment_info)
-                df = df.append(segment_df, ignore_index=True)
-                
-            except Exception as e:
-                logger.info("Some segments have no speaker labels.")
-    
-    df = df[df["score"] > 0].reset_index(drop=True)
-    df = df[df["speaker"] != "no_speaker"].reset_index(drop=True)
-    df = df.rename(columns={"start": "start_time", "end": "end_time", "score":"confidence", "speaker":"speaker_label", 
-                            "phrase":"content"})
-    
+        segment_infos = json_response["segments"]
+        df = pd.DataFrame(segment_infos).apply(extract_data, axis=1)
+
+        df = df[df["score"] > 0].reset_index(drop=True)
+        df = df.dropna(subset=["start", "end"]).reset_index(drop=True)
+        
+        df = df[df["speaker"] != "no_speaker"].reset_index(drop=True)
+        df = df.rename(columns={"start": "start_time", "end": "end_time", "score": "confidence", "speaker": "speaker_label", "phrase": "content"})
+
     speakers = df['speaker_label'].nunique()
     return df, speakers
