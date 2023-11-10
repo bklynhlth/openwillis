@@ -6,12 +6,12 @@ from openwillis.measures.audio.speech_transcribe_whisper import (
     speech_transcription_whisper,
 )
 
-from openwillis.measures.audio.speech_separation import (
-    speaker_separation,
+from openwillis.measures.audio.speech_separation_nlabels import (
+    speaker_separation_nolabels,
 )
 
-from openwillis.measures.audio.speech_separation_cloud import (
-    speaker_separation_cloud,
+from openwillis.measures.audio.speech_separation_labels import (
+    speaker_separation_labels,
 )
 
 from openwillis.measures.audio.speech_transcribe_cloud import (
