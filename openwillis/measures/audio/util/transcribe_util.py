@@ -58,6 +58,89 @@ def replace_speaker_labels(data, check_labels, speaker_labels):
 
     return data
 
+def filter_labels_aws(data):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    replaces speaker labels in AWS JSON.
+
+    Parameters:
+    ...........
+    data : JSON
+        The JSON containing speaker labels.
+
+    Returns:
+    ...........
+    data : JSON
+        The modified JSON with replaced speaker labels.
+
+    ------------------------------------------------------------------------------------------------------
+    """
+    if 'results' in data:
+        speaker_labels = data['results'].get('speaker_labels', {})
+        segments = speaker_labels.get('segments', [])
+
+        for segment in segments:
+            seg_speaker_label = segment.get('speaker_label', '')
+            
+            if 'spk_' in seg_speaker_label:
+                segment['speaker_label'] = seg_speaker_label.replace("spk_", "speaker")
+            
+            seg_items = segment.get('items', [])
+            for seg_item in seg_items:
+                
+                seg_item_speaker_label = seg_item.get('speaker_label', '')
+                if 'spk_' in seg_item_speaker_label:
+                    
+                    seg_item['speaker_label'] = seg_item_speaker_label.replace("spk_", "speaker")
+        items = data['results'].get('items', [])
+        
+        for item in items:
+            item_speaker_label = item.get('speaker_label', '')
+            
+            if 'spk_' in item_speaker_label:
+                item['speaker_label'] = item_speaker_label.replace("spk_", "speaker")
+
+    return data
+
+def filter_labels_whisper(data):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    replaces speaker labels in Whisper JSON.
+
+    Parameters:
+    ...........
+    data : JSON
+        The JSON containing speaker labels.
+
+    Returns:
+    ...........
+    data : JSON
+        The modified JSON with replaced speaker labels.
+
+    ------------------------------------------------------------------------------------------------------
+    """
+    for segment in data.get('segments', []):
+        current_speaker = segment.get('speaker', '')
+
+        if 'SPEAKER_0' in current_speaker:
+            segment["speaker"] = current_speaker.replace("SPEAKER_0", "speaker")
+
+        for word in segment["words"]:
+            word_speaker = word.get('speaker', '')
+            
+            if 'SPEAKER_0' in word_speaker:
+                word["speaker"] = word_speaker.replace("SPEAKER_0", "speaker")
+
+    for word_segment in data.get('word_segments', []):
+        word_seg_speaker = word_segment.get('speaker', '')
+        
+        if 'SPEAKER_0' in word_seg_speaker: 
+            word_segment["speaker"] = word_seg_speaker.replace("SPEAKER_0", "speaker")
+
+    return data
+
 def extract_content(data):
     """
     ------------------------------------------------------------------------------------------------------
@@ -194,7 +277,7 @@ def filter_transcript_response(status, input_param):
     transcript = response['results']['transcripts'][0]['transcript']
     if input_param['speaker_labels'] == True:#replace speaker labels with standard names
 
-        response = replace_speaker_labels(response, ['spk_0', 'spk_1'], ['speaker0', 'speaker1'])
+        response = filter_labels_aws(response)
     return response, transcript
 
 def transcribe_audio(s3uri, input_param):

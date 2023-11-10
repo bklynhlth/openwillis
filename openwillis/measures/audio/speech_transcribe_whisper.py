@@ -106,8 +106,7 @@ def run_whisperx(filepath, input_param):
     json_response, transcript = wutil.get_whisperx_diariazation(filepath, input_param)
     
     if str(json_response) != '{}':
-        json_response = tutil.replace_whisperx_speaker_labels(json_response, ['SPEAKER_00', 'SPEAKER_01'], 
-                                                              ['speaker0', 'speaker1'])
+        json_response = tutil.filter_labels_whisper(json_response)
     return json_response, transcript
     
 
