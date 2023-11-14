@@ -9,10 +9,11 @@ from openwillis.measures.video import (
 )
 from openwillis.measures.audio import (
     vocal_acoustics,
-    speech_transcription,
-    speaker_separation,
-    speaker_separation_cloud,
-    speech_transcription_cloud,
+    speech_transcription_whisper,
+    speaker_separation_nolabels,
+    speaker_separation_labels,
+    speech_transcription_aws,
+    speech_transcription_vosk
 )
 from openwillis.measures.text import (
     speech_characteristics

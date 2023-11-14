@@ -38,7 +38,23 @@ def get_config():
     measures = json.load(file)
     return measures
 
-def speaker_separation_cloud(filepath, json_response):
+def is_amazon_transcribe(json_conf):
+    """
+    ------------------------------------------------------------------------------------------------------
+    This function checks if the json response object is from Amazon Transcribe.
+    Parameters:
+    ...........
+    json_conf: dict
+        JSON response object.
+    Returns:
+    ...........
+    bool: True if the json response object
+     is from Amazon Transcribe, False otherwise.
+    ------------------------------------------------------------------------------------------------------
+    """
+    return "jobName" in json_conf and "results" in json_conf
+
+def speaker_separation_labels(filepath, transcript_json):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -48,7 +64,7 @@ def speaker_separation_cloud(filepath, json_response):
     ...........
     filepath : str
         Path to the input audio file.
-    json_response : json
+    transcript_json : json
         Speech transcription json response.
 
     Returns:
@@ -66,8 +82,12 @@ def speaker_separation_cloud(filepath, json_response):
             return signal_label
 
         audio_signal = AudioSegment.from_file(file = filepath, format = "wav")
-        speaker_df, speaker_count = sutil.transcribe_response_to_dataframe(json_response)
+        if not is_amazon_transcribe(transcript_json):
 
+            speaker_df, speaker_count = sutil.whisperx_to_dataframe(transcript_json)
+        else:
+            speaker_df, speaker_count = sutil.transcribe_response_to_dataframe(transcript_json)
+            
         if len(speaker_df)>0 and speaker_count>1:
             signal_label = sutil.generate_audio_signal(speaker_df , audio_signal, '', measures)
 

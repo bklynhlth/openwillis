@@ -1,5 +1,5 @@
 # author:    Vijay Yadav
-# website:   http://www.bklynhlth.com
+# website:   http://www.brooklyn.health
 
 # import the required packages
 import os
@@ -53,20 +53,19 @@ def read_kwargs(kwargs):
     ------------------------------------------------------------------------------------------------------
     """
     input_param = {}
-    input_param['model'] = kwargs.get('model', 'pyannote')
     input_param['language'] = kwargs.get('language', 'en-US')
     input_param['region'] = kwargs.get('region', 'us-east-1')
 
     input_param['job_name'] = kwargs.get('job_name', 'transcribe_job_01')
-    input_param['ShowSpeakerLabels'] = kwargs.get('ShowSpeakerLabels', True)
-    input_param['MaxSpeakerLabels'] = kwargs.get('MaxSpeakerLabels', 2)
+    input_param['speaker_labels'] = kwargs.get('speaker_labels', False)
+    input_param['max_speakers'] = kwargs.get('max_speakers', 2)
 
-    input_param['c_scale'] = kwargs.get('c_scale', '')
+    input_param['context'] = kwargs.get('context', '')
     input_param['access_key'] = kwargs.get('access_key', '')
     input_param['secret_key'] = kwargs.get('secret_key', '')
     return input_param
 
-def speech_transcription_cloud(filepath, **kwargs):
+def speech_transcription_aws(s3_uri, **kwargs):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -74,29 +73,26 @@ def speech_transcription_cloud(filepath, **kwargs):
 
     Parameters:
     ...........
-    filepath : str
+    s3_uri : str
         The S3 uri for the recording to be transcribed.
     kwargs: Object
-        model : str, optional
-            The transcription model to use ('aws'). Default is 'aws'.
         language : str, optional
             The language of the audio file (e.g. 'en-US', 'en-IN'). Default is 'en-US'.
         region : str, optional
             The AWS region to use (e.g. 'us-east-1'). Only applicable if model is 'aws'. Default is 'us-east-1'.
         job_name : str, optional
             The name of the transcription job. Only applicable if model is 'aws'. Default is 'transcribe_job_01'.
-        ShowSpeakerLabels : boolean, optional
-            Show speaker labels
-        MaxSpeakerLabels : int, optional
-            Max number of speakers
-        c_scale : str, optional
-            Clinical scale to use for slicing the separated audio files, if any.
         access_key : str, optional
             AWS access key
         secret_key : str, optional
             AWS secret key
-
-
+        speaker_labels : boolean, optional
+            Show speaker labels
+        max_speakers : int, optional
+            Max number of speakers
+        context : str, optional
+            scale to use for slicing the separated audio files, if any.
+            
     Returns:
     ...........
     json_response : JSON Object
@@ -108,10 +104,10 @@ def speech_transcription_cloud(filepath, **kwargs):
     """
     input_param = read_kwargs(kwargs)
     measures = get_config()
-    json_response, transcript = tutil.transcribe_audio(filepath, input_param)
-
-    if input_param['ShowSpeakerLabels'] == True and input_param['c_scale']:
+    json_response, transcript = tutil.transcribe_audio(s3_uri, input_param)
+    
+    if input_param['speaker_labels'] == True and input_param['context'].lower() in measures['scale'].split(','):
         content_dict = tutil.extract_content(json_response)
-        json_response = tutil.get_clinical_labels(input_param['c_scale'], measures, content_dict, json_response)
-
+        
+        json_response = tutil.get_clinical_labels(input_param['context'], measures, content_dict, json_response)
     return json_response, transcript

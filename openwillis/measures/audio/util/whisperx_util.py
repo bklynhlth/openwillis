@@ -27,7 +27,7 @@ def delete_model(model):
     torch.cuda.empty_cache()
     del model
 
-def get_diarization(audio, align_json, HF_TOKEN, device, num_speakers, infra_model):
+def get_diarization(audio, align_json, device, input_param):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -38,12 +38,10 @@ def get_diarization(audio, align_json, HF_TOKEN, device, num_speakers, infra_mod
         audio signal object
     align_json: json
         aligned whisper transcribed output
-    HF_TOKEN : str
-        The Hugging Face token for model authentication.
     device : str
         device type
-    num_speakers: int
-        Number of speaker
+    input_param : dict
+        A dictionary containing input parameters
     
     Returns:
     ...........
@@ -53,17 +51,23 @@ def get_diarization(audio, align_json, HF_TOKEN, device, num_speakers, infra_mod
     ------------------------------------------------------------------------------------------------------
     """
     # Assign speaker labels
-    if infra_model[0]:
-        diarize_model = whisperx.DiarizationPipeline(use_auth_token=HF_TOKEN, device=device)
-    
+    if input_param['infra_model'][0]:
+        diarize_model = whisperx.DiarizationPipeline(use_auth_token=input_param['hf_token'], device=device)
     else:
-        diarize_model = infra_model[2]
+        diarize_model = input_param['infra_model'][2]
 
-    if num_speakers == None:
+    if input_param['min_speakers'] == None and input_param['max_speakers'] == None:
         diarize_segments = diarize_model(audio)
     
+    elif input_param['min_speakers'] == None and input_param['max_speakers'] != None:
+        diarize_segments = diarize_model(audio, max_speakers = input_param['max_speakers'])
+    
+    elif input_param['min_speakers'] != None and input_param['max_speakers'] == None:
+        diarize_segments = diarize_model(audio, min_speakers= input_param['min_speakers'])
+        
     else:
-        diarize_segments = diarize_model(audio, min_speakers=num_speakers, max_speakers=num_speakers)
+        diarize_segments = diarize_model(audio, min_speakers=input_param['min_speakers'], max_speakers=input_param['max_speakers'])
+        
     json_response = whisperx.assign_word_speakers(diarize_segments, align_json)
     return json_response
 
@@ -126,7 +130,7 @@ def transcribe_whisper(filepath, model, device, compute_type, batch_size, infra_
     transcribe_json = model_whisp.transcribe(audio, batch_size=batch_size, language=language)
     return transcribe_json, audio
 
-def get_whisperx_diariazation(filepath, HF_TOKEN, del_model, num_speakers, infra_model, language):
+def get_whisperx_diariazation(filepath, input_param):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -136,16 +140,8 @@ def get_whisperx_diariazation(filepath, HF_TOKEN, del_model, num_speakers, infra
     ...........
     filepath : str
         The path to the audio file to be transcribed.
-    HF_TOKEN : str
-        The Hugging Face token for model authentication.
-    del_model: boolean
-        Boolean indicator to delete model if low on GPU resources 
-    num_speakers: int
-        Number of speaker
-    infra_model: list
-        whisper model artifacts (this is optional param: to optimize willisInfra) 
-    language: str
-        language code
+    input_param : dict
+        A dictionary containing input parameters
 
     Returns:
     ...........
@@ -158,11 +154,9 @@ def get_whisperx_diariazation(filepath, HF_TOKEN, del_model, num_speakers, infra
     """
     device = 'cpu'
     compute_type = "int16"
-    
-    model = 'large-v2'
     batch_size = 16
     
-    json_response = '{}'
+    json_response = json.dumps({})
     transcript = ''
     
     try:
@@ -170,16 +164,16 @@ def get_whisperx_diariazation(filepath, HF_TOKEN, del_model, num_speakers, infra
             device = 'cuda'
             compute_type = "float16"
     
-        transcribe_json, audio = transcribe_whisper(filepath, model, device, compute_type, batch_size, infra_model, language)
+        transcribe_json, audio = transcribe_whisper(filepath, input_param['model'], device, compute_type, batch_size, input_param['infra_model'], input_param['language'])
     
         # Align whisper output
-        model_a, metadata = whisperx.load_align_model(language_code=language, device=device)
+        model_a, metadata = whisperx.load_align_model(language_code=input_param['language'], device=device)
         align_json = whisperx.align(transcribe_json["segments"], model_a, metadata, audio, device, return_char_alignments=False)
     
-        if del_model:
+        if input_param['del_model']:
             delete_model(model_a)
             
-        json_response = get_diarization(audio, align_json, HF_TOKEN, device, num_speakers, infra_model)    
+        json_response = get_diarization(audio, align_json, device, input_param)    
         transcript = get_transcribe_summary(json_response)
     
     except Exception as e:
