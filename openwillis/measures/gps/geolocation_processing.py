@@ -19,6 +19,22 @@ logger=logging.getLogger()
 
 
 def create_empty_dataframes(config):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    This function creates empty dataframes with the column names specified in the configuration file.
+
+    Parameters:
+    ...........
+    config : dict
+        The dictionary containing the column names for the output dataframes.
+
+    Returns:
+    ...........
+    df_list: A list containing the empty dataframes.
+
+    ------------------------------------------------------------------------------------------------------
+    """
 
     hourly = pd.DataFrame(
         columns=[
@@ -97,6 +113,27 @@ def get_config(filepath, json_file):
 
 
 def gps_analysis(filepath, timezone):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    This function reads the GPS data from the csv file, performs quality checks, and calculates the
+    summary statistics.
+
+    Parameters:
+    ...........
+    filepath : str
+        The path to the csv file containing the GPS data.
+    timezone : str
+        The timezone of the location.
+
+    Returns:
+    ...........
+    hourly: A dataframe containing the hour-level summary statistics.
+    daily: A dataframe containing the day-level summary statistics.
+    summary: A dataframe containing the file-level summary statistics.
+
+    ------------------------------------------------------------------------------------------------------
+    """
 
     measures = get_config(os.path.abspath(__file__), "gps.json")
     df_list = create_empty_dataframes(measures)
