@@ -150,7 +150,8 @@ def gps_stats(traj, df, frequency, timezone):
         if sum(index_rows) == 0:
             res = [pd.NA for _ in df.columns[1:]]
             res = [date_str] + res
-            df.append(pd.Series(res, index=df.columns), ignore_index=True)
+            new_row = pd.Series(res, index=df.columns)
+            df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
             continue
 
         current_traj = traj_smooth_ends(traj, start_time, end_time, index_rows)
