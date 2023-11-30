@@ -148,7 +148,7 @@ def gps_stats(traj, df, frequency, timezone):
         index_rows = (traj[:, 3] < end_time) * (traj[:, 6] > start_time)
 
         if sum(index_rows) == 0:
-            res = [pd.NA for _ in df.columns[4:]]
+            res = [pd.NA for _ in df.columns[1:]]
             res = [date_str] + res
             df.append(pd.Series(res, index=df.columns), ignore_index=True)
             continue
