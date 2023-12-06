@@ -12,10 +12,8 @@ vosk==0.3.45
 vaderSentiment==3.3.2
 nltk==3.8.1
 lexicalrichness==0.5.0
-piso==0.9.0
-torch==1.13.1
-pyannote.audio==2.1.1
-diart==0.6.0
+torch==2.0.0
+pyannote.audio==3.0.0
 transformers==4.30.0
 sentence-transformers==2.2.2
 huggingface-hub==0.15.1

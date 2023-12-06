@@ -26,7 +26,7 @@ def make_dir(dir_name):
     if not os.path.exists(dir_name):
         os.makedirs(dir_name)
 
-def to_audio(filepath, speaker_label, out_dir):
+def to_audio(filepath, speaker_dict, output_dir):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -36,22 +36,22 @@ def to_audio(filepath, speaker_label, out_dir):
     ----------
         filepath : str
             The path to the input audio file.
-        speaker_label : dict
+        speaker_dict : dict
             A dictionary containing speaker labels as keys and corresponding segments (NumPy arrays) as values.
-        out_dir : str
+        output_dir : str
             The directory where the output audio files will be saved.
 
     ------------------------------------------------------------------------------------------------------
     """
-    make_dir(out_dir)
-    for key, value in speaker_label.items():
+    make_dir(output_dir)
+    for key, value in speaker_dict.items():
         file_name, _ = os.path.splitext(os.path.basename(filepath))
 
         audio_signal = AudioSegment.from_file(file = filepath, format = "wav")
         spk_signal = AudioSegment(value.tobytes(), frame_rate=audio_signal.frame_rate,
                                   sample_width=audio_signal.sample_width, channels=audio_signal.channels)
 
-        output_file = os.path.join(out_dir, file_name + '_' + key + '.wav')
+        output_file = os.path.join(output_dir, file_name + '_' + key + '.wav')
         spk_signal.export(output_file, format="wav")
 
 def get_config(filepath, json_file):

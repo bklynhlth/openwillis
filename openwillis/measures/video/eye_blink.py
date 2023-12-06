@@ -45,7 +45,7 @@ def create_empty_dataframes(config):
 
     ear = pd.DataFrame(columns=[config['frame'], config['ear']])
     blinks = pd.DataFrame(columns=[config['peak_frame'], config['start_frame'], config['end_frame'], config['peak_time'], config['start_time'], config['end_time']])
-    summary = pd.DataFrame(columns=[config['blinks'], config['blink_rate']], index=[config['value']])
+    summary = pd.DataFrame(columns=[config['blinks'], config['blink_rate']])
 
     return ear, blinks, summary
 
@@ -393,7 +393,7 @@ def eye_blink_rate(video):
 
         # create summary dataframe
         summary_list = [len(troughs), len(troughs)/(frame_n/fps)*60]
-        summary.iloc[0] = summary_list
+        summary.loc[0] = summary_list
 
     except Exception as e:
         logger.error(f'Error in eye blink rate calculation- file: {video} & Error: {e}')
@@ -404,10 +404,10 @@ def eye_blink_rate(video):
                 vs.release()
 
         if ear.empty:
-            ear.iloc[0] = np.nan
+            ear.loc[0] = np.nan
         if blinks.empty:
-            blinks.iloc[0] = np.nan
+            blinks.loc[0] = np.nan
         if summary.empty:
-            summary.iloc[0] = np.nan
+            summary.loc[0] = np.nan
 
         return ear, blinks, summary
