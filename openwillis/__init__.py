@@ -8,13 +8,14 @@ from openwillis.measures.api import (
     emotional_expressivity,
     eye_blink_rate,
     vocal_acoustics,
-    speech_transcription,
+    speech_transcription_whisper,
     speech_characteristics,
-    speaker_separation,
-    speaker_separation_cloud,
-    speech_transcription_cloud,
+    speaker_separation_nolabels,
+    speaker_separation_labels,
+    speech_transcription_aws,
+    speech_transcription_vosk,
     gps_analysis,
     to_audio
 )
 
-__all__ = ["facial_expressivity", "vocal_acoustics", "emotional_expressivity", "eye_blink_rate", "speech_transcription", "speech_characteristics", "speaker_separation", "speaker_separation_cloud", "speech_transcription_cloud", "gps_analysis", "to_audio"]
+__all__ = ["facial_expressivity", "vocal_acoustics", "emotional_expressivity", "eye_blink_rate", "speech_transcription_whisper", "speech_characteristics", "speaker_separation_nolabels", "speaker_separation_labels", "speech_transcription_aws", "speech_transcription_vosk", "gps_analysis", "to_audio"]
