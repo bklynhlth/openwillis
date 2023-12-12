@@ -1,0 +1,27 @@
+{
+    "datetime": "datetime",
+    "observed_time": "observed_time",
+    "observed_time_day": "observed_time_day",
+    "observed_time_night": "observed_time_night",
+    "move_time": "move_time",
+    "pause_time": "pause_time",
+    "dist_travelled": "dist_travelled",
+    "home_time": "home_time",
+    "home_max_dist": "home_max_dist",
+    "home_mean_dist": "home_mean_dist",
+    "no_days": "no_days",
+    "total_observed_time": "total_observed_time",
+    "mean_move_time": "mean_move_time",
+    "sd_move_time": "sd_move_time",
+    "mean_pause_time": "mean_pause_time",
+    "sd_pause_time": "sd_pause_time",
+    "mean_dist_travelled": "mean_dist_travelled",
+    "sd_dist_travelled": "sd_dist_travelled",
+    "mean_home_time": "mean_home_time",
+    "sd_home_time": "sd_home_time",
+    "mean_home_max_dist": "mean_home_max_dist",
+    "sd_home_max_dist": "sd_home_max_dist",
+    "mean_home_mean_dist": "mean_home_mean_dist",
+    "sd_home_mean_dist": "sd_home_mean_dist"
+  }
+  
