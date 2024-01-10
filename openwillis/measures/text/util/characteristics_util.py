@@ -92,7 +92,7 @@ def download_nltk_resources():
         nltk.download("punkt")
 
     try:
-        nltk.data.find("averaged_perceptron_tagger")
+        nltk.data.find("taggers/averaged_perceptron_tagger")
     except LookupError:
         nltk.download("averaged_perceptron_tagger")
 
