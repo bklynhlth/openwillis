@@ -14,7 +14,7 @@ nltk==3.8.1
 lexicalrichness==0.5.0
 torch==2.0.0
 pyannote.audio==3.0.0
-transformers==4.30.0
+transformers==4.36.0
 sentence-transformers==2.2.2
 huggingface-hub==0.15.1
 boto3==1.26.106
