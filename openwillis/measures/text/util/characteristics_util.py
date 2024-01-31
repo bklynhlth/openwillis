@@ -568,11 +568,14 @@ def update_summ_df(df_diff, summ_df, full_text, time_index, word_df, turn_df, me
     """
     if len(turn_df) > 0:
         speech_minutes = turn_df[measures["turn_minutes"]].sum()
+        speech_words = turn_df[measures["turn_words"]].sum()
     else:
         speech_minutes = (float(df_diff.iloc[-1][time_index[1]]) - float(df_diff.iloc[0][time_index[0]])) / 60
-    summ_df[measures["speech_minutes"]] = [speech_minutes]
-    
-    summ_df[measures["speech_words"]] = len(df_diff)
+        speech_words = len(df_diff)
+
+    summ_df[measures["speech_minutes"]] = [speech_minutes]    
+    summ_df[measures["speech_words"]] = [speech_words]
+
     if speech_minutes > 0:
         
         summ_df[measures["word_rate"]] = (summ_df[measures["speech_words"]] / summ_df[measures["speech_minutes"]])
