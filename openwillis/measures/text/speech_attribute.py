@@ -278,7 +278,7 @@ def common_summary_feature(df_summ, json_data, model, speaker_label):
         logger.error("Error in file length calculation")
     return df_summ
 
-def process_transcript(df_list, json_conf, measures, min_turn_length, speaker_label, source, language):
+def process_transcript(df_list, json_conf, measures, min_turn_length, speaker_label, source, english_language):
     """
     ------------------------------------------------------------------------------------------------------
     
@@ -298,8 +298,8 @@ def process_transcript(df_list, json_conf, measures, min_turn_length, speaker_la
         Speaker label
     source: str
         model name
-    language: str
-        Language type
+    english_language: bool
+        Whether the language is English or not
     
     Returns:
     ...........
@@ -321,7 +321,7 @@ def process_transcript(df_list, json_conf, measures, min_turn_length, speaker_la
         info = (json_conf, [words, [], text], [[], []])
 
     if len(info[0]) > 0 and len(info[1][-1]) > 0:
-        df_list = cutil.process_language_feature(df_list, info, language, get_time_columns(source), measures)
+        df_list = cutil.process_language_feature(df_list, info, english_language, get_time_columns(source), measures)
     return df_list
 
 def get_time_columns(source):
@@ -347,7 +347,7 @@ def get_time_columns(source):
     else:
         return ["start", "end"]
 
-def speech_characteristics(json_conf, language="en", speaker_label=None, min_turn_length=1):
+def speech_characteristics(json_conf, english_language=True, speaker_label=None, min_turn_length=1):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -357,8 +357,8 @@ def speech_characteristics(json_conf, language="en", speaker_label=None, min_tur
     ...........
     json_conf: dict
         Transcribed json file
-    language: str
-        Language type
+    english_language: bool
+        Whether the language is English or not
     speaker_label: str
         Speaker label
     min_turn_length: int
@@ -382,19 +382,17 @@ def speech_characteristics(json_conf, language="en", speaker_label=None, min_tur
         df_list = cutil.create_empty_dataframes(measures)
 
         if bool(json_conf):
-            language = language[:2].lower() if (language and len(language) >= 2) else "na"
-
-            if language == 'en':
+            if english_language:
                 cutil.download_nltk_resources()
 
             if is_whisper_transcribe(json_conf):
-                df_list = process_transcript(df_list, json_conf, measures, min_turn_length, speaker_label, 'whisper', language)
+                df_list = process_transcript(df_list, json_conf, measures, min_turn_length, speaker_label, 'whisper', english_language)
 
             elif is_amazon_transcribe(json_conf):
-                df_list = process_transcript(df_list, json_conf, measures, min_turn_length, speaker_label, 'aws', language)
+                df_list = process_transcript(df_list, json_conf, measures, min_turn_length, speaker_label, 'aws', english_language)
 
             else:
-                df_list = process_transcript(df_list, json_conf, measures, min_turn_length, speaker_label, 'vosk', language)
+                df_list = process_transcript(df_list, json_conf, measures, min_turn_length, speaker_label, 'vosk', english_language)
 
     except Exception as e:
         logger.error(f"Error in Speech Characteristics {e}")

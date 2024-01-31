@@ -413,7 +413,7 @@ def get_pause_feature_word(word_df, df_diff, word_list, turn_index, measures):
     word_df[measures["num_syllables"]] = [get_num_of_syllables(word) for word in word_list]
     return word_df
 
-def process_pause_feature(df_diff, df, text_level, index_list, time_index, level_name, measures, language):
+def process_pause_feature(df_diff, df, text_level, index_list, time_index, level_name, measures, english_language):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -438,6 +438,8 @@ def process_pause_feature(df_diff, df, text_level, index_list, time_index, level
         The name of the level being analyzed turn.
     measures: dict
         A dictionary containing the names of the columns in the output dataframes.
+    english_language: bool
+        True if language is english
 
     Returns:
     ...........
@@ -475,7 +477,7 @@ def process_pause_feature(df_diff, df, text_level, index_list, time_index, level
                 speech_pct_val = 100 * (1 - np.sum(pauses) / (60 * df.loc[j, measures[f"{level_name}_minutes"]]))
                 df.loc[j, measures["speech_percentage"]] = speech_pct_val
 
-                if language == 'en':
+                if english_language:
                     syllable_rate = (get_num_of_syllables(text_level[j]) / df.loc[j, measures[f"{level_name}_minutes"]])
                     df.loc[j, measures["syllable_rate"]] = syllable_rate
                 
@@ -488,7 +490,7 @@ def process_pause_feature(df_diff, df, text_level, index_list, time_index, level
 
     return df
 
-def get_pause_feature_turn(turn_df, df_diff, turn_list, turn_index, time_index, measures, language):
+def get_pause_feature_turn(turn_df, df_diff, turn_list, turn_index, time_index, measures, english_language):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -512,6 +514,8 @@ def get_pause_feature_turn(turn_df, df_diff, turn_list, turn_index, time_index, 
             the start and end times of each word.
     measures: dict
         A dictionary containing the names of the columns in the output dataframes.
+    english_language: bool
+        True if language is english
 
     Returns:
     ...........
@@ -532,7 +536,7 @@ def get_pause_feature_turn(turn_df, df_diff, turn_list, turn_index, time_index, 
     turn_df.loc[negative_pause, measures["interrupt_flag"]] = True
     turn_df = turn_df.reset_index(drop=True)
 
-    turn_df = process_pause_feature(df_diff, turn_df, turn_list, turn_index, time_index, measures["turn"], measures, language)
+    turn_df = process_pause_feature(df_diff, turn_df, turn_list, turn_index, time_index, measures["turn"], measures, english_language)
     return turn_df
 
 def update_summ_df(df_diff, summ_df, full_text, time_index, word_df, turn_df, measures):
@@ -598,7 +602,7 @@ def update_summ_df(df_diff, summ_df, full_text, time_index, word_df, turn_df, me
 
     return summ_df
 
-def get_pause_feature(json_conf, df_list, text_list, text_indices, measures, time_index, language):
+def get_pause_feature(json_conf, df_list, text_list, text_indices, measures, time_index, english_language):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -619,8 +623,8 @@ def get_pause_feature(json_conf, df_list, text_list, text_indices, measures, tim
         A dictionary containing the names of the columns in the output dataframes.
     time_index: list
         timepoint index (start/end)
-    language: str
-        Language of the transcribed text.
+    english_language: bool
+        True if language is english
 
     Returns:
     ...........
@@ -647,7 +651,7 @@ def get_pause_feature(json_conf, df_list, text_list, text_indices, measures, tim
 
     # turn-level analysis
     if len(turn_index) > 0:
-        turn_df = get_pause_feature_turn(turn_df, df_diff, turn_list, turn_index, time_index, measures, language)
+        turn_df = get_pause_feature_turn(turn_df, df_diff, turn_list, turn_index, time_index, measures, english_language)
 
     # file-level analysis
     summ_df = update_summ_df(df_diff, summ_df, full_text, time_index, word_df, turn_df, measures)
@@ -847,7 +851,7 @@ def calculate_file_feature(json_data, model, speakers):
     speaking_pct = (speaking_time / file_length) * 100
     return file_length/60, speaking_pct
 
-def process_language_feature(df_list, transcribe_info, language, time_index, measures):
+def process_language_feature(df_list, transcribe_info, english_language, time_index, measures):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -861,8 +865,8 @@ def process_language_feature(df_list, transcribe_info, language, time_index, mea
         transcribed info
     time_index: list
         timepoint index (start/end)
-    language: str
-        Language of the transcribed text.
+    english_language: bool
+        True if language is english
     measures: dict
         A dictionary containing the names of the columns in the output dataframes.
 
@@ -874,9 +878,9 @@ def process_language_feature(df_list, transcribe_info, language, time_index, mea
     ------------------------------------------------------------------------------------------------------
     """
     json_conf, text_list, text_indices = transcribe_info
-    df_list = get_pause_feature(json_conf, df_list, text_list, text_indices, measures, time_index, language)
+    df_list = get_pause_feature(json_conf, df_list, text_list, text_indices, measures, time_index, english_language)
 
-    if language == "en":
+    if english_language:
         json_conf = get_tag(json_conf, TAG_DICT, measures)
         df_list = get_tag_summ(json_conf, df_list, measures)
 
