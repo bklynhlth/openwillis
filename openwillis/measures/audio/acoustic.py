@@ -9,10 +9,6 @@ import logging
 import numpy as np
 import pandas as pd
 
-from parselmouth import Sound
-from parselmouth.praat import call, run_file
-from pydub import AudioSegment,silence
-
 from openwillis.measures.audio.util import acoustic_util as autil
 
 logging.basicConfig(level=logging.INFO)
@@ -55,9 +51,7 @@ def get_summary(sound, framewise, sig_df, df_silence, measures):
     summ_silence = autil.silence_summary(sound, df_silence, measures)
     voice_pct = autil.voice_frame(sound, measures)
 
-    df_relative = calculate_relative_stds(framewise, df_silence, measures)
-
-    df_concat = pd.concat(df_list+ [sig_df, summ_silence, voice_pct, df_relative], axis=1)
+    df_concat = pd.concat(df_list+ [sig_df, summ_silence, voice_pct], axis=1)
     return df_concat
 
 def get_voiced_segments(df_silence, min_duration, measures):
@@ -110,121 +104,6 @@ def get_voiced_segments(df_silence, min_duration, measures):
     speech_indices_expanded = speech_indices_expanded.astype(int)
     return speech_indices_expanded
 
-def calculate_relative_stds(framewise, df_silence, measures):
-    """
-    ------------------------------------------------------------------------------------------------------
-    
-    Calculates the relative standard deviation of F0 and loudness for the voiced segments.
-
-    Parameters:
-    ...........
-    framewise : pandas dataframe
-        dataframe containing pitch, loudness, HNR, and formant frequency values
-    df_silence : pandas dataframe
-        dataframe containing the silence window values
-    measures : dict
-        a dictionary containing the measures names for the calculated statistics.
-
-    Returns:
-    ...........
-    df_relative : pandas dataframe
-        dataframe containing the relative standard deviation of F0 and loudness for the voiced segments
-
-    ------------------------------------------------------------------------------------------------------
-    """
-
-    speech_indices = get_voiced_segments(df_silence, 100, measures)
-    if speech_indices is None:
-        speech_indices = np.arange(0, len(framewise))
-    elif speech_indices[-1] < len(framewise):
-        peech_indices = np.append(speech_indices, np.arange(speech_indices[-1], len(framewise)))
-
-    f0 = framewise[measures['fundfreq']][speech_indices]
-    loudness = framewise[measures['loudness']][speech_indices]
-
-    relF0sd = np.std(f0) / np.mean(f0)
-    relSE0SD = np.std(loudness) / np.mean(loudness)
-
-    df_relative = pd.DataFrame([[relF0sd, relSE0SD]], columns=[measures['relF0sd'], measures['relSE0SD']])
-    return df_relative
-
-def calculate_tremor(audio_path):
-    """
-    ------------------------------------------------------------------------------------------------------
-
-    Calculates the tremor features of an audio file.
-
-    Parameters:
-    ...........
-    audio_path : str
-        path to the audio file
-
-    Returns:
-    ...........
-    tremor_features : list
-        list containing the tremor features
-        [FCoM, FTrC, FMon, FTrF, FTrI, FTrP, FTrCIP, FTrPS, FCoHNR, ACoM, ATrC, AMoN, ATrF, ATrI, ATrP, ATrCIP, ATrPS, ACoHNR]
-
-    ------------------------------------------------------------------------------------------------------
-    """
-    tremor_dir = os.path.dirname(os.path.abspath(__file__))
-    tremor_dir = os.path.join(tremor_dir, "util/praat_tremor")
-
-    tremor_var = run_file(
-        f"{tremor_dir}/vocal_tremor.praat",
-        "4", audio_path, "0.015", "60", "350", "0.03", "0.3",
-        "0.01", "0.35", "0.14", "2", "1.5", "15", "0.01", "0.15",
-        "0.01", "0.01", "2", capture_output=True
-    )
-
-    # retrieve the tremor features
-    tremor_features = tremor_var[1].replace('\n', '').split('\t')
-    tremor_features2 = []
-    for x in tremor_features[1:]:
-        if x != '--undefined--':
-            tremor_features2.append(float(x))
-        else:
-            tremor_features2.append(np.NaN)
-
-    return tremor_features2
-
-def get_tremor_summary(df_summary, audio_path, measures):
-    """
-    ------------------------------------------------------------------------------------------------------
-    
-    Calculates the summary statistics for a sustained vowel related to vocal tremor.
-
-    Parameters:
-    ...........
-    df_summary : pandas dataframe
-        dataframe containing the summary statistics for the audio file
-    audio_path : str
-        path to the audio file
-    measures : dict
-        a dictionary containing the measures names for the calculated statistics.
-
-    Returns:
-    ...........
-    df_summary : pandas dataframe
-        dataframe containing the summary statistics for the audio file
-
-    ------------------------------------------------------------------------------------------------------
-    """
-
-    tremor_cols = [
-        measures["FCoM"], measures["FTrC"], measures["FMon"],
-        measures["FTrF"], measures["FTrI"], measures["FTrP"],
-        measures["FTrCIP"], measures["FTrPS"], measures["FCoHNR"],
-        measures["ACoM"], measures["ATrC"], measures["AMoN"],
-        measures["ATrF"], measures["ATrI"], measures["ATrP"],
-        measures["ATrCIP"], measures["ATrPS"], measures["ACoHNR"]
-    ]
-
-    tremor_features = calculate_tremor(audio_path)
-    tremor_summ = pd.DataFrame([tremor_features], columns=tremor_cols)
-
-    df_summary = pd.concat([df_summary, tremor_summ], axis=1)
-    return df_summary
 
 def vocal_acoustics(audio_path):
     """
@@ -265,8 +144,7 @@ def vocal_acoustics(audio_path):
         sig_df = pd.concat([df_jitter, df_shimmer, df_gne], axis=1)
 
         df_summary = get_summary(sound, framewise, sig_df, df_silence, measures)
-        df_summary2 = get_tremor_summary(df_summary, audio_path, measures)
-        return framewise, df_silence, df_summary2
+        return framewise, df_silence, df_summary
 
     except Exception as e:
         logger.error(f'Error in acoustic calculation- file: {audio_path} & Error: {e}')
