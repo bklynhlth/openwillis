@@ -568,11 +568,14 @@ def update_summ_df(df_diff, summ_df, full_text, time_index, word_df, turn_df, me
     """
     if len(turn_df) > 0:
         speech_minutes = turn_df[measures["turn_minutes"]].sum()
+        speech_words = turn_df[measures["turn_words"]].sum()
     else:
         speech_minutes = (float(df_diff.iloc[-1][time_index[1]]) - float(df_diff.iloc[0][time_index[0]])) / 60
-    summ_df[measures["speech_minutes"]] = [speech_minutes]
-    
-    summ_df[measures["speech_words"]] = len(df_diff)
+        speech_words = len(df_diff)
+
+    summ_df[measures["speech_minutes"]] = [speech_minutes]    
+    summ_df[measures["speech_words"]] = [speech_words]
+
     if speech_minutes > 0:
         
         summ_df[measures["word_rate"]] = (summ_df[measures["speech_words"]] / summ_df[measures["speech_minutes"]])
@@ -595,7 +598,7 @@ def update_summ_df(df_diff, summ_df, full_text, time_index, word_df, turn_df, me
 
     return summ_df
 
-def get_pause_feature(json_conf, df_list, text_list, turn_index, measures, time_index, language):
+def get_pause_feature(json_conf, df_list, text_list, text_indices, measures, time_index, language):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -610,7 +613,7 @@ def get_pause_feature(json_conf, df_list, text_list, turn_index, measures, time_
         List of pandas dataframes: word_df, turn_df, summ_df
     text_list: list
         List of transcribed text: split into words, turns, and full text.
-    turn_index: list
+    text_indices: list
         List of indices for text_list.
     measures: dict
         A dictionary containing the names of the columns in the output dataframes.
@@ -629,6 +632,8 @@ def get_pause_feature(json_conf, df_list, text_list, turn_index, measures, time_
     if len(json_conf) <= 0:
         return df_list
 
+    turn_index, turn_index2 = text_indices
+
     word_df, turn_df, summ_df = df_list
     word_list, turn_list, full_text = text_list
     df_diff = pd.DataFrame(json_conf)
@@ -638,7 +643,7 @@ def get_pause_feature(json_conf, df_list, text_list, turn_index, measures, time_
         df_diff[measures["pause"]] = df_diff[time_index[0]].astype(float) - df_diff[time_index[1]].astype(float).shift(1)
 
     # word-level analysis
-    word_df = get_pause_feature_word(word_df, df_diff, word_list, turn_index, measures)
+    word_df = get_pause_feature_word(word_df, df_diff, word_list, turn_index2, measures)
 
     # turn-level analysis
     if len(turn_index) > 0:
@@ -868,8 +873,8 @@ def process_language_feature(df_list, transcribe_info, language, time_index, mea
 
     ------------------------------------------------------------------------------------------------------
     """
-    json_conf, text_list, turn_indices = transcribe_info
-    df_list = get_pause_feature(json_conf, df_list, text_list, turn_indices, measures, time_index, language)
+    json_conf, text_list, text_indices = transcribe_info
+    df_list = get_pause_feature(json_conf, df_list, text_list, text_indices, measures, time_index, language)
 
     if language == "en":
         json_conf = get_tag(json_conf, TAG_DICT, measures)

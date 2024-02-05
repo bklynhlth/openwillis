@@ -108,7 +108,8 @@ def filter_transcribe(json_conf, measures, min_turn_length, speaker_label=None):
         List of transcribed text.
          split into words, turns, and full text.
     text_indices: list
-        List of indices for text_list.
+        List of indices for text_list
+         split into turns and unfiltered turns.
     ------------------------------------------------------------------------------------------------------
     """
     item_data = json_conf["results"]["items"]
@@ -121,16 +122,20 @@ def filter_transcribe(json_conf, measures, min_turn_length, speaker_label=None):
 
     if speaker_label is not None:
         turns_idxs, turns = cutil.filter_speaker_aws(item_data, min_turn_length, speaker_label)
+        turns_idxs2, _ = cutil.filter_speaker_aws(item_data, 1, speaker_label)
+
         text = " ".join(turns)
         
     else:
-        turns_idxs, turns = [], []
+        turns_idxs, turns_idxs2, turns = [], [], []
 
     filter_json = cutil.filter_json_transcribe_aws(item_data, speaker_label, measures)
     words = [word["alternatives"][0]["content"] for word in filter_json]
 
     text_list = [words, turns, text]
-    return filter_json, text_list, turns_idxs
+    text_indices = [turns_idxs, turns_idxs2]
+
+    return filter_json, text_list, text_indices
 
 
 def filter_whisper(json_conf, measures, min_turn_length, speaker_label=None):
@@ -161,7 +166,8 @@ def filter_whisper(json_conf, measures, min_turn_length, speaker_label=None):
         List of transcribed text.
             split into words, phrases, turns, and full text.
     text_indices: list
-        List of indices for phrases and turns.
+        List of indices for turns
+            split into turns and unfiltered turns.
 
     Raises:
     ...........
@@ -178,17 +184,20 @@ def filter_whisper(json_conf, measures, min_turn_length, speaker_label=None):
     item_data = cutil.create_index_column(item_data, measures)
     if speaker_label is not None:    
         turns_idxs, turns = cutil.filter_turns(item_data, speaker_label, measures, min_turn_length)
+        turns_idxs2, _ = cutil.filter_turns(item_data, speaker_label, measures, 1)
         
         text = " ".join(turns)
     else:
-        turns_idxs, turns = [], []
+        turns_idxs, turns_idxs2, turns = [], [], []
     
     # filter json to only include items with start_time and end_time
     filter_json = cutil.filter_json_transcribe(item_data, speaker_label, measures)
     words = [value["word"] for value in filter_json]
     
     text_list = [words, turns, text]
-    return filter_json, text_list, turns_idxs
+    text_indices = [turns_idxs, turns_idxs2]
+
+    return filter_json, text_list, text_indices
 
 
 def filter_vosk(json_conf, measures):
@@ -309,7 +318,7 @@ def process_transcript(df_list, json_conf, measures, min_turn_length, speaker_la
         
     else:
         words, text = filter_vosk(json_conf, measures)
-        info = (json_conf, [words, [], text], [])
+        info = (json_conf, [words, [], text], [[], []])
 
     if len(info[0]) > 0 and len(info[1][-1]) > 0:
         df_list = cutil.process_language_feature(df_list, info, language, get_time_columns(source), measures)
