@@ -8,14 +8,15 @@ protobuf3-to-dict==0.1.5
 praat-parselmouth==0.4.3
 pydub==0.25.1
 deepface==0.0.75
-vosk==0.3.45
+vosk==0.3.44
 vaderSentiment==3.3.2
 nltk==3.8.1
 lexicalrichness==0.5.0
 torch==2.0.0
 pyannote.audio==3.0.0
-transformers==4.30.0
+transformers==4.36.0
 sentence-transformers==2.2.2
 huggingface-hub==0.15.1
 boto3==1.26.106
 scipy==1.10.1
+forest @ git+https://github.com/onnela-lab/forest@5b9ba664cc09ac49f58e42cce3b271aa03a41967
