@@ -95,95 +95,100 @@ def download_nltk_resources():
         nltk.data.find("averaged_perceptron_tagger")
     except LookupError:
         nltk.download("averaged_perceptron_tagger")
-
-def filter_turn_aws(item_data, min_turn_length, speaker_label):
+        
+def create_turns_aws(item_data):
     """
     ------------------------------------------------------------------------------------------------------
-    
-    This function updates the turns list
-        to only include the speaker label provided.
+
+    This function creates a dataframe of turns from the JSON response object for AWS.
 
     Parameters:
     ...........
     item_data: dict
         JSON response object.
-    min_turn_length: int
-        minimum words required in each turn
-    speaker_label: str
-        Speaker label
-        
+
     Returns:
     ...........
-    turns_idxs: list
-        A list of tuples containing
-            the start and end indices of the turns in the JSON object.
-    turns: list
-        A list of turns extracted from the JSON object.
+    utterances: pandas dataframe
+        A dataframe containing the turns extracted from the JSON object,
+            along with word, phrase and utterance indices and texts.
 
     ------------------------------------------------------------------------------------------------------
     """
-    start_idx = 0
-    turns_idxs, turns = [], []
-    for i, item in enumerate(item_data):
-        
-        try:
-            if (i > 0 and item.get("speaker_label", "") == speaker_label and item_data[i - 1].get("speaker_label", "") != speaker_label):
-                start_idx = i
+
+    utterances, current_utterance, utterance_texts = [], [], []
+    current_words, words_texts = [], []
+    current_speaker = None
+    utterance_id = 0
+
+    for item in item_data:
+        # Check if the item is a continuation of the current speaker's turn
+        if item['speaker_label'] == current_speaker:
+            current_utterance.append(utterance_id)
+            utterance_texts.append(item['alternatives'][0]['content'])
+            if 'start_time' in item and 'end_time' in item:
+                current_words.append(utterance_id)
+                words_texts.append(item['alternatives'][0]['content'])
+        else:
+            # If not, save the current utterance (if any) and start a new one
+            if current_utterance:
+                # split utterance into phrases
+                phrases = nltk.tokenize.sent_tokenize(' '.join(utterance_texts))
+                phrases_idxs = []
+
+                start_idx = current_utterance[0]
+                for phrase in phrases:
+                    end_idx = start_idx + len(phrase.split()) - 1
+                    phrases_idxs.append((start_idx, end_idx))
+                    start_idx = end_idx + 1
+
+                utterances.append({
+                    'utterance_ids': (current_utterance[0], current_utterance[-1]),
+                    'utterance_text': ' '.join(utterance_texts),
+                    'phrases_ids': phrases_idxs,
+                    'phrases_texts': phrases.copy(),
+                    'words_ids': current_words.copy(),
+                    'words_texts': words_texts.copy(),
+                    'speaker_label': current_speaker,
+                })
+                current_utterance.clear()
+                utterance_texts.clear()
+                current_words.clear()
+                words_texts.clear()
             
-            elif (i > 0 and item.get("speaker_label", "") != speaker_label and item_data[i - 1].get("speaker_label", "") == speaker_label):
-                turn_text = " ".join([item["alternatives"][0]["content"] for item in item_data[start_idx:i]])
+            current_speaker = item['speaker_label']
+            current_utterance.append(utterance_id)
+            utterance_texts.append(item['alternatives'][0]['content'])
+            if 'start_time' in item and 'end_time' in item:
+                current_words.append(utterance_id)
+                words_texts.append(item['alternatives'][0]['content'])
+        
+        utterance_id += 1
 
-                if len(turn_text.split(" ")) >= min_turn_length:
-                    turns_idxs.append((start_idx, i - 1))
-                    turns.append(turn_text)
-                
-        except Exception as e:
-            logger.error(f"Error in turn-split for speaker {speaker_label}: {e}")
-            continue
+    # Don't forget to add the last utterance if the loop ends
+    if current_utterance:
+        phrases = nltk.tokenize.sent_tokenize(' '.join(utterance_texts))
+        phrases_idxs = []
 
-    if start_idx not in [item[0] for item in turns_idxs]:
-        turn_text = " ".join([item["alternatives"][0]["content"] for item in item_data[start_idx:]])
+        start_idx = current_utterance[0]
+        for phrase in phrases:
+            end_idx = start_idx + len(phrase.split()) - 1
+            phrases_idxs.append((start_idx, end_idx))
+            start_idx = end_idx + 1
 
-        if len(turn_text.split(" ")) >= min_turn_length:
-            turns_idxs.append((start_idx, len(item_data) - 1))
+        utterances.append({
+            'utterance_ids': (current_utterance[0], current_utterance[-1]),
+            'utterance_text': ' '.join(utterance_texts),
+            'phrases_ids': phrases_idxs,
+            'phrases_texts': phrases.copy(),
+            'words_ids': current_words.copy(),
+            'words_texts': words_texts.copy(),
+            'speaker_label': current_speaker,
+        })
 
-            turns.append(turn_text)
-    return turns_idxs, turns
+    return pd.DataFrame(utterances)
 
-def filter_speaker_aws(item_data, min_turn_length, speaker_label):
-    """
-    ------------------------------------------------------------------------------------------------------
-
-    This function updates the turns lists to only include the speaker label provided.
-
-    Parameters:
-    ...........
-    item_data: dict
-        JSON response object.
-    min_turn_length: int
-        minimum words required in each turn
-    speaker_label: str
-        Speaker label
-
-    Returns:
-    ...........
-    turns_idxs: list
-        A list of tuples containing the start and end indices of the turns in the JSON object.
-    turns: list
-        A list of turns extracted from the JSON object.
-
-    ------------------------------------------------------------------------------------------------------
-    """
-
-    speaker_labels = [item["speaker_label"] for item in item_data if "speaker_label" in item]
-
-    if speaker_label not in speaker_labels:
-        logger.error(f"Speaker label {speaker_label} not found in the json response object.")
-
-    turns_idxs, turns = filter_turn_aws(item_data, min_turn_length, speaker_label)
-    return turns_idxs, turns
-
-def filter_json_transcribe_aws(item_data, speaker_label, measures):
+def filter_json_transcribe_aws(item_data, measures):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -193,8 +198,6 @@ def filter_json_transcribe_aws(item_data, speaker_label, measures):
     ...........
     item_data: dict
         JSON response object.
-    speaker_label: str
-        Speaker label
     measures: dict
         A dictionary containing the names of the columns in the output dataframes.
 
@@ -208,78 +211,85 @@ def filter_json_transcribe_aws(item_data, speaker_label, measures):
     filter_json = [item for item in item_data if "start_time" in item and "end_time" in item]
     filter_json = pause_calculation(filter_json, measures, ['start_time', 'end_time'])
 
-    if speaker_label is not None:
-        filter_json = [item for item in filter_json if item.get("speaker_label", "") == speaker_label]
-
     return filter_json
 
-def filter_turns(item_data, speaker_label, measures, min_turn_length):
+def create_turns_whisper(item_data):
     """
     ------------------------------------------------------------------------------------------------------
-    
-    This function updates the turns list
-        to only include the speaker label provided.
+
+    This function creates a dataframe of turns from the JSON response object for Whisper.
 
     Parameters:
     ...........
     item_data: dict
         JSON response object.
-    speaker_label: str
-        Speaker label
-    measures: dict
-        A dictionary containing the names of the columns in the output dataframes.
-    min_turn_length: int
-        minimum words required in each turn
 
     Returns:
     ...........
-    turns_idxs: list
-        A list of tuples containing
-            the start and end indices of the turns in the JSON object.
-    turns: list
-        A list of turns extracted from the JSON object.
+    utterances: pandas dataframe
+        A dataframe containing the turns extracted from the JSON object,
+            along with word, phrase and utterance indices and texts.
 
     ------------------------------------------------------------------------------------------------------
     """
-    turns_idxs, turns = [], []
-    current_turn = None
+
+    data = []
+    current_speaker = None
+    aggregated_text = ""
+    aggregated_ids = []
+    word_ids, word_texts = [], []
+    phrase_ids, phrase_texts = [], []
 
     for item in item_data:
-        try:
-            
-            if "speaker" in item:
-                if item["speaker"] == speaker_label:
-                    current_turn = [item] if current_turn is None else current_turn + [item]
-                    
-                else:
-                    if current_turn is not None:
-                        
-                        if len(current_turn)>0 and len(current_turn[0]["words"])>0: 
-                            start_idx2 = current_turn[0]["words"][0][measures["old_index"]]
-                            
-                            end_idx2 = current_turn[-1]["words"][-1][measures["old_index"]]
-                            turn_text = " ".join(item["text"] for item in current_turn)
-                            
-                            if len(turn_text.split(" ")) >= min_turn_length:
-                                turns_idxs.append((start_idx2, end_idx2))
+        if item['speaker'] == current_speaker:
+            idxs = [word['old_idx'] for word in item['words']]
+            # Continue aggregating text and ids for the current speaker
+            aggregated_text += " " + item['text']
+            aggregated_ids.extend(idxs)
 
-                                turns.append(turn_text)
-                        current_turn = None
-                        
-        except Exception as e:
-            logger.error(f"Error in turn calculation {e}")
-    
-    if current_turn is not None:
-        start_idx2 = current_turn[0]["words"][0][measures["old_index"]]
-        
-        end_idx2 = current_turn[-1]["words"][-1][measures["old_index"]]
-        turn_text = " ".join(item["text"] for item in current_turn)
-        
-        if len(turn_text.split(" ")) >= min_turn_length: 
-            turns_idxs.append((start_idx2, end_idx2))
+            word_ids.extend(idxs)
+            word_texts.extend([word['word'] for word in item['words']])
+
+            phrase_ids.append((idxs[0], idxs[-1]))
+            phrase_texts.append(item['text'])
+
+        else:
+            # If the speaker changes, save the current aggregation (if it exists) and start new aggregation
+            if aggregated_ids:  # Check to ensure it's not the first item
+                data.append({
+                    'utterance_ids': (aggregated_ids[0], aggregated_ids[-1]),
+                    'utterance_text': aggregated_text.strip(),
+                    'phrases_ids': phrase_ids,
+                    'phrases_texts': phrase_texts,
+                    'words_ids': word_ids,
+                    'words_texts': word_texts,
+                    'speaker_label': current_speaker
+                })
             
-            turns.append(turn_text)
-    return turns_idxs, turns
+            # Reset aggregation for the new speaker
+            current_speaker = item['speaker']
+            aggregated_text = item['text']
+            aggregated_ids = [word['old_idx'] for word in item['words']]
+
+            word_ids = [word['old_idx'] for word in item['words']]
+            word_texts = [word['word'] for word in item['words']]
+
+            phrase_ids = [(word_ids[0], word_ids[-1])]
+            phrase_texts = [item['text']]
+    
+    # Don't forget to add the last aggregated utterance
+    if aggregated_ids:
+        data.append({
+            'utterance_ids': (aggregated_ids[0], aggregated_ids[-1]),
+            'utterance_text': aggregated_text.strip(),
+            'phrases_ids': phrase_ids,
+            'phrases_texts': phrase_texts,
+            'words_ids': word_ids,
+            'words_texts': word_texts,
+            'speaker_label': current_speaker
+        })
+
+    return pd.DataFrame(data)
 
 def pause_calculation(filter_json, measures, time_index):
     """
@@ -309,7 +319,7 @@ def pause_calculation(filter_json, measures, time_index):
             item[measures["pause"]] = np.nan
     return filter_json
 
-def filter_json_transcribe(item_data, speaker_label, measures):
+def filter_json_transcribe(item_data, measures):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -319,8 +329,6 @@ def filter_json_transcribe(item_data, speaker_label, measures):
     ...........
     item_data: dict
         JSON response object.
-    speaker_label: str
-        Speaker label
     measures: dict
         A dictionary containing the names of the columns in the output dataframes.
 
@@ -334,8 +342,10 @@ def filter_json_transcribe(item_data, speaker_label, measures):
     item_data2 = []
     for item in item_data:
         try:
-            
-            speaker = item["speaker"]
+            if "speaker" in item:
+                speaker = item["speaker"]
+            else:
+                speaker = ""
             words = item["words"]
             
             for j, w in enumerate(words):# update speaker labels
@@ -348,8 +358,6 @@ def filter_json_transcribe(item_data, speaker_label, measures):
     filter_json = [item for item in item_data2 if "start" in item and "end" in item]
     filter_json = pause_calculation(filter_json, measures, ['start', 'end'])
 
-    if speaker_label is not None:
-        filter_json = [item for item in filter_json if item.get("speaker", "") == speaker_label]
     return filter_json
 
 def get_num_of_syllables(text):
@@ -842,7 +850,50 @@ def calculate_file_feature(json_data, model, speakers):
     speaking_pct = (speaking_time / file_length) * 100
     return file_length/60, speaking_pct
 
-def process_language_feature(df_list, transcribe_info, language, time_index, measures):
+def create_text_list(utterances_speaker, speaker_label, min_turn_length):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    This function creates a list of transcribed text at the word, turn, and full text levels,
+        and a list of the indices of the first and last word in each turn.
+
+    Parameters:
+    ...........
+    utterances_speaker: pandas dataframe
+        A dataframe containing the turns extracted from the JSON object
+         for the specified speaker.
+    speaker_label: str
+        Speaker label
+    min_turn_length: int
+        minimum words required in each turn
+
+    Returns:
+    ...........
+    text_list: list
+        List of transcribed text at the word, turn, and full text levels.
+    turn_indices: list
+        A list containing the indices of the first and last word in each turn.
+
+    ------------------------------------------------------------------------------------------------------
+
+    """
+
+    word_list = []
+    turn_list = []
+    text = ""
+    turn_indices = []
+    for row in utterances_speaker.itertuples():
+        text += row.utterance_text
+        word_list += row.words_texts
+        if speaker_label is not None and len(row.words_texts) >= min_turn_length:
+            turn_list.append(row.utterance_text)
+            turn_indices.append(row.utterance_ids)
+
+    text_list = [word_list, turn_list, text]
+
+    return text_list, turn_indices
+
+def process_language_feature(df_list, transcribe_info, speaker_label, min_turn_length, language, time_index, measures):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -854,6 +905,10 @@ def process_language_feature(df_list, transcribe_info, language, time_index, mea
         List of pandas dataframes.
     transcribe_info: list
         transcribed info
+    min_turn_length: int
+        minimum words required in each turn
+    speaker_label: str
+        Speaker label
     time_index: list
         timepoint index (start/end)
     language: str
@@ -868,12 +923,21 @@ def process_language_feature(df_list, transcribe_info, language, time_index, mea
 
     ------------------------------------------------------------------------------------------------------
     """
-    json_conf, text_list, turn_indices = transcribe_info
-    df_list = get_pause_feature(json_conf, df_list, text_list, turn_indices, measures, time_index, language)
+    json_conf, utterances = transcribe_info
+    if speaker_label is not None:
+        utterances_speaker = utterances[utterances['speaker_label'] == speaker_label]
+        json_conf_speaker = [item for item in json_conf if item.get("speaker_label", "") == speaker_label or item.get("speaker", "") == speaker_label]
+    else:
+        utterances_speaker = utterances.copy()
+        json_conf_speaker = json_conf.copy()
+
+    text_list, turn_indices = create_text_list(utterances_speaker, speaker_label, min_turn_length)
+
+    df_list = get_pause_feature(json_conf_speaker, df_list, text_list, turn_indices, measures, time_index, language)
 
     if language == "en":
-        json_conf = get_tag(json_conf, TAG_DICT, measures)
-        df_list = get_tag_summ(json_conf, df_list, measures)
+        json_conf_speaker = get_tag(json_conf_speaker, TAG_DICT, measures)
+        df_list = get_tag_summ(json_conf_speaker, df_list, measures)
 
         df_list = get_sentiment(df_list, text_list, measures)
     return df_list

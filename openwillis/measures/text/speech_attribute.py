@@ -84,7 +84,7 @@ def is_whisper_transcribe(json_conf):
                 return True
     return False
 
-def filter_transcribe(json_conf, measures, min_turn_length, speaker_label=None):
+def filter_transcribe(json_conf, measures):
     """
     ------------------------------------------------------------------------------------------------------
     This function extracts the text and filters the JSON data for Amazon Transcribe json response objects.
@@ -95,20 +95,13 @@ def filter_transcribe(json_conf, measures, min_turn_length, speaker_label=None):
         aws transcribe json response.
     measures: dict
         A dictionary containing the names of the columns in the output dataframes.
-    min_turn_length: int
-        minimum words required in each turn
-    speaker_label: str
-        Speaker label
     Returns:
     ...........
     filter_json: list
         The filtered JSON object containing
         only the relevant data for processing.
-    text_list: list
-        List of transcribed text.
-         split into words, turns, and full text.
-    text_indices: list
-        List of indices for text_list.
+    utterances: pd.DataFrame
+        The utterances extracted from the JSON object.
     ------------------------------------------------------------------------------------------------------
     """
     item_data = json_conf["results"]["items"]
@@ -116,24 +109,13 @@ def filter_transcribe(json_conf, measures, min_turn_length, speaker_label=None):
     for i, item in enumerate(item_data): # create_index_column
         item[measures["old_index"]] = i
 
-    # extract text
-    text = " ".join([item["alternatives"][0]["content"] for item in item_data if "alternatives" in item])
+    utterances = cutil.create_turns_aws(item_data)
 
-    if speaker_label is not None:
-        turns_idxs, turns = cutil.filter_speaker_aws(item_data, min_turn_length, speaker_label)
-        text = " ".join(turns)
-        
-    else:
-        turns_idxs, turns = [], []
+    filter_json = cutil.filter_json_transcribe_aws(item_data, measures)
 
-    filter_json = cutil.filter_json_transcribe_aws(item_data, speaker_label, measures)
-    words = [word["alternatives"][0]["content"] for word in filter_json]
+    return filter_json, utterances
 
-    text_list = [words, turns, text]
-    return filter_json, text_list, turns_idxs
-
-
-def filter_whisper(json_conf, measures, min_turn_length, speaker_label=None):
+def filter_whisper(json_conf, measures):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -157,12 +139,9 @@ def filter_whisper(json_conf, measures, min_turn_length, speaker_label=None):
     filter_json: list
         The filtered JSON object containing
         only the relevant data for processing.
-    text_list: list
-        List of transcribed text.
-            split into words, phrases, turns, and full text.
-    text_indices: list
-        List of indices for phrases and turns.
-
+    utterances: pd.DataFrame
+        The utterances extracted from the JSON object.
+        
     Raises:
     ...........
     ValueError: If the speaker label is not found in the json response object.
@@ -170,26 +149,14 @@ def filter_whisper(json_conf, measures, min_turn_length, speaker_label=None):
     ------------------------------------------------------------------------------------------------------
     """
     item_data = json_conf["segments"]
-    text = " ".join(item.get("text", "") for item in item_data)
 
-    if speaker_label is not None:
-        item_data = [segment for segment in item_data if "speaker" in segment]
-        
     item_data = cutil.create_index_column(item_data, measures)
-    if speaker_label is not None:    
-        turns_idxs, turns = cutil.filter_turns(item_data, speaker_label, measures, min_turn_length)
-        
-        text = " ".join(turns)
-    else:
-        turns_idxs, turns = [], []
+    utterances = cutil.create_turns_whisper(item_data)
     
     # filter json to only include items with start_time and end_time
-    filter_json = cutil.filter_json_transcribe(item_data, speaker_label, measures)
-    words = [value["word"] for value in filter_json]
-    
-    text_list = [words, turns, text]
-    return filter_json, text_list, turns_idxs
+    filter_json = cutil.filter_json_transcribe(item_data, measures)
 
+    return filter_json, utterances
 
 def filter_vosk(json_conf, measures):
     """
@@ -207,21 +174,36 @@ def filter_vosk(json_conf, measures):
 
     Returns:
     ...........
-    words: list
-        A list of words extracted from the JSON object.
-    text: str
-        The text extracted from the JSON object.
+    json_conf: list
+        The filtered JSON object containing
+        only the relevant data for processing.
+    utterances: pd.DataFrame
+        The utterances extracted from the JSON object.
 
     ------------------------------------------------------------------------------------------------------
     """
-    words = [word["word"] for word in json_conf if "word" in word]
-    text = " ".join(words)
-
     # make a dictionary to map old indices to new indices
+    words = []
+    words_ids = []
     for i, item in enumerate(json_conf):
         item[measures["old_index"]] = i
-        
-    return words, text
+
+        if "word" in item:
+            words.append(item["word"])
+            words_ids.append(i)
+
+    text = " ".join(words)
+
+    utterances = [{
+        "utterance_ids": (0, len(json_conf) - 1),
+        "utterance_text": text,
+        'words_ids': words_ids,
+        'words_texts': words,
+        'speaker_label': "",
+
+    }]
+
+    return json_conf, utterances
 
 def common_summary_feature(df_summ, json_data, model, speaker_label):
     """
@@ -302,17 +284,16 @@ def process_transcript(df_list, json_conf, measures, min_turn_length, speaker_la
     common_summary_feature(df_list[2], json_conf, source, speaker_label)
 
     if source == 'whisper':
-        info = filter_whisper(json_conf, measures, min_turn_length, speaker_label)
-        
-    elif source == 'aws':
-        info = filter_transcribe(json_conf, measures, min_turn_length, speaker_label)
-        
-    else:
-        words, text = filter_vosk(json_conf, measures)
-        info = (json_conf, [words, [], text], [])
+        info = filter_whisper(json_conf, measures)
 
-    if len(info[0]) > 0 and len(info[1][-1]) > 0:
-        df_list = cutil.process_language_feature(df_list, info, language, get_time_columns(source), measures)
+    elif source == 'aws':
+        info = filter_transcribe(json_conf, measures)
+
+    else:
+        info = filter_vosk(json_conf, measures)
+
+    if len(info[0]) > 0 and len(info[1]) > 0:
+        df_list = cutil.process_language_feature(df_list, info, speaker_label, min_turn_length, language, get_time_columns(source), measures)
     return df_list
 
 def get_time_columns(source):
