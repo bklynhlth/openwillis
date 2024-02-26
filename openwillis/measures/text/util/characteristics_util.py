@@ -213,7 +213,7 @@ def filter_json_transcribe_aws(item_data, measures):
 
     return filter_json
 
-def create_turns_whisper(item_data):
+def create_turns_whisper(item_data, measures):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -223,6 +223,8 @@ def create_turns_whisper(item_data):
     ...........
     item_data: dict
         JSON response object.
+    measures: dict
+        A dictionary containing the names of the columns in the output dataframes.
 
     Returns:
     ...........
@@ -242,7 +244,7 @@ def create_turns_whisper(item_data):
 
     for item in item_data:
         if item['speaker'] == current_speaker:
-            idxs = [word['old_idx'] for word in item['words']]
+            idxs = [word[measures["old_index"]] for word in item['words']]
             # Continue aggregating text and ids for the current speaker
             aggregated_text += " " + item['text']
             aggregated_ids.extend(idxs)
@@ -269,9 +271,9 @@ def create_turns_whisper(item_data):
             # Reset aggregation for the new speaker
             current_speaker = item['speaker']
             aggregated_text = item['text']
-            aggregated_ids = [word['old_idx'] for word in item['words']]
+            aggregated_ids = [word[measures["old_index"]] for word in item['words']]
 
-            word_ids = [word['old_idx'] for word in item['words']]
+            word_ids = [word[measures["old_index"]] for word in item['words']]
             word_texts = [word['word'] for word in item['words']]
 
             phrase_ids = [(word_ids[0], word_ids[-1])]

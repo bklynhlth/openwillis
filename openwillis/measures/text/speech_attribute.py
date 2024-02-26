@@ -151,7 +151,7 @@ def filter_whisper(json_conf, measures):
     item_data = json_conf["segments"]
 
     item_data = cutil.create_index_column(item_data, measures)
-    utterances = cutil.create_turns_whisper(item_data)
+    utterances = cutil.create_turns_whisper(item_data, measures)
     
     # filter json to only include items with start_time and end_time
     filter_json = cutil.filter_json_transcribe(item_data, measures)
