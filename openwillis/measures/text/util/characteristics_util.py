@@ -929,11 +929,18 @@ def process_language_feature(df_list, transcribe_info, speaker_label, min_turn_l
     if speaker_label is not None:
         utterances_speaker = utterances[utterances['speaker_label'] == speaker_label]
         json_conf_speaker = [item for item in json_conf if item.get("speaker_label", "") == speaker_label or item.get("speaker", "") == speaker_label]
+
+        if len(utterances_speaker) <= 0:
+            logger.error(f"No utterances found for speaker {speaker_label}")
+            return df_list
     else:
         utterances_speaker = utterances.copy()
         json_conf_speaker = json_conf.copy()
 
     text_list, turn_indices = create_text_list(utterances_speaker, speaker_label, min_turn_length)
+    if speaker_label is not None and len(turn_indices) <= 0:
+        logger.error(f"No utterances found for speaker {speaker_label} with minimum length {min_turn_length}")
+        return df_list
 
     df_list = get_pause_feature(json_conf_speaker, df_list, text_list, turn_indices, measures, time_index, language)
 
