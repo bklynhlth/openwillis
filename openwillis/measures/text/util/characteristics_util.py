@@ -5,6 +5,7 @@
 
 import pandas as pd
 import numpy as np
+import string
 import logging
 
 import nltk
@@ -46,6 +47,7 @@ def create_empty_dataframes(measures):
                                     measures["pause_meandur"], measures["pause_var"], measures["pos"], measures["neg"], 
                                     measures["neu"], measures["compound"], measures["speech_mattr"],
                                     measures["first_person_percentage"], measures["first_person_sentiment"],
+                                    measures["word_repeat_percentage"], measures["phrase_repeat_percentage"],
                                     measures["interrupt_flag"]])
 
     summ_df = pd.DataFrame(
@@ -53,6 +55,7 @@ def create_empty_dataframes(measures):
                  measures["syllable_rate"], measures["word_pause_mean"], measures["word_pause_var"], 
                  measures["speech_percentage"], measures["pos"], measures["neg"], measures["neu"], measures["compound"], 
                  measures["speech_mattr"], measures["first_person_percentage"], measures["first_person_sentiment"],
+                 measures["word_repeat_percentage"], measures["phrase_repeat_percentage"],
                  measures["num_turns"], measures["num_one_word_turns"], measures["turn_minutes_mean"],
                  measures["turn_words_mean"], measures["turn_pause_mean"], measures["speaker_percentage"], 
                  measures["num_interrupts"]])
@@ -607,7 +610,7 @@ def update_summ_df(df_diff, summ_df, full_text, time_index, word_df, turn_df, me
         summ_df[measures["turn_words_mean"]] = turn_df[measures["turn_words"]].mean(skipna=True)
         summ_df[measures["turn_pause_mean"]] = turn_df[measures["turn_pause"]].mean(skipna=True)
         
-        summ_df["num_one_word_turns"] = len(turn_df[turn_df[measures["turn_words"]] == 1])
+        summ_df[measures["num_one_word_turns"]] = len(turn_df[turn_df[measures["turn_words"]] == 1])
         summ_df[measures["num_interrupts"]] = len(turn_df[turn_df[measures["interrupt_flag"]]==True])
 
     return summ_df
@@ -856,11 +859,11 @@ def get_first_person_summ(summ_df, turn_df, full_text, measures):
     ------------------------------------------------------------------------------------------------------
     """
 
+    summ_df[measures["first_person_percentage"]] = calculate_first_person_percentage(full_text)
+
     if len(turn_df) > 0:
-        summ_df[measures["first_person_percentage"]] = turn_df[measures["first_person_percentage"]].mean(skipna=True)
         summ_df[measures["first_person_sentiment"]] = turn_df[measures["first_person_sentiment"]].mean(skipna=True)
     else:
-        summ_df[measures["first_person_percentage"]] = calculate_first_person_percentage(full_text)
         summ_df[measures["first_person_sentiment"]] = calculate_first_person_sentiment(summ_df, measures)
 
     return summ_df
@@ -948,6 +951,94 @@ def get_sentiment(df_list, text_list, measures):
     df_list = [word_df, turn_df, summ_df]
     return df_list
 
+def calculate_repetitions(words_texts, phrases_texts):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    This function calculates the percentage of repeated words and phrases in the input lists.
+
+    Parameters:
+    ...........
+    words_texts: list
+        List of transcribed text at the word level.
+    phrases_texts: list
+        List of transcribed text at the phrase level.
+
+    Returns:
+    ...........
+    word_reps_perc: float
+        The percentage of repeated words in the input lists.
+    phrase_reps_perc: float
+        The percentage of repeated phrases in the input lists.
+
+    ------------------------------------------------------------------------------------------------------
+    """
+    # remove punctuation - lowercase
+    words_texts = [word.translate(str.maketrans('', '', string.punctuation)).lower() for word in words_texts]
+    phrases_texts = [phrase.translate(str.maketrans('', '', string.punctuation)).lower() for phrase in phrases_texts]
+
+    # remove empty strings
+    words_texts = [word for word in words_texts if word != '']
+    phrases_texts = [phrase for phrase in phrases_texts if phrase != '']
+
+    # calculate repetitions
+    word_reps = len(words_texts) - len(set(words_texts))
+    phrase_reps = len(phrases_texts) - len(set(phrases_texts))
+
+    return 100*word_reps/len(words_texts), 100*phrase_reps/len(phrases_texts)
+
+
+def get_repetitions(df_list, utterances_speaker, utterances_speaker_filtered, measures):
+    """
+
+    This function calculates the percentage of repeated words and phrases in the input text
+    and adds them to the output dataframes.
+
+    Parameters:
+    ...........
+    df_list: list
+        List of pandas dataframes.
+    utterances_speaker: pandas dataframe
+        A dataframe containing the turns extracted from the JSON object for the specified speaker.
+    utterances_speaker_filtered: pandas dataframe
+        A dataframe containing the turns extracted from the JSON object for the specified speaker
+        after filtering out turns with less than min_turn_length words.
+    measures: dict
+        A dictionary containing the names of the columns in the output dataframes.
+
+    Returns:
+    ...........
+    df_list: list
+        List of updated pandas dataframes.
+
+    """
+    
+    word_df, turn_df, summ_df = df_list
+
+    # turn-level
+    if len(turn_df) > 0:
+        for i in range(len(utterances_speaker_filtered)):
+            row = utterances_speaker_filtered.iloc[i]
+            words_texts = row[measures['words_texts']]
+            phrases_texts = row[measures['phrases_texts']]
+
+            word_reps_perc, phrase_reps_perc = calculate_repetitions(words_texts, phrases_texts)
+
+            turn_df.loc[i, measures['word_repeat_percentage']] = word_reps_perc
+            turn_df.loc[i, measures['phrase_repeat_percentage']] = phrase_reps_perc
+
+    # summary-level
+    words_texts = [word for words in utterances_speaker[measures['words_texts']] for word in words]
+    phrases_texts = [phrase for phrases in utterances_speaker[measures['phrases_texts']] for phrase in phrases]
+
+    word_reps_perc, phrase_reps_perc = calculate_repetitions(words_texts, phrases_texts)
+
+    summ_df[measures['word_repeat_percentage']] = word_reps_perc
+    summ_df[measures['phrase_repeat_percentage']] = phrase_reps_perc
+
+    df_list = [word_df, turn_df, summ_df]
+    return df_list
+
 def calculate_file_feature(json_data, model, speakers):
     """
     ------------------------------------------------------------------------------------------------------
@@ -1031,7 +1122,7 @@ def create_text_list(utterances_speaker, speaker_label, min_turn_length, measure
         words_texts = row[measures['words_texts']]
         utterance_ids = row[measures['utterance_ids']]
 
-        text += utterance_text
+        text += " " + utterance_text
         word_list += words_texts
 
         if speaker_label is not None and len(words_texts) >= min_turn_length:
@@ -1088,8 +1179,12 @@ def process_language_feature(df_list, transcribe_info, speaker_label, min_turn_l
     if speaker_label is not None and len(turn_indices) <= 0:
         logger.error(f"No utterances found for speaker {speaker_label} with minimum length {min_turn_length}")
         return df_list
+    
+    # filter utterances with minimum length
+    utterances_speaker_filtered = utterances_speaker[utterances_speaker[measures['words_texts']].apply(lambda x: len(x) >= min_turn_length)].reset_index(drop=True)
 
     df_list = get_pause_feature(json_conf_speaker, df_list, text_list, turn_indices, measures, time_index, language)
+    df_list = get_repetitions(df_list, utterances_speaker, utterances_speaker_filtered, measures)
 
     if language == "en":
         df_list = get_sentiment(df_list, text_list, measures)
