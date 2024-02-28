@@ -16,7 +16,8 @@ logger = logging.getLogger()
 
 # NLTK Tag list
 TAG_DICT = {"PRP": "Pronoun", "PRP$": "Pronoun", "VB": "Verb", "VBD": "Verb", "VBG": "Verb", "VBN": "Verb", "VBP": "Verb", 
-            "VBZ": "Verb", "JJ": "Adjective", "JJR": "Adjective", "JJS": "Adjective", "NN": "Noun", "NNP": "Noun", "NNS": "Noun"}
+            "VBZ": "Verb", "JJ": "Adjective", "JJR": "Adjective", "JJS": "Adjective", "NN": "Noun", "NNP": "Noun", "NNS": "Noun",
+            "RB": "Adverb", "RBR": "Adverb", "RBS": "Adverb", "DT": "Determiner"}
 
 def create_empty_dataframes(measures):
     """
@@ -691,18 +692,20 @@ def get_mattr(text):
 
     return mattr
 
-def get_tag(json_conf, tag_dict, measures):
+def get_tag(word_df, word_list, tag_dict, measures):
     """
     ------------------------------------------------------------------------------------------------------
 
     This function performs part-of-speech
-     tagging on the input text using NLTK, and returns an updated
-     json_conf list with the part-of-speech tags.
+     tagging on the input text using NLTK, and returns
+     word-level part-of-speech tags.
 
     Parameters:
     ...........
-    json_conf: list
-        JSON response object.
+    word_df: pandas dataframe
+        A dataframe containing word summary information.
+    word_list: list
+        List of transcribed text at the word level.
     tag_dict: dict
         A dictionary mapping the NLTK tags to more readable tags.
     measures: dict
@@ -710,58 +713,27 @@ def get_tag(json_conf, tag_dict, measures):
 
     Returns:
     ...........
-    json_conf: list
-        The updated json_conf list.
+    word_df: pandas dataframe
+        The updated word_df dataframe.
 
     ------------------------------------------------------------------------------------------------------
     """
-    if len(json_conf) <= 0:
-        return json_conf
-
-    if "alternatives" not in json_conf[0].keys():
-        word_list = [word["word"] for word in json_conf if "word" in word]# local vosk transcriber
-    
-    else:
-        word_list = [item["alternatives"][0]["content"] for item in json_conf]# aws transcriber
-
     tag_list = nltk.pos_tag(word_list)
     for i, tag in enumerate(tag_list):
         
         if tag[1] in tag_dict.keys():
-            json_conf[i][measures["tag"]] = tag_dict[tag[1]]
-        
+            word_df.loc[i, measures["part_of_speechs"]] = tag_dict[tag[1]]
         else:
-            json_conf[i][measures["tag"]] = "Other"
-    return json_conf
+            word_df.loc[i, measures["part_of_speech"]] = "Other"
 
-def get_tag_summ(json_conf, df_list, measures):
-    """
-    ------------------------------------------------------------------------------------------------------
+    return word_df
 
-    This function calculates the proportions of verbs,
-     pronouns, adjectives, and nouns in the
-     transcribed text, and adds them to the output dataframe summ_df.
-
-    Parameters:
-    ...........
-    json_conf: list
-        JSON response object.
-    df_list: list
-        List of pandas dataframes: word_df, turn_df, summ_df
-    measures: dict
-        A dictionary containing the names of the columns in the output dataframes.
-
-    Returns:
-    ...........
-    df_list: list
-        List of updated pandas dataframes.
-
-    ------------------------------------------------------------------------------------------------------
-    """
+def get_pos_tag(df_list, text_list, tag_dict, measures):
     word_df, turn_df, summ_df = df_list
-    df_conf = pd.DataFrame(json_conf)
-    word_df[measures["part_of_speech"]] = df_conf[measures["tag"]]
-    
+    word_list, turn_list, full_text = text_list
+
+    word_df = get_tag(word_df, word_list, tag_dict, measures)
+
     df_list = [word_df, turn_df, summ_df]
     return df_list
 
@@ -888,7 +860,9 @@ def create_text_list(utterances_speaker, speaker_label, min_turn_length, measure
     turn_list = []
     text = ""
     turn_indices = []
-    for row in utterances_speaker.itertuples():
+    for i in range(len(utterances_speaker)):
+        row = utterances_speaker.iloc[i]
+
         utterance_text = row[measures['utterance_text']]
         words_texts = row[measures['words_texts']]
         utterance_ids = row[measures['utterance_ids']]
@@ -954,8 +928,7 @@ def process_language_feature(df_list, transcribe_info, speaker_label, min_turn_l
     df_list = get_pause_feature(json_conf_speaker, df_list, text_list, turn_indices, measures, time_index, language)
 
     if language == "en":
-        json_conf_speaker = get_tag(json_conf_speaker, TAG_DICT, measures)
-        df_list = get_tag_summ(json_conf_speaker, df_list, measures)
+        df_list = get_pos_tag(df_list, text_list, TAG_DICT, measures)
 
         df_list = get_sentiment(df_list, text_list, measures)
     return df_list
