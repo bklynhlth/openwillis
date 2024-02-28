@@ -109,7 +109,7 @@ def filter_transcribe(json_conf, measures):
     for i, item in enumerate(item_data): # create_index_column
         item[measures["old_index"]] = i
 
-    utterances = cutil.create_turns_aws(item_data)
+    utterances = cutil.create_turns_aws(item_data, measures)
 
     filter_json = cutil.filter_json_transcribe_aws(item_data, measures)
 
@@ -153,7 +153,6 @@ def filter_whisper(json_conf, measures):
     item_data = cutil.create_index_column(item_data, measures)
     utterances = cutil.create_turns_whisper(item_data, measures)
     
-    # filter json to only include items with start_time and end_time
     filter_json = cutil.filter_json_transcribe(item_data, measures)
 
     return filter_json, utterances
@@ -195,11 +194,11 @@ def filter_vosk(json_conf, measures):
     text = " ".join(words)
 
     utterances = [{
-        "utterance_ids": (0, len(json_conf) - 1),
-        "utterance_text": text,
-        'words_ids': words_ids,
-        'words_texts': words,
-        'speaker_label': "",
+        measures["utterance_ids"]: (0, len(json_conf) - 1),
+        measures["utterance_text"]: text,
+        measures['words_ids']: words_ids,
+        measures['words_texts']: words,
+        measures['speaker_label']: "",
 
     }]
 

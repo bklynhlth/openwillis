@@ -96,7 +96,7 @@ def download_nltk_resources():
     except LookupError:
         nltk.download("averaged_perceptron_tagger")
         
-def create_turns_aws(item_data):
+def create_turns_aws(item_data, measures):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -106,6 +106,8 @@ def create_turns_aws(item_data):
     ...........
     item_data: dict
         JSON response object.
+    measures: dict
+        A dictionary containing the names of the columns in the output dataframes.
 
     Returns:
     ...........
@@ -143,13 +145,13 @@ def create_turns_aws(item_data):
                     start_idx = end_idx + 1
 
                 utterances.append({
-                    'utterance_ids': (current_utterance[0], current_utterance[-1]),
-                    'utterance_text': ' '.join(utterance_texts),
-                    'phrases_ids': phrases_idxs,
-                    'phrases_texts': phrases.copy(),
-                    'words_ids': current_words.copy(),
-                    'words_texts': words_texts.copy(),
-                    'speaker_label': current_speaker,
+                    measures['utterance_ids']: (current_utterance[0], current_utterance[-1]),
+                    measures['utterance_text']: ' '.join(utterance_texts),
+                    measures['phrases_ids']: phrases_idxs,
+                    measures['phrases_texts']: phrases.copy(),
+                    measures['words_ids']: current_words.copy(),
+                    measures['words_texts']: words_texts.copy(),
+                    measures['speaker_label']: current_speaker,
                 })
                 current_utterance.clear()
                 utterance_texts.clear()
@@ -177,13 +179,13 @@ def create_turns_aws(item_data):
             start_idx = end_idx + 1
 
         utterances.append({
-            'utterance_ids': (current_utterance[0], current_utterance[-1]),
-            'utterance_text': ' '.join(utterance_texts),
-            'phrases_ids': phrases_idxs,
-            'phrases_texts': phrases.copy(),
-            'words_ids': current_words.copy(),
-            'words_texts': words_texts.copy(),
-            'speaker_label': current_speaker,
+            measures['utterance_ids']: (current_utterance[0], current_utterance[-1]),
+            measures['utterance_text']: ' '.join(utterance_texts),
+            measures['phrases_ids']: phrases_idxs,
+            measures['phrases_texts']: phrases.copy(),
+            measures['words_ids']: current_words.copy(),
+            measures['words_texts']: words_texts.copy(),
+            measures['speaker_label']: current_speaker,
         })
 
     return pd.DataFrame(utterances)
@@ -259,13 +261,13 @@ def create_turns_whisper(item_data, measures):
             # If the speaker changes, save the current aggregation (if it exists) and start new aggregation
             if aggregated_ids:  # Check to ensure it's not the first item
                 data.append({
-                    'utterance_ids': (aggregated_ids[0], aggregated_ids[-1]),
-                    'utterance_text': aggregated_text.strip(),
-                    'phrases_ids': phrase_ids,
-                    'phrases_texts': phrase_texts,
-                    'words_ids': word_ids,
-                    'words_texts': word_texts,
-                    'speaker_label': current_speaker
+                    measures['utterance_ids']: (aggregated_ids[0], aggregated_ids[-1]),
+                    measures['utterance_text']: aggregated_text.strip(),
+                    measures['phrases_ids']: phrase_ids,
+                    measures['phrases_texts']: phrase_texts,
+                    measures['words_ids']: word_ids,
+                    measures['words_texts']: word_texts,
+                    measures['speaker_label']: current_speaker
                 })
             
             # Reset aggregation for the new speaker
@@ -282,13 +284,13 @@ def create_turns_whisper(item_data, measures):
     # Don't forget to add the last aggregated utterance
     if aggregated_ids:
         data.append({
-            'utterance_ids': (aggregated_ids[0], aggregated_ids[-1]),
-            'utterance_text': aggregated_text.strip(),
-            'phrases_ids': phrase_ids,
-            'phrases_texts': phrase_texts,
-            'words_ids': word_ids,
-            'words_texts': word_texts,
-            'speaker_label': current_speaker
+            measures['utterance_ids']: (aggregated_ids[0], aggregated_ids[-1]),
+            measures['utterance_text']: aggregated_text.strip(),
+            measures['phrases_ids']: phrase_ids,
+            measures['phrases_texts']: phrase_texts,
+            measures['words_ids']: word_ids,
+            measures['words_texts']: word_texts,
+            measures['speaker_label']: current_speaker
         })
 
     return pd.DataFrame(data)
@@ -852,7 +854,7 @@ def calculate_file_feature(json_data, model, speakers):
     speaking_pct = (speaking_time / file_length) * 100
     return file_length/60, speaking_pct
 
-def create_text_list(utterances_speaker, speaker_label, min_turn_length):
+def create_text_list(utterances_speaker, speaker_label, min_turn_length, measures):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -868,6 +870,8 @@ def create_text_list(utterances_speaker, speaker_label, min_turn_length):
         Speaker label
     min_turn_length: int
         minimum words required in each turn
+    measures: dict
+        A dictionary containing the names of the columns in the output dataframes.
 
     Returns:
     ...........
@@ -885,11 +889,16 @@ def create_text_list(utterances_speaker, speaker_label, min_turn_length):
     text = ""
     turn_indices = []
     for row in utterances_speaker.itertuples():
-        text += row.utterance_text
-        word_list += row.words_texts
-        if speaker_label is not None and len(row.words_texts) >= min_turn_length:
-            turn_list.append(row.utterance_text)
-            turn_indices.append(row.utterance_ids)
+        utterance_text = row[measures['utterance_text']]
+        words_texts = row[measures['words_texts']]
+        utterance_ids = row[measures['utterance_ids']]
+
+        text += utterance_text
+        word_list += words_texts
+
+        if speaker_label is not None and len(words_texts) >= min_turn_length:
+            turn_list.append(utterance_text)
+            turn_indices.append(utterance_ids)
 
     text_list = [word_list, turn_list, text]
 
@@ -927,7 +936,7 @@ def process_language_feature(df_list, transcribe_info, speaker_label, min_turn_l
     """
     json_conf, utterances = transcribe_info
     if speaker_label is not None:
-        utterances_speaker = utterances[utterances['speaker_label'] == speaker_label]
+        utterances_speaker = utterances[utterances[measures['speaker_label']] == speaker_label]
         json_conf_speaker = [item for item in json_conf if item.get("speaker_label", "") == speaker_label or item.get("speaker", "") == speaker_label]
 
         if len(utterances_speaker) <= 0:
@@ -937,7 +946,7 @@ def process_language_feature(df_list, transcribe_info, speaker_label, min_turn_l
         utterances_speaker = utterances.copy()
         json_conf_speaker = json_conf.copy()
 
-    text_list, turn_indices = create_text_list(utterances_speaker, speaker_label, min_turn_length)
+    text_list, turn_indices = create_text_list(utterances_speaker, speaker_label, min_turn_length, measures)
     if speaker_label is not None and len(turn_indices) <= 0:
         logger.error(f"No utterances found for speaker {speaker_label} with minimum length {min_turn_length}")
         return df_list
