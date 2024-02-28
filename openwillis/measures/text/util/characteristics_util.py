@@ -18,6 +18,7 @@ logger = logging.getLogger()
 TAG_DICT = {"PRP": "Pronoun", "PRP$": "Pronoun", "VB": "Verb", "VBD": "Verb", "VBG": "Verb", "VBN": "Verb", "VBP": "Verb", 
             "VBZ": "Verb", "JJ": "Adjective", "JJR": "Adjective", "JJS": "Adjective", "NN": "Noun", "NNP": "Noun", "NNS": "Noun",
             "RB": "Adverb", "RBR": "Adverb", "RBS": "Adverb", "DT": "Determiner"}
+FIRST_PERSON_PRONOUNS = ["I", "me", "my", "mine", "myself"]
 
 def create_empty_dataframes(measures):
     """
@@ -38,18 +39,21 @@ def create_empty_dataframes(measures):
     ------------------------------------------------------------------------------------------------------
     """
 
-    word_df = pd.DataFrame(columns=[measures["word_pause"], measures["num_syllables"], measures["part_of_speech"]])
+    word_df = pd.DataFrame(columns=[measures["word_pause"], measures["num_syllables"], measures["part_of_speech"],
+                                    measures["first_person"], measures["verb_tense"]])
     turn_df = pd.DataFrame(columns=[measures["turn_pause"], measures["turn_minutes"], measures["turn_words"], 
                                     measures["word_rate"], measures["syllable_rate"], measures["speech_percentage"], 
                                     measures["pause_meandur"], measures["pause_var"], measures["pos"], measures["neg"], 
-                                    measures["neu"], measures["compound"], measures["speech_mattr"], 
+                                    measures["neu"], measures["compound"], measures["speech_mattr"],
+                                    measures["first_person_percentage"], measures["first_person_sentiment"],
                                     measures["interrupt_flag"]])
 
     summ_df = pd.DataFrame(
         columns=[measures["file_length"], measures["speech_minutes"], measures["speech_words"], measures["word_rate"],
                  measures["syllable_rate"], measures["word_pause_mean"], measures["word_pause_var"], 
                  measures["speech_percentage"], measures["pos"], measures["neg"], measures["neu"], measures["compound"], 
-                 measures["speech_mattr"], measures["num_turns"], measures["num_one_word_turns"], measures["turn_minutes_mean"],
+                 measures["speech_mattr"], measures["first_person_percentage"], measures["first_person_sentiment"],
+                 measures["num_turns"], measures["num_one_word_turns"], measures["turn_minutes_mean"],
                  measures["turn_words_mean"], measures["turn_pause_mean"], measures["speaker_percentage"], 
                  measures["num_interrupts"]])
 
@@ -692,7 +696,7 @@ def get_mattr(text):
 
     return mattr
 
-def get_tag(word_df, word_list, tag_dict, measures):
+def get_tag(word_df, word_list, measures):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -706,8 +710,6 @@ def get_tag(word_df, word_list, tag_dict, measures):
         A dataframe containing word summary information.
     word_list: list
         List of transcribed text at the word level.
-    tag_dict: dict
-        A dictionary mapping the NLTK tags to more readable tags.
     measures: dict
         A dictionary containing the names of the columns in the output dataframes.
 
@@ -719,20 +721,182 @@ def get_tag(word_df, word_list, tag_dict, measures):
     ------------------------------------------------------------------------------------------------------
     """
     tag_list = nltk.pos_tag(word_list)
-    for i, tag in enumerate(tag_list):
-        
-        if tag[1] in tag_dict.keys():
-            word_df.loc[i, measures["part_of_speechs"]] = tag_dict[tag[1]]
-        else:
-            word_df.loc[i, measures["part_of_speech"]] = "Other"
+    
+    tag_list_pos = [TAG_DICT[tag[1]] if tag[1] in TAG_DICT.keys() else "Other" for tag in tag_list]
+    word_df[measures["part_of_speech"]] = tag_list_pos
+
+    word_df[measures["first_person"]] = [word in FIRST_PERSON_PRONOUNS for word in word_list]
+    # make non pronouns None
+    word_df[measures["first_person"]] = word_df[measures["first_person"]].where(word_df[measures["part_of_speech"]] == "Pronoun", None)
+
+    present_tense = ["VBP", "VBZ"]
+    past_tense = ["VBD", "VBN"]
+    tag_list_verb = ["Present" if tag[1] in present_tense else "Past" if tag[1] in past_tense else "Other" for tag in tag_list]
+    word_df[measures["verb_tense"]] = tag_list_verb
+    # make non verbs None
+    word_df[measures["verb_tense"]] = word_df[measures["verb_tense"]].where(word_df[measures["part_of_speech"]] == "Verb", None)
 
     return word_df
 
-def get_pos_tag(df_list, text_list, tag_dict, measures):
+def calculate_first_person_sentiment(df, measures):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    This function calculates a measure of the influence of sentiment on the use of first person pronouns.
+
+    Parameters:
+    ...........
+    df: pandas dataframe
+        A dataframe containing summary information.
+    measures: dict
+        A dictionary containing the names of the columns in the output dataframes.
+
+    Returns:
+    ...........
+    res: list
+        A list containing the calculated values.
+
+    ------------------------------------------------------------------------------------------------------
+    """
+    
+    res = []
+    for i in range(len(df)):
+        perc = df.loc[i, measures["first_person_percentage"]]
+        pos = df.loc[i, measures["pos"]]
+        neg = df.loc[i, measures["neg"]]
+
+        if perc is np.nan:
+            res.append(np.nan)
+            continue
+
+        if pos >= neg:
+            res.append((100-perc)*pos)
+        else:
+            res.append(perc*neg)
+
+    return res
+
+def calculate_first_person_percentage(text):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    This function calculates the percentage of first person pronouns in the input text.
+
+    Parameters:
+    ...........
+    text: str
+        The input text to be analyzed.
+
+    Returns:
+    ...........
+    float
+        The calculated percentage of first person pronouns in the input text.
+
+    ------------------------------------------------------------------------------------------------------
+    """
+
+    words = nltk.word_tokenize(text)
+    tags = nltk.pos_tag(words)
+    # filter out non pronouns
+    pronouns = [tag[0] for tag in tags if tag[1] == "PRP" or tag[1] == "PRP$"]
+    if len(pronouns) == 0:
+        return np.nan
+
+    first_person_pronouns = len([word for word in pronouns if word in FIRST_PERSON_PRONOUNS])
+    return (first_person_pronouns / len(pronouns)) * 100
+
+def get_first_person_turn(turn_df, turn_list, measures):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    This function calculates measures related to the first person pronouns in each turn.
+
+    Parameters:
+    ...........
+    turn_df: pandas dataframe
+        A dataframe containing turn summary information.
+    turn_list: list
+        List of transcribed text at the turn level.
+
+    Returns:
+    ...........
+    turn_df: pandas dataframe
+        The updated turn_df dataframe.
+
+    ------------------------------------------------------------------------------------------------------
+    """
+    first_person_percentages = [calculate_first_person_percentage(turn) for turn in turn_list]
+
+    turn_df[measures["first_person_percentage"]] = first_person_percentages
+    turn_df[measures["first_person_sentiment"]] = calculate_first_person_sentiment(turn_df, measures)
+    return turn_df
+
+def get_first_person_summ(summ_df, turn_df, full_text, measures):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    This function calculates measures related to the first person pronouns in the transcript.
+
+    Parameters:
+    ...........
+    summ_df: pandas dataframe
+        A dataframe containing summary information.
+    turn_df: pandas dataframe
+        A dataframe containing turn summary information.
+    full_text: str
+        The full transcribed text.
+    measures: dict
+        A dictionary containing the names of the columns in the output dataframes.
+
+    Returns:
+    ...........
+    summ_df: pandas dataframe
+        The updated summ_df dataframe.
+
+    ------------------------------------------------------------------------------------------------------
+    """
+
+    if len(turn_df) > 0:
+        summ_df[measures["first_person_percentage"]] = turn_df[measures["first_person_percentage"]].mean(skipna=True)
+        summ_df[measures["first_person_sentiment"]] = turn_df[measures["first_person_sentiment"]].mean(skipna=True)
+    else:
+        summ_df[measures["first_person_percentage"]] = calculate_first_person_percentage(full_text)
+        summ_df[measures["first_person_sentiment"]] = calculate_first_person_sentiment(summ_df, measures)
+
+    return summ_df
+
+def get_pos_tag(df_list, text_list, measures):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    This function calculates the part-of-speech measures
+        and adds them to the output dataframes
+
+    Parameters:
+    ...........
+    df_list: list
+        List of pandas dataframes.
+    text_list: list
+        List of transcribed text.
+    measures: dict
+        A dictionary containing the names of the columns in the output dataframes.
+
+    Returns:
+    ...........
+    df_list: list
+        List of updated pandas dataframes.
+
+    ------------------------------------------------------------------------------------------------------
+    """
     word_df, turn_df, summ_df = df_list
     word_list, turn_list, full_text = text_list
 
-    word_df = get_tag(word_df, word_list, tag_dict, measures)
+    word_df = get_tag(word_df, word_list, measures)
+
+    if len(turn_list) > 0:
+        turn_df = get_first_person_turn(turn_df, turn_list, measures)
+
+    summ_df = get_first_person_summ(summ_df, turn_df, full_text, measures)
 
     df_list = [word_df, turn_df, summ_df]
     return df_list
@@ -928,7 +1092,7 @@ def process_language_feature(df_list, transcribe_info, speaker_label, min_turn_l
     df_list = get_pause_feature(json_conf_speaker, df_list, text_list, turn_indices, measures, time_index, language)
 
     if language == "en":
-        df_list = get_pos_tag(df_list, text_list, TAG_DICT, measures)
-
         df_list = get_sentiment(df_list, text_list, measures)
+        df_list = get_pos_tag(df_list, text_list, measures)
+
     return df_list
