@@ -2,8 +2,6 @@
 # website:   http://www.bklynhlth.com
 
 # import the required packages
-import os
-import json
 import logging
 
 import numpy as np
@@ -51,7 +49,9 @@ def get_summary(sound, framewise, sig_df, df_silence, measures):
     summ_silence = autil.silence_summary(sound, df_silence, measures)
     voice_pct = autil.voice_frame(sound, measures)
 
-    df_concat = pd.concat(df_list+ [sig_df, summ_silence, voice_pct], axis=1)
+    df_relative = calculate_relative_stds(framewise, df_silence, measures)
+
+    df_concat = pd.concat(df_list+ [sig_df, summ_silence, voice_pct, df_relative], axis=1)
     return df_concat
 
 def get_voiced_segments(df_silence, min_duration, measures):
@@ -104,6 +104,43 @@ def get_voiced_segments(df_silence, min_duration, measures):
     speech_indices_expanded = speech_indices_expanded.astype(int)
     return speech_indices_expanded
 
+def calculate_relative_stds(framewise, df_silence, measures):
+    """
+    ------------------------------------------------------------------------------------------------------
+    
+    Calculates the relative standard deviation of F0 and loudness for the voiced segments.
+
+    Parameters:
+    ...........
+    framewise : pandas dataframe
+        dataframe containing pitch, loudness, HNR, and formant frequency values
+    df_silence : pandas dataframe
+        dataframe containing the silence window values
+    measures : dict
+        a dictionary containing the measures names for the calculated statistics.
+
+    Returns:
+    ...........
+    df_relative : pandas dataframe
+        dataframe containing the relative standard deviation of F0 and loudness for the voiced segments
+
+    ------------------------------------------------------------------------------------------------------
+    """
+
+    speech_indices = get_voiced_segments(df_silence, 100, measures)
+    if speech_indices is None:
+        speech_indices = np.arange(0, len(framewise))
+    elif speech_indices[-1] < len(framewise):
+        speech_indices = np.append(speech_indices, np.arange(speech_indices[-1], len(framewise)))
+
+    f0 = framewise[measures['fundfreq']][speech_indices]
+    loudness = framewise[measures['loudness']][speech_indices]
+
+    relF0sd = np.std(f0) / np.mean(f0)
+    relSE0SD = np.std(loudness) / np.mean(loudness)
+
+    df_relative = pd.DataFrame([[relF0sd, relSE0SD]], columns=[measures['relF0sd'], measures['relSE0SD']])
+    return df_relative
 
 def vocal_acoustics(audio_path):
     """

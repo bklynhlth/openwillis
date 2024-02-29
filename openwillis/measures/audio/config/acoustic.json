@@ -24,6 +24,8 @@
   "pause_meandur": "pause_meandur",
   "pause_rate": "pause_rate",
   "silence_ratio": "silence_ratio",
+  "relF0sd": "rel_f0_sd",
+  "relSE0SD": "rel_se0_sd",
   "spir": "spir",
   "pause_meddur": "dur_med",
   "pause_maddur": "dur_mad"
