@@ -11,6 +11,8 @@ import logging
 import nltk
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 from lexicalrichness import LexicalRichness
+from transformers import BertTokenizer, BertModel
+from sklearn.metrics.pairwise import cosine_similarity
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger()
@@ -41,7 +43,14 @@ def create_empty_dataframes(measures):
     """
 
     word_df = pd.DataFrame(columns=[measures["word_pause"], measures["num_syllables"], measures["part_of_speech"],
-                                    measures["first_person"], measures["verb_tense"]])
+                                    measures["first_person"], measures["verb_tense"],
+                                    measures["word_coherence"], measures["word_coherence_5"], measures["word_coherence_10"],
+                                    measures["word_coherence_variability_2"], measures["word_coherence_variability_3"],
+                                    measures["word_coherence_variability_4"], measures["word_coherence_variability_5"],
+                                    measures["word_coherence_variability_6"], measures["word_coherence_variability_7"],
+                                    measures["word_coherence_variability_8"], measures["word_coherence_variability_9"],
+                                    measures["word_coherence_variability_10"]
+                                    ])
     turn_df = pd.DataFrame(columns=[measures["turn_pause"], measures["turn_minutes"], measures["turn_words"], 
                                     measures["word_rate"], measures["syllable_rate"], measures["speech_percentage"], 
                                     measures["pause_meandur"], measures["pause_var"], measures["pos"], measures["neg"], 
@@ -52,13 +61,25 @@ def create_empty_dataframes(measures):
 
     summ_df = pd.DataFrame(
         columns=[measures["file_length"], measures["speech_minutes"], measures["speech_words"], measures["word_rate"],
-                 measures["syllable_rate"], measures["word_pause_mean"], measures["word_pause_var"], 
-                 measures["speech_percentage"], measures["pos"], measures["neg"], measures["neu"], measures["compound"], 
-                 measures["speech_mattr"], measures["first_person_percentage"], measures["first_person_sentiment"],
-                 measures["word_repeat_percentage"], measures["phrase_repeat_percentage"],
-                 measures["num_turns"], measures["num_one_word_turns"], measures["turn_minutes_mean"],
-                 measures["turn_words_mean"], measures["turn_pause_mean"], measures["speaker_percentage"], 
-                 measures["num_interrupts"]])
+                measures["syllable_rate"], measures["word_pause_mean"], measures["word_pause_var"], 
+                measures["speech_percentage"], measures["pos"], measures["neg"], measures["neu"], measures["compound"], 
+                measures["speech_mattr"], measures["first_person_percentage"], measures["first_person_sentiment"],
+                measures["word_repeat_percentage"], measures["phrase_repeat_percentage"],
+                measures["word_coherence_mean"], measures["word_coherence_var"],
+                measures["word_coherence_5_mean"], measures["word_coherence_5_var"],
+                measures["word_coherence_10_mean"], measures["word_coherence_10_var"],
+                measures["word_coherence_variability_2_mean"], measures["word_coherence_variability_2_var"],
+                measures["word_coherence_variability_3_mean"], measures["word_coherence_variability_3_var"],
+                measures["word_coherence_variability_4_mean"], measures["word_coherence_variability_4_var"],
+                measures["word_coherence_variability_5_mean"], measures["word_coherence_variability_5_var"],
+                measures["word_coherence_variability_6_mean"], measures["word_coherence_variability_6_var"],
+                measures["word_coherence_variability_7_mean"], measures["word_coherence_variability_7_var"],
+                measures["word_coherence_variability_8_mean"], measures["word_coherence_variability_8_var"],
+                measures["word_coherence_variability_9_mean"], measures["word_coherence_variability_9_var"],
+                measures["word_coherence_variability_10_mean"], measures["word_coherence_variability_10_var"],
+                measures["num_turns"], measures["num_one_word_turns"], measures["turn_minutes_mean"],
+                measures["turn_words_mean"], measures["turn_pause_mean"], measures["speaker_percentage"], 
+                measures["num_interrupts"]])
 
     return word_df, turn_df, summ_df
 
@@ -1039,6 +1060,133 @@ def get_repetitions(df_list, utterances_speaker, utterances_speaker_filtered, me
     df_list = [word_df, turn_df, summ_df]
     return df_list
 
+def get_word_embeddings(word_list, tokenizer, model):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    This function calculates the word embeddings for the input text using BERT.
+
+    Parameters:
+    ...........
+    word_list: list
+        List of transcribed text at the word level.
+    language: str
+        Language of the transcribed text.
+
+    Returns:
+    ...........
+    word_embeddings: numpy array
+        The calculated word embeddings.
+
+    ------------------------------------------------------------------------------------------------------
+    """
+
+    inputs = tokenizer(word_list, return_tensors='pt', padding=True)
+    outputs = model(**inputs)
+    # Average pooling of the hidden states
+    return outputs.last_hidden_state.mean(1).detach().numpy()
+
+def get_word_coherence(df_list, utterances_speaker, language, measures):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    This function calculates word coherence measures
+
+    Parameters:
+    ...........
+    df_list: list
+        List of pandas dataframes.
+    utterances_speaker: pandas dataframe
+        A dataframe containing the turns extracted from the JSON object for the specified speaker.
+    language: str
+        Language of the transcribed text.
+    measures: dict
+        A dictionary containing the names of the columns in the output dataframes.
+
+    Returns:
+    ...........
+    df_list: list
+        List of updated pandas dataframes.
+
+    ------------------------------------------------------------------------------------------------------
+    """
+    word_df, turn_df, summ_df = df_list
+
+    # model init
+    if language == "en":
+        tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+        model = BertModel.from_pretrained('bert-base-uncased')
+    else:
+        tokenizer = BertTokenizer.from_pretrained('bert-base-multilingual-uncased')
+        model = BertModel.from_pretrained('bert-base-multilingual-uncased')
+
+
+    # word-level
+    word_coherence_list = []
+    word_coherence_5_list = []
+    word_coherence_10_list = []
+    word_coherence_variability = {
+        x: [] for x in range(2, 11)
+    }
+    for i in range(len(utterances_speaker)):
+        row = utterances_speaker.iloc[i]
+        words_texts = row[measures['words_texts']]
+        word_embeddings = get_word_embeddings(words_texts, tokenizer, model)
+        similarity_matrix = cosine_similarity(word_embeddings)
+
+        # calculate semantic similarity of each word to the immediately preceding word
+        if len(words_texts) > 1:
+            word_coherence = [np.nan] + [similarity_matrix[j, j-1] for j in range(1, len(words_texts))]
+        else:
+            word_coherence = [np.nan]*len(words_texts)
+
+        # calculate semantic similarity of each word in 5-words window
+        if len(words_texts) > 5:
+            word_coherence_5 = [np.nan]*2 + [np.mean(similarity_matrix[j-2:j+3, j]) for j in range(2, len(words_texts)-2)] + [np.nan]*2
+        else:
+            word_coherence_5 = [np.nan]*len(words_texts)
+
+        # calculate semantic similarity of each word in 10-words window
+        if len(words_texts) > 10:
+            word_coherence_10 = [np.nan]*5 + [np.mean(similarity_matrix[j-5:j+6, j]) for j in range(5, len(words_texts)-5)] + [np.nan]*5
+        else:
+            word_coherence_10 = [np.nan]*len(words_texts)
+
+        # calculate word-to-word variability at k inter-word distances (for k from 2 to 10)
+        # indicating semantic similarity between each word and the next following word at k inter-word distance
+        word_word_variability = {}
+        for k in range(2, 11):
+            if len(words_texts) > k:
+                word_word_variability[k] = [similarity_matrix[j, j+k] for j in range(len(words_texts)-k)] + [np.nan]*k
+            else:
+                word_word_variability[k] = [np.nan]*len(words_texts)
+
+        word_coherence_list += word_coherence
+        word_coherence_5_list += word_coherence_5
+        word_coherence_10_list += word_coherence_10
+        for k in range(2, 11):
+            word_coherence_variability[k] += word_word_variability[k]
+    
+    word_df[measures['word_coherence']] = word_coherence_list
+    word_df[measures['word_coherence_5']] = word_coherence_5_list
+    word_df[measures['word_coherence_10']] = word_coherence_10_list
+    for k in range(2, 11):
+        word_df[measures[f'word_coherence_variability_{k}']] = word_coherence_variability[k]
+
+    # summary-level
+    summ_df[measures['word_coherence_mean']] = word_df[measures['word_coherence']].mean(skipna=True)
+    summ_df[measures['word_coherence_var']] = word_df[measures['word_coherence']].var(skipna=True)
+    summ_df[measures['word_coherence_5_mean']] = word_df[measures['word_coherence_5']].mean(skipna=True)
+    summ_df[measures['word_coherence_5_var']] = word_df[measures['word_coherence_5']].var(skipna=True)
+    summ_df[measures['word_coherence_10_mean']] = word_df[measures['word_coherence_10']].mean(skipna=True)
+    summ_df[measures['word_coherence_10_var']] = word_df[measures['word_coherence_10']].var(skipna=True)
+    for k in range(2, 11):
+        summ_df[measures[f'word_coherence_variability_{k}_mean']] = word_df[measures[f'word_coherence_variability_{k}']].mean(skipna=True)
+        summ_df[measures[f'word_coherence_variability_{k}_var']] = word_df[measures[f'word_coherence_variability_{k}']].var(skipna=True)
+
+    df_list = [word_df, turn_df, summ_df]
+    return df_list
+
 def calculate_file_feature(json_data, model, speakers):
     """
     ------------------------------------------------------------------------------------------------------
@@ -1185,6 +1333,7 @@ def process_language_feature(df_list, transcribe_info, speaker_label, min_turn_l
 
     df_list = get_pause_feature(json_conf_speaker, df_list, text_list, turn_indices, measures, time_index, language)
     df_list = get_repetitions(df_list, utterances_speaker, utterances_speaker_filtered, measures)
+    df_list = get_word_coherence(df_list, utterances_speaker, language, measures)
 
     if language == "en":
         df_list = get_sentiment(df_list, text_list, measures)
