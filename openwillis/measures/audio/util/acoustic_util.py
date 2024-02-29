@@ -39,9 +39,8 @@ def common_summary(df, col_name):
     max_val = df.max()
     range_val = max_val - min_val
 
-    values = [mean, std, min_val, max_val, range_val]
-    cols = [col_name + '_mean', col_name + '_stddev', col_name + '_min', col_name + '_max',
-            col_name + '_range']
+    values = [mean, std, range_val]
+    cols = [col_name + '_mean', col_name + '_stddev', col_name + '_range']
 
     df_summ = pd.DataFrame([values], columns= cols)
     return df_summ
