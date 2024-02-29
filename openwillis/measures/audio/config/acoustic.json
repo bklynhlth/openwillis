@@ -23,5 +23,8 @@
   "silence_end": "pause_end",
   "pause_meandur": "pause_meandur",
   "pause_rate": "pause_rate",
-  "silence_ratio": "silence_ratio"
+  "silence_ratio": "silence_ratio",
+  "spir": "spir",
+  "pause_meddur": "dur_med",
+  "pause_maddur": "dur_mad"
 }

@@ -70,19 +70,28 @@ def silence_summary(sound, df, measures):
     duration = call(sound, "Get total duration")
     df_silence = df[measures['voicesilence']]
 
-    num_pause = (len(df_silence)/duration)*60
-
     if len(df_silence) == 0:
-        mean = np.NaN
+        spir = 0
+        dur_med = np.NaN
+        dur_mad = np.NaN
     else:
-        mean = df_silence.mean()
+        # inappropriate pauses stats
+        df2 = df[df_silence > 0.05][df_silence < 2]
+
+        total_pause_time = df_silence.sum() # in seconds
+        total_speech_time = duration - total_pause_time # in seconds
+        spir = len(df2) / total_speech_time
+
+        dur_med = df2[measures['voicesilence']].median()
+
+        dur_mad = np.median(np.abs(df2[measures['voicesilence']] - df2[measures['voicesilence']].mean()))
 
     cols = [
-        measures['pause_meandur'], measures['pause_rate'],
+        measures['spir'], measures['pause_meddur'], measures['pause_maddur']    
     ]
 
     silence_summ = pd.DataFrame(
-        [[mean, num_pause]], columns = cols
+        [[spir, dur_med, dur_mad]], columns = cols
     )
     return silence_summ
 

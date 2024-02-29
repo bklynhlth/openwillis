@@ -144,7 +144,7 @@ def vocal_acoustics(audio_path):
         sig_df = pd.concat([df_jitter, df_shimmer, df_gne], axis=1)
 
         df_summary = get_summary(sound, framewise, sig_df, df_silence, measures)
-        return framewise, df_silence, df_summary
+        return framewise, df_summary
 
     except Exception as e:
         logger.error(f'Error in acoustic calculation- file: {audio_path} & Error: {e}')
