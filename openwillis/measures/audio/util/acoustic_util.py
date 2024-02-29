@@ -4,13 +4,17 @@
 
 import os
 import json
+import math
 
 import numpy as np
 import pandas as pd
+import scipy
+import numpy.matlib
 
 from parselmouth import Sound
 from parselmouth.praat import call
 from pydub import AudioSegment, silence
+import librosa
 
 
 def common_summary(df, col_name):
@@ -402,3 +406,133 @@ def get_voice_silence(sound, min_silence, measures):
 
     df_silence[measures['voicesilence']] = df_silence[cols[1]] - df_silence[cols[0]]
     return df_silence
+
+def cpp(x, fs, normOpt, dBScaleOpt): 
+    """
+    ------------------------------------------------------------------------------------------------------
+    Computes cepstral peak prominence for a given signal 
+
+    Parameters
+    ...........
+    x: ndarray
+        The audio signal
+    fs: integer
+        The sampling frequency
+    normOpt: string
+        'line', 'mean' or 'nonorm' for selecting normalisation type
+    dBScaleOpt: binary
+        True or False for using decibel scale
+
+    Returns
+    ...........
+    cpp: ndarray
+        The CPP with time values 
+    """
+    # Settings
+    frame_length = int(np.round_(0.04*fs))
+    frame_shift = int(np.round_(0.01*fs))
+    half_len = int(np.round_(frame_length/2))
+    x_len = len(x)
+    frame_len = half_len*2 + 1
+    NFFT = 2**(math.ceil(np.log(frame_len)/np.log(2)))
+    quef = np.linspace(0, frame_len/1000, NFFT)  
+    
+    # Allowed quefrency range
+    pitch_range=[60, 333.3]
+    quef_lim = [int(np.round_(fs/pitch_range[1])), int(np.round_(fs/pitch_range[0]))]
+    quef_seq = range(quef_lim[0]-1, quef_lim[1])
+    
+    # Time samples
+    time_samples = np.array(range(frame_length+1, x_len-frame_length+1, frame_shift))
+    N = len(time_samples)
+    frame_start = time_samples-half_len
+    frame_stop = time_samples+half_len
+    
+    # High-pass filtering
+    HPfilt_b = [1 - 0.97]
+    x = scipy.signal.lfilter( HPfilt_b, 1, x )
+    
+    # Frame matrix
+    frameMat = np.zeros([NFFT, N])
+    for n in range(0, N):
+        frameMat[0: frame_len, n] = x[frame_start[n]-1:frame_stop[n]]
+        
+    # Hanning
+    def hanning(N):
+        x = np.array([i/(N+1) for i in range(1,int(np.ceil(N/2))+1)])
+        w = 0.5-0.5*np.cos(2*np.pi*x)
+        w_rev = w[::-1]
+        return np.concatenate((w, w_rev[int((np.ceil(N%2))):]))
+    win = hanning(frame_len)
+    winmat = np.matlib.repmat(win, N, 1).transpose()
+    frameMat = frameMat[0:frame_len, :]*winmat
+    
+    # Cepstrum
+    SpecMat = np.abs(np.fft.fft(frameMat, axis=0))
+    SpecdB = 20*np.log10(SpecMat)
+    if dBScaleOpt:
+        ceps = 20*np.log10(np.abs(np.fft.fft(SpecdB, axis=0)))
+    else:
+        ceps = 2*np.log(np.abs(np.fft.fft(SpecdB, axis=0)))
+
+    # Finding the peak
+    ceps_lim = ceps[quef_seq, :]
+    ceps_max = ceps_lim.max(axis=0)
+    max_index = ceps_lim.argmax(axis=0)
+    
+    # Normalisation
+    ceps_norm = np.zeros([N])
+    if normOpt=='line':
+        for n in range(0, N):
+            p = np.polyfit(quef_seq, ceps_lim[:,n],1)
+            ceps_norm[n] = np.polyval(p, quef_seq[max_index[n]])
+    elif normOpt == 'mean':
+        ceps_norm = np.mean(ceps_lim)
+
+    cpp = ceps_max-ceps_norm
+    
+    return cpp
+
+def get_cepstral_features(audio_path, measures):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    Extracts cepstral features from an audio file.
+
+    Parameters:
+    ...........
+    audio_path : str
+        the path to the audio file.
+    measures : obj
+        measures config object
+
+    Returns:
+    ...........
+    df_cepstral : pandas dataframe
+        a dataframe containing the cepstral features of the audio file.
+
+    ------------------------------------------------------------------------------------------------------
+    """
+    y, sr = librosa.load(audio_path, sr=None)
+
+    # Extract MFCC features
+    mfccs = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=14)
+
+    mfccs_mean = np.mean(mfccs.T, axis=0).tolist()
+    mfccs_var = np.var(mfccs.T, axis=0).tolist()
+
+    cpp_0 = cpp(y, sr, 'line', True)
+    cpp_0_mean = np.mean(cpp_0)
+    cpp_0_var = np.var(cpp_0)
+
+    df_cepstral = pd.DataFrame([mfccs_mean + mfccs_var + [cpp_0_mean] + [cpp_0_var]], columns = [
+        measures['mfcc1_mean'], measures['mfcc2_mean'], measures['mfcc3_mean'], measures['mfcc4_mean'],
+        measures['mfcc5_mean'], measures['mfcc6_mean'], measures['mfcc7_mean'], measures['mfcc8_mean'],
+        measures['mfcc9_mean'], measures['mfcc10_mean'], measures['mfcc11_mean'], measures['mfcc12_mean'],
+        measures['mfcc13_mean'], measures['mfcc14_mean'], measures['mfcc1_var'], measures['mfcc2_var'],
+        measures['mfcc3_var'], measures['mfcc4_var'], measures['mfcc5_var'], measures['mfcc6_var'],
+        measures['mfcc7_var'], measures['mfcc8_var'], measures['mfcc9_var'], measures['mfcc10_var'],
+        measures['mfcc11_var'], measures['mfcc12_var'], measures['mfcc13_var'], measures['mfcc14_var'],
+        measures['cpp_mean'], measures['cpp_var']
+    ])
+    return df_cepstral

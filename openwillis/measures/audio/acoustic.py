@@ -29,7 +29,7 @@ def get_summary(sound, framewise, sig_df, df_silence, measures):
         a dataframe containing the fundamental frequency, loudness, HNR, and formant frequency values for
         each frame in the audio file.
     sig_df : pandas dataframe
-        a dataframe containing the jitter, shimmer, and GNE values for the audio file.
+        a dataframe containing the jitter, shimmer, GNE values and Cepstral features for the audio file.
     df_silence :pandas dataframe
         a dataframe containing the silence intervals in the audio file.
     measures : dict
@@ -298,9 +298,10 @@ def vocal_acoustics(audio_path, advanced=False):
         df_gne = autil.glottal_ratio(sound, measures)
         df_formant = autil.formfreq(sound, measures)
         df_silence = autil.get_voice_silence(audio_path, 500, measures)
+        df_cepstral = autil.get_cepstral_features(audio_path, measures)
 
         framewise = pd.concat([df_pitch, df_formant, df_loudness, df_hnr], axis=1)
-        sig_df = pd.concat([df_jitter, df_shimmer, df_gne], axis=1)
+        sig_df = pd.concat([df_jitter, df_shimmer, df_gne, df_cepstral], axis=1)
 
         df_summary = get_summary(sound, framewise, sig_df, df_silence, measures)
         df_summary2 = get_advanced_summary(df_summary, audio_path, advanced, measures)
