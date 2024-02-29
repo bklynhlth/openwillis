@@ -11,11 +11,15 @@ import logging
 import nltk
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 from lexicalrichness import LexicalRichness
-from transformers import BertTokenizer, BertModel
+from transformers import BertTokenizer, BertModel, BertForMaskedLM
+from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
+import torch
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger()
+# Suppress warnings from transformers
+logging.getLogger("transformers").setLevel(logging.ERROR)
 
 # NLTK Tag list
 TAG_DICT = {"PRP": "Pronoun", "PRP$": "Pronoun", "VB": "Verb", "VBD": "Verb", "VBG": "Verb", "VBN": "Verb", "VBP": "Verb", 
@@ -57,6 +61,8 @@ def create_empty_dataframes(measures):
                                     measures["neu"], measures["compound"], measures["speech_mattr"],
                                     measures["first_person_percentage"], measures["first_person_sentiment"],
                                     measures["word_repeat_percentage"], measures["phrase_repeat_percentage"],
+                                    measures["sentence_tangeniality1"], measures["sentence_tangeniality2"],
+                                    measures["turn_to_turn_tangeniality"], measures["perplexity"],
                                     measures["interrupt_flag"]])
 
     summ_df = pd.DataFrame(
@@ -79,6 +85,10 @@ def create_empty_dataframes(measures):
                 measures["word_coherence_variability_10_mean"], measures["word_coherence_variability_10_var"],
                 measures["num_turns"], measures["num_one_word_turns"], measures["turn_minutes_mean"],
                 measures["turn_words_mean"], measures["turn_pause_mean"], measures["speaker_percentage"], 
+                measures["sentence_tangeniality1_mean"], measures["sentence_tangeniality1_var"],
+                measures["sentence_tangeniality2_mean"], measures["sentence_tangeniality2_var"],
+                measures["turn_to_turn_tangeniality_mean"], measures["turn_to_turn_tangeniality_var"],
+                measures["turn_to_turn_tangeniality_slope"], measures["perplexity_mean"], measures["perplexity_var"],
                 measures["num_interrupts"]])
 
     return word_df, turn_df, summ_df
@@ -1187,6 +1197,237 @@ def get_word_coherence(df_list, utterances_speaker, language, measures):
     df_list = [word_df, turn_df, summ_df]
     return df_list
 
+def calculate_perplexity(text, model, tokenizer):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    This function calculates the pseudo-perplexity of the input text using BERT.
+
+    Parameters:
+    ...........
+    text: str
+        The input text to be analyzed.
+    model: BertForMaskedLM
+        A BERT model.
+    tokenizer: BertTokenizer
+        A BERT tokenizer.
+
+    Returns:
+    ...........
+    float
+        The calculated pseudo-perplexity of the input text.
+
+    ------------------------------------------------------------------------------------------------------
+    """
+    # Tokenize input text
+    tokens = tokenizer(text, return_tensors='pt')
+    input_ids = tokens.input_ids
+    masked_input_ids = input_ids.clone()
+
+    log_probs = []
+    # Iterate over each token in the input
+    for i in range(input_ids.size(1)):
+        # Mask the current token
+        masked_input_ids[0, i] = tokenizer.mask_token_id
+        with torch.no_grad():
+            outputs = model(input_ids=masked_input_ids, labels=input_ids)
+        
+        # Calculate log probability of the original token
+        logit_prob = outputs.logits[0, i].softmax(dim=0)
+        true_log_prob = logit_prob[input_ids[0, i]].log().item()
+        log_probs.append(true_log_prob)
+        
+        # Unmask the token for the next iteration
+        masked_input_ids[0, i] = input_ids[0, i]
+    
+    # Calculate perplexity
+    perplexity = np.exp(-np.mean(log_probs))
+    return perplexity
+
+def calculate_phrase_tangeniality(phrases_texts, utterance_text, sentence_encoder, bert, tokenizer):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    This function calculates the semantic similarity of each phrase to the immediately preceding phrase,
+    the semantic similarity of each phrase to the phrase 2 turns before, and the pseudo-perplexity of the turn.
+
+    Parameters:
+    ...........
+    phrases_texts: list
+        List of transcribed text at the phrase level.
+    utterance_text: str
+        The full transcribed text.
+    sentence_encoder: SentenceTransformer
+        A SentenceTransformer model.
+    bert: BertForMaskedLM
+        A BERT model.
+    tokenizer: BertTokenizer
+        A BERT tokenizer.
+
+    Returns:
+    ...........
+    sentence_tangeniality1: float
+        The semantic similarity of each phrase to the immediately preceding phrase.
+    sentence_tangeniality2: float
+        The semantic similarity of each phrase to the phrase 2 turns before.
+    perplexity: float
+        The pseudo-perplexity of the turn.
+
+    ------------------------------------------------------------------------------------------------------
+    """
+    phrase_embeddings = sentence_encoder.encode(phrases_texts)
+    similarity_matrix = cosine_similarity(phrase_embeddings)
+
+    # calculate semantic similarity of each phrase to the immediately preceding phrase
+    if len(phrases_texts) > 1:
+        sentence_tangeniality1 = np.mean([similarity_matrix[j, j-1] for j in range(1, len(phrases_texts))])
+    else:
+        sentence_tangeniality1 = np.nan
+
+    # calculate semantic similarity of each phrase to the phrase 2 turns before
+    if len(phrases_texts) > 2:
+        sentence_tangeniality2 = np.mean([similarity_matrix[j-2, j] for j in range(2, len(phrases_texts))])
+    else:
+        sentence_tangeniality2 = np.nan
+
+    # calculate pseudo-perplexity of the turn and indicating how predictable the turn is
+    perplexity = calculate_perplexity(utterance_text, bert, tokenizer)
+
+    return sentence_tangeniality1, sentence_tangeniality2, perplexity
+
+def calculate_slope(y):
+    """
+    ------------------------------------------------------------------------------------------------------
+    This function calculates the slope
+     of the input list using linear regression
+
+    Parameters:
+    ...........
+    y: list
+        A list of values.
+
+    Returns:
+    ...........
+    float
+        The calculated slope of the input list.
+
+    ------------------------------------------------------------------------------------------------------
+    """
+
+    x = range(len(y))
+    slope, _ = np.polyfit(x, y, 1)
+
+    return slope
+
+
+def get_phrase_coherence(df_list, utterances_filtered, speaker_label, language, measures):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    This function calculates turn coherence measures
+
+    Parameters:
+    ...........
+    df_list: list
+        List of pandas dataframes.
+    utterances_filtered: pandas dataframe
+        A dataframe containing the turns extracted from the JSON object
+        after filtering out turns with less than min_turn_length words of the specified speaker.
+    speaker_label: str
+        Speaker label
+    language: str
+        Language of the transcribed text.
+    measures: dict
+        A dictionary containing the names of the columns in the output dataframes.
+
+    Returns:
+    ...........
+    df_list: list
+        List of updated pandas dataframes.
+
+    ------------------------------------------------------------------------------------------------------
+    """
+    word_df, turn_df, summ_df = df_list
+
+    if language in measures["english_langs"]:
+        sentence_encoder = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
+
+        tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+        bert = BertForMaskedLM.from_pretrained('bert-base-uncased')
+    else:
+        sentence_encoder = SentenceTransformer('sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2')
+
+        tokenizer = BertTokenizer.from_pretrained('bert-base-multilingual-cased')
+        bert = BertForMaskedLM.from_pretrained('bert-base-multilingual-cased')
+
+
+    # turn-level
+    if len(turn_df) > 0:
+        sentence_tangeniality1_list = []
+        sentence_tangeniality2_list = []
+        perplexity_list = []
+        for i in range(len(utterances_filtered)):
+            row = utterances_filtered.iloc[i]
+            current_speaker = row[measures['speaker_label']]
+
+            if current_speaker == speaker_label:
+                phrases_texts = row[measures['phrases_texts']]
+                utterance_text = row[measures['utterance_text']]
+                
+                sentence_tangeniality1, sentence_tangeniality2, perplexity = calculate_phrase_tangeniality(
+                    phrases_texts, utterance_text, sentence_encoder, bert, tokenizer
+                )
+                
+                sentence_tangeniality1_list.append(sentence_tangeniality1)
+                sentence_tangeniality2_list.append(sentence_tangeniality2)
+                perplexity_list.append(perplexity)
+
+        ## semantic similarity of current turn to previous turn of the other speaker
+        utterances_texts = utterances_filtered[measures['utterance_text']].values.tolist()
+        utterances_embeddings = sentence_encoder.encode(utterances_texts)
+        similarity_matrix = cosine_similarity(utterances_embeddings)
+
+        ## get the indices of the turns of our speaker
+        speaker_indices = utterances_filtered[utterances_filtered[measures['speaker_label']] == speaker_label].index.tolist()
+        if speaker_indices[0] == 0:
+            turn_to_turn_tangeniality_list = [np.nan] + [similarity_matrix[i, i-1] for i in speaker_indices[1:]]
+        else:
+            turn_to_turn_tangeniality_list = [similarity_matrix[i, i-1] for i in speaker_indices]
+
+        turn_df[measures['sentence_tangeniality1']] = sentence_tangeniality1_list
+        turn_df[measures['sentence_tangeniality2']] = sentence_tangeniality2_list
+        turn_df[measures['perplexity']] = perplexity_list
+        turn_df[measures['turn_to_turn_tangeniality']] = turn_to_turn_tangeniality_list
+
+
+    # summary-level
+    if len(turn_df) > 0:
+        summ_df[measures['sentence_tangeniality1_mean']] = turn_df[measures['sentence_tangeniality1']].mean(skipna=True)
+        summ_df[measures['sentence_tangeniality1_var']] = turn_df[measures['sentence_tangeniality1']].var(skipna=True)
+        summ_df[measures['sentence_tangeniality2_mean']] = turn_df[measures['sentence_tangeniality2']].mean(skipna=True)
+        summ_df[measures['sentence_tangeniality2_var']] = turn_df[measures['sentence_tangeniality2']].var(skipna=True)
+        summ_df[measures['perplexity_mean']] = turn_df[measures['perplexity']].mean(skipna=True)
+        summ_df[measures['perplexity_var']] = turn_df[measures['perplexity']].var(skipna=True)
+        summ_df[measures['turn_to_turn_tangeniality_mean']] = turn_df[measures['turn_to_turn_tangeniality']].mean(skipna=True)
+        summ_df[measures['turn_to_turn_tangeniality_var']] = turn_df[measures['turn_to_turn_tangeniality']].var(skipna=True)
+        summ_df[measures['turn_to_turn_tangeniality_slope']] = calculate_slope(turn_df[measures['turn_to_turn_tangeniality']])
+
+    else:
+        # first element of utterances_filtered
+        full_text = utterances_filtered[measures['utterance_text']].values[0]
+        phrases_texts = utterances_filtered[measures['phrases_texts']].values[0]
+
+        sentence_tangeniality1, sentence_tangeniality2, perplexity = calculate_phrase_tangeniality(
+            phrases_texts, full_text, sentence_encoder, bert, tokenizer
+        )
+
+        summ_df[measures['sentence_tangeniality1_mean']] = sentence_tangeniality1
+        summ_df[measures['sentence_tangeniality2_mean']] = sentence_tangeniality2
+        summ_df[measures['perplexity_mean']] = perplexity
+
+    df_list = [word_df, turn_df, summ_df]
+    return df_list
+
 def calculate_file_feature(json_data, model, speakers):
     """
     ------------------------------------------------------------------------------------------------------
@@ -1330,10 +1571,24 @@ def process_language_feature(df_list, transcribe_info, speaker_label, min_turn_l
     
     # filter utterances with minimum length
     utterances_speaker_filtered = utterances_speaker[utterances_speaker[measures['words_texts']].apply(lambda x: len(x) >= min_turn_length)].reset_index(drop=True)
+    # filter utterances with minimum length for speaker
+    if speaker_label is not None:
+        utterances_filtered = utterances.copy().iloc[0:0]
+        for i in range(len(utterances)):
+            if utterances.iloc[i][measures['speaker_label']] != speaker_label:
+                utterances_filtered = pd.concat([utterances_filtered, utterances.iloc[i:i+1]])
+            else:
+                if len(utterances.iloc[i][measures['words_texts']]) >= min_turn_length:
+                    utterances_filtered = pd.concat([utterances_filtered, utterances.iloc[i:i+1]])
+
+        utterances_filtered = utterances_filtered.reset_index(drop=True)
+    else:
+        utterances_filtered = utterances.copy()
 
     df_list = get_pause_feature(json_conf_speaker, df_list, text_list, turn_indices, measures, time_index, language)
     df_list = get_repetitions(df_list, utterances_speaker, utterances_speaker_filtered, measures)
     df_list = get_word_coherence(df_list, utterances_speaker, language, measures)
+    df_list = get_phrase_coherence(df_list, utterances_filtered, speaker_label, language, measures)
 
     if language == "en":
         df_list = get_sentiment(df_list, text_list, measures)
