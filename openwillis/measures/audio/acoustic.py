@@ -2,12 +2,15 @@
 # website:   http://www.bklynhlth.com
 
 # import the required packages
+import os
 import logging
 
 import numpy as np
 import pandas as pd
+from parselmouth.praat import run_file
 
 from openwillis.measures.audio.util import acoustic_util as autil
+from openwillis.measures.audio.util import disvoice_util as dutil
 
 logging.basicConfig(level=logging.INFO)
 logger=logging.getLogger()
@@ -142,7 +145,124 @@ def calculate_relative_stds(framewise, df_silence, measures):
     df_relative = pd.DataFrame([[relF0sd, relSE0SD]], columns=[measures['relF0sd'], measures['relSE0SD']])
     return df_relative
 
-def vocal_acoustics(audio_path):
+def calculate_glottal(audio_path):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    Calculates the glottal features of an audio file.
+
+    Parameters:
+    ...........
+    audio_path : str
+        path to the audio file
+    
+    Returns:
+    ...........
+    glottal_features : list
+        list containing the glottal features
+         [mean_hrf, std_hrf, mean_naq, std_naq, mean_qoq, std_qoq]
+
+    ------------------------------------------------------------------------------------------------------
+    """
+
+    glottal_features = dutil.extract_features_file(audio_path)
+
+    return glottal_features
+
+def calculate_tremor(audio_path):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    Calculates the tremor features of an audio file.
+
+    Parameters:
+    ...........
+    audio_path : str
+        path to the audio file
+
+    Returns:
+    ...........
+    tremor_features : list
+        list containing the tremor features
+        [FCoM, FTrC, FMon, FTrF, FTrI, FTrP, FTrCIP, FTrPS, FCoHNR, ACoM, ATrC, AMoN, ATrF, ATrI, ATrP, ATrCIP, ATrPS, ACoHNR]
+
+    ------------------------------------------------------------------------------------------------------
+    """
+    tremor_dir = os.path.dirname(os.path.abspath(__file__))
+    tremor_dir = os.path.join(tremor_dir, "util/praat_tremor")
+
+    tremor_var = run_file(
+        f"{tremor_dir}/vocal_tremor.praat",
+        "4", audio_path, "0.015", "60", "350", "0.03", "0.3",
+        "0.01", "0.35", "0.14", "2", "1.5", "15", "0.01", "0.15",
+        "0.01", "0.01", "2", capture_output=True
+    )
+
+    # retrieve the tremor features
+    tremor_features = tremor_var[1].replace('\n', '').split('\t')
+    tremor_features2 = []
+    for x in tremor_features[1:]:
+        if x != '--undefined--':
+            tremor_features2.append(float(x))
+        else:
+            tremor_features2.append(np.NaN)
+
+    return tremor_features2
+
+def get_advanced_summary(df_summary, audio_path, advanced, measures):
+    """
+    ------------------------------------------------------------------------------------------------------
+    
+    Calculates the summary statistics for a sustained vowel.
+
+    Parameters:
+    ...........
+    df_summary : pandas dataframe
+        dataframe containing the summary statistics for the audio file
+    audio_path : str
+        path to the audio file
+    advanced : bool
+        whether to calculate the advanced vocal acoustic variables
+    measures : dict
+        a dictionary containing the measures names for the calculated statistics.
+
+    Returns:
+    ...........
+    df_summary : pandas dataframe
+        dataframe containing the summary statistics for the audio file
+
+    ------------------------------------------------------------------------------------------------------
+    """
+
+    glottal_cols = [
+        measures["mean_hrf"], measures["std_hrf"],
+        measures["mean_naq"], measures["std_naq"],
+        measures["mean_qoq"], measures["std_qoq"]
+    ]
+    tremor_cols = [
+        measures["FCoM"], measures["FTrC"], measures["FMon"],
+        measures["FTrF"], measures["FTrI"], measures["FTrP"],
+        measures["FTrCIP"], measures["FTrPS"], measures["FCoHNR"],
+        measures["ACoM"], measures["ATrC"], measures["AMoN"],
+        measures["ATrF"], measures["ATrI"], measures["ATrP"],
+        measures["ATrCIP"], measures["ATrPS"], measures["ACoHNR"]
+    ]
+
+    tremor_features = calculate_tremor(audio_path)
+    tremor_summ = pd.DataFrame([tremor_features], columns=tremor_cols)
+
+    if not advanced:
+        glottal_summ = pd.DataFrame([[np.NaN] * 6], columns=glottal_cols)
+        df_summary = pd.concat([df_summary, glottal_summ, tremor_summ], axis=1)
+        return df_summary
+
+    glottal_features = calculate_glottal(audio_path)
+
+    glottal_summ = pd.DataFrame([glottal_features], columns=glottal_cols)
+    df_summary = pd.concat([df_summary, glottal_summ, tremor_summ], axis=1)
+    return df_summary
+
+def vocal_acoustics(audio_path, advanced=False):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -152,6 +272,8 @@ def vocal_acoustics(audio_path):
     ...........
     audio_path : str
         path to the audio file
+    advanced : bool
+        whether to calculate the advanced vocal acoustic variables
 
     Returns:
     ...........
@@ -181,7 +303,8 @@ def vocal_acoustics(audio_path):
         sig_df = pd.concat([df_jitter, df_shimmer, df_gne], axis=1)
 
         df_summary = get_summary(sound, framewise, sig_df, df_silence, measures)
-        return framewise, df_summary
+        df_summary2 = get_advanced_summary(df_summary, audio_path, advanced, measures)
+        return framewise, df_summary2
 
     except Exception as e:
         logger.error(f'Error in acoustic calculation- file: {audio_path} & Error: {e}')
