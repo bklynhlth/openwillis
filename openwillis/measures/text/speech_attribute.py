@@ -352,8 +352,11 @@ def speech_characteristics(json_conf, language="en", speaker_label=None, min_tur
 
         if bool(json_conf):
             language = language[:2].lower() if (language and len(language) >= 2) else "na"
+            if language not in measures["english_langs"] + measures["supported_langs_sentence_embeddings"] + measures["supported_langs_bert"]:
+                logger.warning(f"Language {language} not supported. Defaulting to English")
+                language = "en"
 
-            if language == 'en':
+            if language in measures["english_langs"]:
                 cutil.download_nltk_resources()
 
             if is_whisper_transcribe(json_conf):

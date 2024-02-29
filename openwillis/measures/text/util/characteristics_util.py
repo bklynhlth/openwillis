@@ -526,7 +526,7 @@ def process_pause_feature(df_diff, df, text_level, index_list, time_index, level
                 speech_pct_val = 100 * (1 - np.sum(pauses) / (60 * df.loc[j, measures[f"{level_name}_minutes"]]))
                 df.loc[j, measures["speech_percentage"]] = speech_pct_val
 
-                if language == 'en':
+                if language in measures["english_langs"]:
                     syllable_rate = (get_num_of_syllables(text_level[j]) / df.loc[j, measures[f"{level_name}_minutes"]])
                     df.loc[j, measures["syllable_rate"]] = syllable_rate
                 
@@ -1123,12 +1123,15 @@ def get_word_coherence(df_list, utterances_speaker, language, measures):
     word_df, turn_df, summ_df = df_list
 
     # model init
-    if language == "en":
+    if language in measures["english_langs"]:
         tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
         model = BertModel.from_pretrained('bert-base-uncased')
-    else:
+    elif language in measures["supported_langs_bert"]:
         tokenizer = BertTokenizer.from_pretrained('bert-base-multilingual-uncased')
         model = BertModel.from_pretrained('bert-base-multilingual-uncased')
+    else:
+        logger.error(f"Language {language} not supported for word coherence analysis")
+        return df_list
 
 
     # word-level
@@ -1275,23 +1278,30 @@ def calculate_phrase_tangeniality(phrases_texts, utterance_text, sentence_encode
 
     ------------------------------------------------------------------------------------------------------
     """
-    phrase_embeddings = sentence_encoder.encode(phrases_texts)
-    similarity_matrix = cosine_similarity(phrase_embeddings)
+    if sentence_encoder is not None:
+        phrase_embeddings = sentence_encoder.encode(phrases_texts)
+        similarity_matrix = cosine_similarity(phrase_embeddings)
 
-    # calculate semantic similarity of each phrase to the immediately preceding phrase
-    if len(phrases_texts) > 1:
-        sentence_tangeniality1 = np.mean([similarity_matrix[j, j-1] for j in range(1, len(phrases_texts))])
+        # calculate semantic similarity of each phrase to the immediately preceding phrase
+        if len(phrases_texts) > 1:
+            sentence_tangeniality1 = np.mean([similarity_matrix[j, j-1] for j in range(1, len(phrases_texts))])
+        else:
+            sentence_tangeniality1 = np.nan
+
+        # calculate semantic similarity of each phrase to the phrase 2 turns before
+        if len(phrases_texts) > 2:
+            sentence_tangeniality2 = np.mean([similarity_matrix[j-2, j] for j in range(2, len(phrases_texts))])
+        else:
+            sentence_tangeniality2 = np.nan
     else:
         sentence_tangeniality1 = np.nan
-
-    # calculate semantic similarity of each phrase to the phrase 2 turns before
-    if len(phrases_texts) > 2:
-        sentence_tangeniality2 = np.mean([similarity_matrix[j-2, j] for j in range(2, len(phrases_texts))])
-    else:
         sentence_tangeniality2 = np.nan
 
-    # calculate pseudo-perplexity of the turn and indicating how predictable the turn is
-    perplexity = calculate_perplexity(utterance_text, bert, tokenizer)
+    if tokenizer is not None and bert is not None:
+        # calculate pseudo-perplexity of the turn and indicating how predictable the turn is
+        perplexity = calculate_perplexity(utterance_text, bert, tokenizer)
+    else:
+        perplexity = np.nan
 
     return sentence_tangeniality1, sentence_tangeniality2, perplexity
 
@@ -1355,10 +1365,19 @@ def get_phrase_coherence(df_list, utterances_filtered, speaker_label, language, 
         tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
         bert = BertForMaskedLM.from_pretrained('bert-base-uncased')
     else:
-        sentence_encoder = SentenceTransformer('sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2')
+        if language in measures["supported_langs_sentence_embeddings"]:
+            sentence_encoder = SentenceTransformer('sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2')
+        else:
+            sentence_encoder = None
+            logger.error(f"Language {language} not supported for phrase coherence analysis")
 
-        tokenizer = BertTokenizer.from_pretrained('bert-base-multilingual-cased')
-        bert = BertForMaskedLM.from_pretrained('bert-base-multilingual-cased')
+        if language in measures["supported_langs_bert"]:
+            tokenizer = BertTokenizer.from_pretrained('bert-base-multilingual-uncased')
+            bert = BertForMaskedLM.from_pretrained('bert-base-multilingual-uncased')
+        else:
+            tokenizer = None
+            bert = None
+            logger.error(f"Language {language} not supported for perplexity analysis")
 
 
     # turn-level
@@ -1590,7 +1609,7 @@ def process_language_feature(df_list, transcribe_info, speaker_label, min_turn_l
     df_list = get_word_coherence(df_list, utterances_speaker, language, measures)
     df_list = get_phrase_coherence(df_list, utterances_filtered, speaker_label, language, measures)
 
-    if language == "en":
+    if language in measures["english_langs"]:
         df_list = get_sentiment(df_list, text_list, measures)
         df_list = get_pos_tag(df_list, text_list, measures)
 
