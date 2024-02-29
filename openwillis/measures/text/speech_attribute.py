@@ -6,9 +6,7 @@ import os
 import json
 import logging
 
-import nltk
 import numpy as np
-import pandas as pd
 from openwillis.measures.text.util import characteristics_util as cutil
 
 logging.basicConfig(level=logging.INFO)
