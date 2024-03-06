@@ -7,6 +7,7 @@ import json
 import logging
 
 import numpy as np
+import pandas as pd
 from openwillis.measures.text.util import characteristics_util as cutil
 
 logging.basicConfig(level=logging.INFO)
@@ -191,14 +192,16 @@ def filter_vosk(json_conf, measures):
 
     text = " ".join(words)
 
-    utterances = [{
-        measures["utterance_ids"]: (0, len(json_conf) - 1),
-        measures["utterance_text"]: text,
-        measures['words_ids']: words_ids,
-        measures['words_texts']: words,
-        measures['speaker_label']: "",
+    utterances = pd.DataFrame({
+        measures["utterance_ids"]: [(0, len(json_conf) - 1)],
+        measures["utterance_text"]: [text],
+        measures['words_ids']: [words_ids],
+        measures['words_texts']: [words],
+        measures['phrases_ids']: [[]],
+        measures['phrases_texts']: [[]],
+        measures['speaker_label']: [""],
 
-    }]
+    })
 
     return json_conf, utterances
 

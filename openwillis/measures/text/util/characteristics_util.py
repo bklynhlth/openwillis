@@ -1016,6 +1016,9 @@ def calculate_repetitions(words_texts, phrases_texts):
     word_reps = len(words_texts) - len(set(words_texts))
     phrase_reps = len(phrases_texts) - len(set(phrases_texts))
 
+    if len(phrases_texts) == 0:
+        return 100*word_reps/len(words_texts), np.nan
+
     return 100*word_reps/len(words_texts), 100*phrase_reps/len(phrases_texts)
 
 
@@ -1278,7 +1281,7 @@ def calculate_phrase_tangeniality(phrases_texts, utterance_text, sentence_encode
 
     ------------------------------------------------------------------------------------------------------
     """
-    if sentence_encoder is not None:
+    if sentence_encoder is not None and len(phrases_texts) > 0:
         phrase_embeddings = sentence_encoder.encode(phrases_texts)
         similarity_matrix = cosine_similarity(phrase_embeddings)
 
