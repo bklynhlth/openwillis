@@ -1,6 +1,6 @@
 OpenWillis is a python library for digital health measurement.
 
-It was developed by [Brooklyn Health](https://www.bklynhlth.com/openwillis) to establish standardized methods in digital phenotyping and make them open and accessible to the scientific community.
+It was developed by [Brooklyn Health](https://brooklyn.health/openwillis) to establish standardized methods in digital phenotyping and make them open and accessible to the scientific community.
 
 It is freely available for non-commercial use ([see license](https://github.com/bklynhlth/openwillis/blob/main/LICENSE.txt)).
 
