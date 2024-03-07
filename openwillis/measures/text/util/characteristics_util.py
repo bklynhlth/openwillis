@@ -5,6 +5,7 @@
 
 import pandas as pd
 import numpy as np
+import re
 import string
 import logging
 
@@ -1226,17 +1227,33 @@ def calculate_perplexity(text, model, tokenizer):
     ------------------------------------------------------------------------------------------------------
     """
     # Tokenize input text
-    tokens = tokenizer(text, return_tensors='pt')
+    clean_text = text.translate(str.maketrans('', '', string.punctuation)).lower()
+    clean_text = re.sub(r'\s+', ' ', clean_text)
+
+    tokens = tokenizer(clean_text, return_tensors='pt')
     input_ids = tokens.input_ids
     masked_input_ids = input_ids.clone()
 
     log_probs = []
     # Iterate over each token in the input
     for i in range(input_ids.size(1)):
-        # Mask the current token
+        # filter so that all input_ids include the masked location +- 256 tokens
+        if i < 256:
+            start = 0
+        else:
+            start = i - 256
+        if i > input_ids.size(1) - 256:
+            end = input_ids.size(1)
+        else:
+            end = i + 256
+
         masked_input_ids[0, i] = tokenizer.mask_token_id
+        
+        input_ids2 = input_ids[:, start:end]
+        masked_input_ids2 = masked_input_ids[:, start:end]
+
         with torch.no_grad():
-            outputs = model(input_ids=masked_input_ids, labels=input_ids)
+            outputs = model(input_ids=masked_input_ids2, labels=input_ids2)
         
         # Calculate log probability of the original token
         logit_prob = outputs.logits[0, i].softmax(dim=0)
@@ -1433,19 +1450,6 @@ def get_phrase_coherence(df_list, utterances_filtered, speaker_label, language, 
         summ_df[measures['turn_to_turn_tangeniality_mean']] = turn_df[measures['turn_to_turn_tangeniality']].mean(skipna=True)
         summ_df[measures['turn_to_turn_tangeniality_var']] = turn_df[measures['turn_to_turn_tangeniality']].var(skipna=True)
         summ_df[measures['turn_to_turn_tangeniality_slope']] = calculate_slope(turn_df[measures['turn_to_turn_tangeniality']])
-
-    else:
-        # first element of utterances_filtered
-        full_text = utterances_filtered[measures['utterance_text']].values[0]
-        phrases_texts = utterances_filtered[measures['phrases_texts']].values[0]
-
-        sentence_tangeniality1, sentence_tangeniality2, perplexity = calculate_phrase_tangeniality(
-            phrases_texts, full_text, sentence_encoder, bert, tokenizer
-        )
-
-        summ_df[measures['sentence_tangeniality1_mean']] = sentence_tangeniality1
-        summ_df[measures['sentence_tangeniality2_mean']] = sentence_tangeniality2
-        summ_df[measures['perplexity_mean']] = perplexity
 
     df_list = [word_df, turn_df, summ_df]
     return df_list
