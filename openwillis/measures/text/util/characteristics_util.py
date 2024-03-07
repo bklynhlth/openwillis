@@ -1094,11 +1094,22 @@ def get_word_embeddings(word_list, tokenizer, model):
 
     ------------------------------------------------------------------------------------------------------
     """
+    if len(word_list) >= 512:
+        # split the text into chunks of 512 tokens
+        word_list = [word_list[i:i+512] for i in range(0, len(word_list), 512)]
+        word_embeddings = []
+        for chunk in word_list:
+            inputs = tokenizer(chunk, return_tensors='pt', padding=True)
+            outputs = model(**inputs)
+            word_embeddings.append(outputs.last_hidden_state.mean(1).detach().numpy())
+        word_embeddings = np.concatenate(word_embeddings, axis=0)
+    else:
 
-    inputs = tokenizer(word_list, return_tensors='pt', padding=True)
-    outputs = model(**inputs)
-    # Average pooling of the hidden states
-    return outputs.last_hidden_state.mean(1).detach().numpy()
+        inputs = tokenizer(word_list, return_tensors='pt', padding=True)
+        outputs = model(**inputs)
+        # Average pooling of the hidden states
+        word_embeddings = outputs.last_hidden_state.mean(1).detach().numpy()
+    return word_embeddings
 
 def get_word_coherence(df_list, utterances_speaker, language, measures):
     """
