@@ -394,7 +394,13 @@ def get_voice_silence(sound, min_silence, measures):
 
     ------------------------------------------------------------------------------------------------------
     """
-    audio = AudioSegment.from_wav(sound)
+    if sound.endswith('.wav'):
+        audio = AudioSegment.from_wav(sound)
+    elif sound.endswith('.mp3'):
+        audio = AudioSegment.from_mp3(sound)
+    else:
+        raise ValueError("Unsupported file format")
+
     dBFS = audio.dBFS
 
     thresh = dBFS-16

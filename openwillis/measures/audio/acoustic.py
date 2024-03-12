@@ -209,7 +209,7 @@ def calculate_tremor(audio_path):
 
     return tremor_features2
 
-def get_advanced_summary(df_summary, audio_path, advanced, measures):
+def get_advanced_summary(df_summary, audio_path, option, measures):
     """
     ------------------------------------------------------------------------------------------------------
     
@@ -221,7 +221,7 @@ def get_advanced_summary(df_summary, audio_path, advanced, measures):
         dataframe containing the summary statistics for the audio file
     audio_path : str
         path to the audio file
-    advanced : bool
+    option : str
         whether to calculate the advanced vocal acoustic variables
     measures : dict
         a dictionary containing the measures names for the calculated statistics.
@@ -251,7 +251,7 @@ def get_advanced_summary(df_summary, audio_path, advanced, measures):
     tremor_features = calculate_tremor(audio_path)
     tremor_summ = pd.DataFrame([tremor_features], columns=tremor_cols)
 
-    if not advanced:
+    if option == 'simple':
         glottal_summ = pd.DataFrame([[np.NaN] * 6], columns=glottal_cols)
         df_summary = pd.concat([df_summary, glottal_summ, tremor_summ], axis=1)
         return df_summary
@@ -262,7 +262,7 @@ def get_advanced_summary(df_summary, audio_path, advanced, measures):
     df_summary = pd.concat([df_summary, glottal_summ, tremor_summ], axis=1)
     return df_summary
 
-def vocal_acoustics(audio_path, advanced=False):
+def vocal_acoustics(audio_path, option='simple'):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -272,8 +272,9 @@ def vocal_acoustics(audio_path, advanced=False):
     ...........
     audio_path : str
         path to the audio file
-    advanced : bool
+    option : str
         whether to calculate the advanced vocal acoustic variables
+        can be either 'simple' or 'advanced'
 
     Returns:
     ...........
@@ -287,6 +288,9 @@ def vocal_acoustics(audio_path, advanced=False):
     ------------------------------------------------------------------------------------------------------
     """
     try:
+        if option not in ['simple', 'advanced']:
+            raise ValueError("Option should be either 'simple' or 'advanced'")
+
         sound, measures = autil.read_audio(audio_path)
         df_pitch = autil.pitchfreq(sound, measures, 75, 500)
         df_loudness = autil.loudness(sound, measures)
@@ -304,7 +308,7 @@ def vocal_acoustics(audio_path, advanced=False):
         sig_df = pd.concat([df_jitter, df_shimmer, df_gne, df_cepstral], axis=1)
 
         df_summary = get_summary(sound, framewise, sig_df, df_silence, measures)
-        df_summary2 = get_advanced_summary(df_summary, audio_path, advanced, measures)
+        df_summary2 = get_advanced_summary(df_summary, audio_path, option, measures)
         return framewise, df_summary2
 
     except Exception as e:
