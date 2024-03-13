@@ -1073,13 +1073,17 @@ def get_repetitions(df_list, utterances_speaker, utterances_speaker_filtered, me
             turn_df.loc[i, measures['phrase_repeat_percentage']] = phrase_reps_perc
 
     # summary-level
-    words_texts = [word for words in utterances_speaker[measures['words_texts']] for word in words]
-    phrases_texts = [phrase for phrases in utterances_speaker[measures['phrases_texts']] for phrase in phrases]
+    if len(turn_df) > 0:
+        summ_df[measures['word_repeat_percentage']] = turn_df[measures['word_repeat_percentage']].mean(skipna=True)
+        summ_df[measures['phrase_repeat_percentage']] = turn_df[measures['phrase_repeat_percentage']].mean(skipna=True)
+    else:
+        words_texts = [word for words in utterances_speaker[measures['words_texts']] for word in words]
+        phrases_texts = [phrase for phrases in utterances_speaker[measures['phrases_texts']] for phrase in phrases]
 
-    word_reps_perc, phrase_reps_perc = calculate_repetitions(words_texts, phrases_texts)
+        word_reps_perc, phrase_reps_perc = calculate_repetitions(words_texts, phrases_texts)
 
-    summ_df[measures['word_repeat_percentage']] = word_reps_perc
-    summ_df[measures['phrase_repeat_percentage']] = phrase_reps_perc
+        summ_df[measures['word_repeat_percentage']] = word_reps_perc
+        summ_df[measures['phrase_repeat_percentage']] = phrase_reps_perc
 
     df_list = [word_df, turn_df, summ_df]
     return df_list
