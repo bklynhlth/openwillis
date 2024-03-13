@@ -248,17 +248,20 @@ def get_advanced_summary(df_summary, audio_path, option, measures):
         measures["ATrCIP"], measures["ATrPS"], measures["ACoHNR"]
     ]
 
-    tremor_features = calculate_tremor(audio_path)
-    tremor_summ = pd.DataFrame([tremor_features], columns=tremor_cols)
-
     if option == 'simple':
+        tremor_summ = pd.DataFrame([[np.NaN] * 18], columns=tremor_cols)
         glottal_summ = pd.DataFrame([[np.NaN] * 6], columns=glottal_cols)
-        df_summary = pd.concat([df_summary, glottal_summ, tremor_summ], axis=1)
-        return df_summary
+    elif option == 'tremor':
+        tremor_features = calculate_tremor(audio_path)
+        tremor_summ = pd.DataFrame([tremor_features], columns=tremor_cols)
+        glottal_summ = pd.DataFrame([[np.NaN] * 6], columns=glottal_cols)
+    else:
+        tremor_features = calculate_tremor(audio_path)
+        tremor_summ = pd.DataFrame([tremor_features], columns=tremor_cols)
 
-    glottal_features = calculate_glottal(audio_path)
+        glottal_features = calculate_glottal(audio_path)
+        glottal_summ = pd.DataFrame([glottal_features], columns=glottal_cols)
 
-    glottal_summ = pd.DataFrame([glottal_features], columns=glottal_cols)
     df_summary = pd.concat([df_summary, glottal_summ, tremor_summ], axis=1)
     return df_summary
 
@@ -274,7 +277,7 @@ def vocal_acoustics(audio_path, option='simple'):
         path to the audio file
     option : str
         whether to calculate the advanced vocal acoustic variables
-        can be either 'simple' or 'advanced'
+        can be either 'simple', 'advanced' or 'tremor'
 
     Returns:
     ...........
@@ -288,8 +291,8 @@ def vocal_acoustics(audio_path, option='simple'):
     ------------------------------------------------------------------------------------------------------
     """
     try:
-        if option not in ['simple', 'advanced']:
-            raise ValueError("Option should be either 'simple' or 'advanced'")
+        if option not in ['simple', 'advanced', 'tremor']:
+            raise ValueError("Option should be either 'simple', 'advanced' or 'tremor'")
 
         sound, measures = autil.read_audio(audio_path)
         df_pitch = autil.pitchfreq(sound, measures, 75, 500)
