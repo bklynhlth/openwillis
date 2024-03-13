@@ -60,7 +60,7 @@ def create_empty_dataframes(measures):
                                     measures["word_rate"], measures["syllable_rate"], measures["speech_percentage"], 
                                     measures["pause_meandur"], measures["pause_var"], measures["pos"], measures["neg"], 
                                     measures["neu"], measures["compound"], measures["speech_mattr"],
-                                    measures["first_person_percentage"], measures["first_person_sentiment"],
+                                    measures["first_person_percentage"], measures["first_person_sentiment_positive"], measures["first_person_sentiment_negative"],
                                     measures["word_repeat_percentage"], measures["phrase_repeat_percentage"],
                                     measures["sentence_tangeniality1"], measures["sentence_tangeniality2"],
                                     measures["turn_to_turn_tangeniality"], measures["perplexity"],
@@ -70,7 +70,7 @@ def create_empty_dataframes(measures):
         columns=[measures["file_length"], measures["speech_minutes"], measures["speech_words"], measures["word_rate"],
                 measures["syllable_rate"], measures["word_pause_mean"], measures["word_pause_var"], 
                 measures["speech_percentage"], measures["pos"], measures["neg"], measures["neu"], measures["compound"], 
-                measures["speech_mattr"], measures["first_person_percentage"], measures["first_person_sentiment"],
+                measures["speech_mattr"], measures["first_person_percentage"], measures["first_person_sentiment_positive"], measures["first_person_sentiment_negative"],
                 measures["word_repeat_percentage"], measures["phrase_repeat_percentage"],
                 measures["word_coherence_mean"], measures["word_coherence_var"],
                 measures["word_coherence_5_mean"], measures["word_coherence_5_var"],
@@ -788,28 +788,30 @@ def calculate_first_person_sentiment(df, measures):
 
     Returns:
     ...........
-    res: list
-        A list containing the calculated values.
+    res1: list
+        A list containing the calculated measure of the influence of positive sentiment on the use of first person pronouns.
+    res2: list
+        A list containing the calculated measure of the influence of negative sentiment on the use of first person pronouns.
 
     ------------------------------------------------------------------------------------------------------
     """
     
-    res = []
+    res1 = []
+    res2 = []
     for i in range(len(df)):
         perc = df.loc[i, measures["first_person_percentage"]]
         pos = df.loc[i, measures["pos"]]
         neg = df.loc[i, measures["neg"]]
 
         if perc is np.nan:
-            res.append(np.nan)
+            res1.append(np.nan)
+            res2.append(np.nan)
             continue
 
-        if pos >= neg:
-            res.append((100-perc)*pos)
-        else:
-            res.append(perc*neg)
+        res1.append((100-perc)*pos)
+        res2.append(perc*neg)
 
-    return res
+    return res1, res2
 
 def calculate_first_person_percentage(text):
     """
@@ -863,7 +865,12 @@ def get_first_person_turn(turn_df, turn_list, measures):
     first_person_percentages = [calculate_first_person_percentage(turn) for turn in turn_list]
 
     turn_df[measures["first_person_percentage"]] = first_person_percentages
-    turn_df[measures["first_person_sentiment"]] = calculate_first_person_sentiment(turn_df, measures)
+
+    first_pos, first_neg = calculate_first_person_sentiment(turn_df, measures)
+
+    turn_df[measures["first_person_sentiment_positive"]] = first_pos
+    turn_df[measures["first_person_sentiment_negative"]] = first_neg
+
     return turn_df
 
 def get_first_person_summ(summ_df, turn_df, full_text, measures):
@@ -894,9 +901,12 @@ def get_first_person_summ(summ_df, turn_df, full_text, measures):
     summ_df[measures["first_person_percentage"]] = calculate_first_person_percentage(full_text)
 
     if len(turn_df) > 0:
-        summ_df[measures["first_person_sentiment"]] = turn_df[measures["first_person_sentiment"]].mean(skipna=True)
+        summ_df[measures["first_person_sentiment_positive"]] = turn_df[measures["first_person_sentiment_positive"]].mean(skipna=True)
+        summ_df[measures["first_person_sentiment_negative"]] = turn_df[measures["first_person_sentiment_negative"]].mean(skipna=True)
     else:
-        summ_df[measures["first_person_sentiment"]] = calculate_first_person_sentiment(summ_df, measures)
+        first_pos, first_neg = calculate_first_person_sentiment(summ_df, measures)
+        summ_df[measures["first_person_sentiment_positive"]] = first_pos
+        summ_df[measures["first_person_sentiment_negative"]] = first_neg
 
     return summ_df
 
