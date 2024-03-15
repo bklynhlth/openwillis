@@ -59,6 +59,7 @@
   "first_person_percentage": "first_person_percentage",
   "first_person_sentiment_positive": "first_person_sentiment_positive",
   "first_person_sentiment_negative": "first_person_sentiment_negative",
+  "first_person_sentiment_overall": "first_person_sentiment_overall",
   "word_repeat_percentage": "word_repeat_percentage",
   "phrase_repeat_percentage": "phrase_repeat_percentage",
   "word_coherence": "word_coherence",

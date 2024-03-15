@@ -70,7 +70,8 @@ def create_empty_dataframes(measures):
         columns=[measures["file_length"], measures["speech_minutes"], measures["speech_words"], measures["word_rate"],
                 measures["syllable_rate"], measures["word_pause_mean"], measures["word_pause_var"], 
                 measures["speech_percentage"], measures["pos"], measures["neg"], measures["neu"], measures["compound"], 
-                measures["speech_mattr"], measures["first_person_percentage"], measures["first_person_sentiment_positive"], measures["first_person_sentiment_negative"],
+                measures["speech_mattr"], measures["first_person_percentage"], measures["first_person_sentiment_positive"],
+                measures["first_person_sentiment_negative"], measures["first_person_sentiment_overall"],
                 measures["word_repeat_percentage"], measures["phrase_repeat_percentage"],
                 measures["word_coherence_mean"], measures["word_coherence_var"],
                 measures["word_coherence_5_mean"], measures["word_coherence_5_var"],
@@ -903,10 +904,24 @@ def get_first_person_summ(summ_df, turn_df, full_text, measures):
     if len(turn_df) > 0:
         summ_df[measures["first_person_sentiment_positive"]] = turn_df[measures["first_person_sentiment_positive"]].mean(skipna=True)
         summ_df[measures["first_person_sentiment_negative"]] = turn_df[measures["first_person_sentiment_negative"]].mean(skipna=True)
+
+        first_person_sentiment = []
+        for i in range(len(turn_df)):
+            if turn_df.loc[i, measures["pos"]] > turn_df.loc[i, measures["neg"]]:
+                first_person_sentiment.append(turn_df.loc[i, measures["first_person_sentiment_positive"]])
+            else:    
+                first_person_sentiment.append(turn_df.loc[i, measures["first_person_sentiment_negative"]])
+
+        summ_df[measures["first_person_sentiment_overall"]] = np.nanmean(first_person_sentiment)
     else:
         first_pos, first_neg = calculate_first_person_sentiment(summ_df, measures)
         summ_df[measures["first_person_sentiment_positive"]] = first_pos
         summ_df[measures["first_person_sentiment_negative"]] = first_neg
+
+        if summ_df[measures["pos"]].values[0] > summ_df[measures["neg"]].values[0]:
+            summ_df[measures["first_person_sentiment_overall"]] = summ_df[measures["first_person_sentiment_positive"]].values[0]
+        else:
+            summ_df[measures["first_person_sentiment_overall"]] = summ_df[measures["first_person_sentiment_negative"]].values[0]
 
     return summ_df
 
