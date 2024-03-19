@@ -131,7 +131,7 @@ def calculate_relative_stds(framewise, df_silence, measures):
     """
 
     speech_indices = get_voiced_segments(df_silence, 100, measures)
-    if speech_indices is None:
+    if speech_indices is None or len(speech_indices) == 0:
         speech_indices = np.arange(0, len(framewise))
     elif speech_indices[-1] < len(framewise):
         speech_indices = np.append(speech_indices, np.arange(speech_indices[-1], len(framewise)))
