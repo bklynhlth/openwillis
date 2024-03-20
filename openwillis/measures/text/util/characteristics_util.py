@@ -848,6 +848,8 @@ def get_first_person_turn(turn_df, turn_list, measures):
     ------------------------------------------------------------------------------------------------------
 
     This function calculates measures related to the first person pronouns in each turn.
+     Specifically, it calculates the percentage of first person pronouns in each turn,
+     and the influence of sentiment on the use of first person pronouns.
 
     Parameters:
     ...........
@@ -1140,6 +1142,104 @@ def get_word_embeddings(word_list, tokenizer, model):
         word_embeddings = outputs.last_hidden_state.mean(1).detach().numpy()
     return word_embeddings
 
+def get_word_coherence_utterance(row, tokenizer, model, measures):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    This function calculates word coherence measures for a single utterance.
+
+    Parameters:
+    ...........
+    row: pandas dataframe
+        A dataframe containing the turns extracted from the JSON object for the specified speaker.
+    tokenizer: BertTokenizer
+        A tokenizer object for BERT.
+    model: BertModel
+        A BERT model object.
+    measures: dict
+        A dictionary containing the names of the columns in the output dataframes.
+
+    Returns:
+    ...........
+    word_coherence: list
+        A list containing the calculated semantic similarity of each word to the immediately preceding word.
+    word_coherence_5: list
+        A list containing the calculated semantic similarity of each word in 5-words window.
+    word_coherence_10: list
+        A list containing the calculated semantic similarity of each word in 10-words window.
+    word_word_variability: dict
+        A dictionary containing the calculated word-to-word variability at k inter-word distances.
+
+    ------------------------------------------------------------------------------------------------------
+    """
+    words_texts = row[measures['words_texts']]
+    word_embeddings = get_word_embeddings(words_texts, tokenizer, model)
+    similarity_matrix = cosine_similarity(word_embeddings)
+
+    # calculate semantic similarity of each word to the immediately preceding word
+    if len(words_texts) > 1:
+        word_coherence = [np.nan] + [similarity_matrix[j, j-1] for j in range(1, len(words_texts))]
+    else:
+        word_coherence = [np.nan]*len(words_texts)
+
+    # calculate semantic similarity of each word in 5-words window
+    if len(words_texts) > 5:
+        word_coherence_5 = [np.nan]*2 + [np.mean(similarity_matrix[j-2:j+3, j]) for j in range(2, len(words_texts)-2)] + [np.nan]*2
+    else:
+        word_coherence_5 = [np.nan]*len(words_texts)
+
+    # calculate semantic similarity of each word in 10-words window
+    if len(words_texts) > 10:
+        word_coherence_10 = [np.nan]*5 + [np.mean(similarity_matrix[j-5:j+6, j]) for j in range(5, len(words_texts)-5)] + [np.nan]*5
+    else:
+        word_coherence_10 = [np.nan]*len(words_texts)
+
+    # calculate word-to-word variability at k inter-word distances (for k from 2 to 10)
+    # indicating semantic similarity between each word and the next following word at k inter-word distance
+    word_word_variability = {}
+    for k in range(2, 11):
+        if len(words_texts) > k:
+            word_word_variability[k] = [similarity_matrix[j, j+k] for j in range(len(words_texts)-k)] + [np.nan]*k
+        else:
+            word_word_variability[k] = [np.nan]*len(words_texts)
+
+    return word_coherence, word_coherence_5, word_coherence_10, word_word_variability    
+
+def get_word_coherence_summary(word_df, summ_df, measures):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    This function summarizes the word coherence measures at the summary level.
+
+    Parameters:
+    ...........
+    word_df: pandas dataframe
+        A dataframe containing word summary information.
+    summ_df: pandas dataframe
+        A dataframe containing summary information.
+    measures: dict
+        A dictionary containing the names of the columns in the output dataframes.
+
+    Returns:
+    ...........
+    summ_df: pandas dataframe
+        The updated summ_df dataframe.
+
+    ------------------------------------------------------------------------------------------------------
+    """
+
+    summ_df[measures['word_coherence_mean']] = word_df[measures['word_coherence']].mean(skipna=True)
+    summ_df[measures['word_coherence_var']] = word_df[measures['word_coherence']].var(skipna=True)
+    summ_df[measures['word_coherence_5_mean']] = word_df[measures['word_coherence_5']].mean(skipna=True)
+    summ_df[measures['word_coherence_5_var']] = word_df[measures['word_coherence_5']].var(skipna=True)
+    summ_df[measures['word_coherence_10_mean']] = word_df[measures['word_coherence_10']].mean(skipna=True)
+    summ_df[measures['word_coherence_10_var']] = word_df[measures['word_coherence_10']].var(skipna=True)
+    for k in range(2, 11):
+        summ_df[measures[f'word_coherence_variability_{k}_mean']] = word_df[measures[f'word_coherence_variability_{k}']].mean(skipna=True)
+        summ_df[measures[f'word_coherence_variability_{k}_var']] = word_df[measures[f'word_coherence_variability_{k}']].var(skipna=True)
+
+    return summ_df
+
 def get_word_coherence(df_list, utterances_speaker, language, measures):
     """
     ------------------------------------------------------------------------------------------------------
@@ -1187,36 +1287,8 @@ def get_word_coherence(df_list, utterances_speaker, language, measures):
     }
     for i in range(len(utterances_speaker)):
         row = utterances_speaker.iloc[i]
-        words_texts = row[measures['words_texts']]
-        word_embeddings = get_word_embeddings(words_texts, tokenizer, model)
-        similarity_matrix = cosine_similarity(word_embeddings)
 
-        # calculate semantic similarity of each word to the immediately preceding word
-        if len(words_texts) > 1:
-            word_coherence = [np.nan] + [similarity_matrix[j, j-1] for j in range(1, len(words_texts))]
-        else:
-            word_coherence = [np.nan]*len(words_texts)
-
-        # calculate semantic similarity of each word in 5-words window
-        if len(words_texts) > 5:
-            word_coherence_5 = [np.nan]*2 + [np.mean(similarity_matrix[j-2:j+3, j]) for j in range(2, len(words_texts)-2)] + [np.nan]*2
-        else:
-            word_coherence_5 = [np.nan]*len(words_texts)
-
-        # calculate semantic similarity of each word in 10-words window
-        if len(words_texts) > 10:
-            word_coherence_10 = [np.nan]*5 + [np.mean(similarity_matrix[j-5:j+6, j]) for j in range(5, len(words_texts)-5)] + [np.nan]*5
-        else:
-            word_coherence_10 = [np.nan]*len(words_texts)
-
-        # calculate word-to-word variability at k inter-word distances (for k from 2 to 10)
-        # indicating semantic similarity between each word and the next following word at k inter-word distance
-        word_word_variability = {}
-        for k in range(2, 11):
-            if len(words_texts) > k:
-                word_word_variability[k] = [similarity_matrix[j, j+k] for j in range(len(words_texts)-k)] + [np.nan]*k
-            else:
-                word_word_variability[k] = [np.nan]*len(words_texts)
+        word_coherence, word_coherence_5, word_coherence_10, word_word_variability = get_word_coherence_utterance(row, tokenizer, model, measures)
 
         word_coherence_list += word_coherence
         word_coherence_5_list += word_coherence_5
@@ -1231,15 +1303,7 @@ def get_word_coherence(df_list, utterances_speaker, language, measures):
         word_df[measures[f'word_coherence_variability_{k}']] = word_coherence_variability[k]
 
     # summary-level
-    summ_df[measures['word_coherence_mean']] = word_df[measures['word_coherence']].mean(skipna=True)
-    summ_df[measures['word_coherence_var']] = word_df[measures['word_coherence']].var(skipna=True)
-    summ_df[measures['word_coherence_5_mean']] = word_df[measures['word_coherence_5']].mean(skipna=True)
-    summ_df[measures['word_coherence_5_var']] = word_df[measures['word_coherence_5']].var(skipna=True)
-    summ_df[measures['word_coherence_10_mean']] = word_df[measures['word_coherence_10']].mean(skipna=True)
-    summ_df[measures['word_coherence_10_var']] = word_df[measures['word_coherence_10']].var(skipna=True)
-    for k in range(2, 11):
-        summ_df[measures[f'word_coherence_variability_{k}_mean']] = word_df[measures[f'word_coherence_variability_{k}']].mean(skipna=True)
-        summ_df[measures[f'word_coherence_variability_{k}_var']] = word_df[measures[f'word_coherence_variability_{k}']].var(skipna=True)
+    summ_df = get_word_coherence_summary(word_df, summ_df, measures)
 
     df_list = [word_df, turn_df, summ_df]
     return df_list
