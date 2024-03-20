@@ -516,7 +516,6 @@ def get_displacement(lmk_df, base_path, measures):
         if len(lmk_df)>1:
             disp_actual_df = get_distance(lmk_df)
             disp_actual_df['overall'] = pd.DataFrame(disp_actual_df.mean(axis=1))
-            disp_actual_df = calculate_areas_displacement(disp_actual_df, measures)
 
             if os.path.exists(base_path):
                 disp_base_df = baseline(base_path)
@@ -528,6 +527,7 @@ def get_displacement(lmk_df, base_path, measures):
                     disp_actual_df = disp_actual_df/disp_base_df.values
                     disp_actual_df = disp_actual_df - 1
 
+            disp_actual_df = calculate_areas_displacement(disp_actual_df, measures)
             displacement_df = pd.concat([df_meta, disp_actual_df], axis=1).reset_index(drop=True)
     except Exception as e:
 

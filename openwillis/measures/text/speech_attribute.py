@@ -86,14 +86,17 @@ def is_whisper_transcribe(json_conf):
 def filter_transcribe(json_conf, measures):
     """
     ------------------------------------------------------------------------------------------------------
+
     This function extracts the text and filters the JSON data for Amazon Transcribe json response objects.
     Also, it filters the JSON data based on the speaker label if provided.
+
     Parameters:
     ...........
     json_conf: dict
         aws transcribe json response.
     measures: dict
         A dictionary containing the names of the columns in the output dataframes.
+
     Returns:
     ...........
     filter_json: list
@@ -101,6 +104,7 @@ def filter_transcribe(json_conf, measures):
         only the relevant data for processing.
     utterances: pd.DataFrame
         The utterances extracted from the JSON object.
+
     ------------------------------------------------------------------------------------------------------
     """
     item_data = json_conf["results"]["items"]

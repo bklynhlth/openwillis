@@ -18,6 +18,9 @@ from openwillis.measures.audio import (
 from openwillis.measures.text import (
     speech_characteristics
 )
+from openwillis.measures.gps import (
+    gps_analysis
+)
 
 from openwillis.measures.commons import (
     to_audio
