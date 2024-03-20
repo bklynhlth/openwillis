@@ -12,7 +12,7 @@ from scipy.io.wavfile import read
 from scipy.integrate import cumtrapz
 from scipy.signal import find_peaks
 
-from disvoice.glottal.GCI import iaif
+from disvoice.glottal.GCI import iaif, compute_h1h2_hrf_frame, find_amid_t
 from disvoice.glottal.utils_gci import create_continuous_smooth_f0, GetLPCresidual, get_MBS, get_MBS_GCI_intervals, search_res_interval_peaks
 import pysptk
 
@@ -385,70 +385,6 @@ def get_vq_params(gf, gfd, fs, GCI):
         _, HRF[n]=compute_h1h2_hrf_frame(GCI[n], T0, T0_num, gfd, F0, fs)
 
     return NAQ, QOQ, HRF
-
-def compute_h1h2_hrf_frame(GCIn, T0, T0_num, gfd, F0, fs):
-    H1H2=0
-    HRF=0
-
-    if GCIn-int((T0*T0_num)/2)>0:
-        f_start=int(GCIn-int((T0*T0_num)/2))
-    else:
-        f_start=0
-    if GCIn+int((T0*T0_num)/2)<=len(gfd):
-        f_stop=int(GCIn+int((T0*T0_num)/2))
-    else:
-        f_stop=len(gfd)
-    f_frame=gfd[f_start:f_stop]
-    f_win=f_frame*np.hamming(len(f_frame))
-    f_spec=20*np.log10(np.abs(np.fft.fft(f_win, fs)))
-
-    f_spec=f_spec[0:int(len(f_spec)/2)]
-    # get H1-H2 and HRF
-    [max_peaks, min_peaks]=peakdetect(f_spec,lookahead = int(T0))
-
-
-    if len(max_peaks)==0:
-        return 0, 0
-    h_idx, h_amp=zip(*max_peaks)
-    HRF_harm_num=np.fix(HRF_freq_max/F0)
-    if len(h_idx)>=min_harm_num:
-        temp1=np.arange(HRF_harm_num)*F0
-        f0_idx=np.zeros(len(h_idx))
-        for mp in range(len(h_idx)):
-
-            temp2=h_idx[mp]-temp1
-            temp2=np.abs(temp2)
-            posmin=np.where(temp2==min(temp2))[0]
-            if len(posmin)>1:
-                posmin=posmin[0]
-
-            if posmin<len(h_idx):
-                f0_idx[mp]=posmin
-            else:
-                f0_idx[mp]=len(h_idx)-1
-
-        f0_idx=[int(mm) for mm in f0_idx]
-
-        H1H2=h_amp[f0_idx[0]]-h_amp[f0_idx[1]]
-        harms=[h_amp[mm] for mm in f0_idx[1:]]
-        HRF=sum(harms)/h_amp[f0_idx[0]]
-
-    return H1H2, HRF
-
-def find_amid_t(glot_adj, Amid, Tz):
-    #Function to find the start and stop positions of the quasi-open phase.
-    T1=0
-    T2=0
-    if Tz!=0:
-        n=Tz
-        while glot_adj[n]>Amid and n>2:
-            n=n-1
-        T1=n
-        n=Tz
-        while glot_adj[n] > Amid and n < len(glot_adj)-1:
-            n=n+1
-        T2=n
-    return T1, T2
 
 def peakdetect(y_axis, lookahead=200, delta=0):
     """
