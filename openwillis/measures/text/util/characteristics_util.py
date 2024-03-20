@@ -651,7 +651,7 @@ def update_summ_df(df_diff, summ_df, full_text, time_index, word_df, turn_df, me
 
     return summ_df
 
-def get_pause_feature(json_conf, df_list, text_list, text_indices, measures, time_index, language):
+def get_pause_feature(json_conf, df_list, text_list, turn_index, measures, time_index, language):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -666,7 +666,7 @@ def get_pause_feature(json_conf, df_list, text_list, text_indices, measures, tim
         List of pandas dataframes: word_df, turn_df, summ_df
     text_list: list
         List of transcribed text: split into words, turns, and full text.
-    text_indices: list
+    turn_index: list
         List of indices for text_list.
     measures: dict
         A dictionary containing the names of the columns in the output dataframes.
@@ -685,8 +685,6 @@ def get_pause_feature(json_conf, df_list, text_list, text_indices, measures, tim
     if len(json_conf) <= 0:
         return df_list
 
-    turn_index, turn_index2 = text_indices
-
     word_df, turn_df, summ_df = df_list
     word_list, turn_list, full_text = text_list
     df_diff = pd.DataFrame(json_conf)
@@ -696,7 +694,7 @@ def get_pause_feature(json_conf, df_list, text_list, text_indices, measures, tim
         df_diff[measures["pause"]] = df_diff[time_index[0]].astype(float) - df_diff[time_index[1]].astype(float).shift(1)
 
     # word-level analysis
-    word_df = get_pause_feature_word(word_df, df_diff, word_list, turn_index2, measures)
+    word_df = get_pause_feature_word(word_df, df_diff, word_list, turn_index, measures)
 
     # turn-level analysis
     if len(turn_index) > 0:
