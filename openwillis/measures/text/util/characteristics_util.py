@@ -1271,11 +1271,11 @@ def get_word_coherence(df_list, utterances_speaker, language, measures):
 
     # model init
     if language in measures["english_langs"]:
-        tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
-        model = BertModel.from_pretrained('bert-base-uncased')
+        tokenizer = BertTokenizer.from_pretrained('bert-base-cased')
+        model = BertModel.from_pretrained('bert-base-cased')
     elif language in measures["supported_langs_bert"]:
-        tokenizer = BertTokenizer.from_pretrained('bert-base-multilingual-uncased')
-        model = BertModel.from_pretrained('bert-base-multilingual-uncased')
+        tokenizer = BertTokenizer.from_pretrained('bert-base-multilingual-cased')
+        model = BertModel.from_pretrained('bert-base-multilingual-cased')
     else:
         logger.error(f"Language {language} not supported for word coherence analysis")
         return df_list
@@ -1334,7 +1334,7 @@ def calculate_perplexity(text, model, tokenizer):
     ------------------------------------------------------------------------------------------------------
     """
     # Tokenize input text
-    clean_text = text.translate(str.maketrans('', '', string.punctuation)).lower()
+    clean_text = text.translate(str.maketrans('', '', string.punctuation))
     clean_text = re.sub(r'\s+', ' ', clean_text)
 
     tokens = tokenizer(clean_text, return_tensors='pt')
@@ -1489,8 +1489,8 @@ def get_phrase_coherence(df_list, utterances_filtered, speaker_label, language, 
     if language in measures["english_langs"]:
         sentence_encoder = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
 
-        tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
-        bert = BertForMaskedLM.from_pretrained('bert-base-uncased')
+        tokenizer = BertTokenizer.from_pretrained('bert-base-cased')
+        bert = BertForMaskedLM.from_pretrained('bert-base-cased')
     else:
         if language not in measures["supported_langs_sentence_embeddings"] + measures["supported_langs_bert"]:
             logger.error(f"Language {language} not supported for phrase coherence nor perplexity analysis")
@@ -1503,8 +1503,8 @@ def get_phrase_coherence(df_list, utterances_filtered, speaker_label, language, 
             logger.error(f"Language {language} not supported for phrase coherence analysis")
 
         if language in measures["supported_langs_bert"]:
-            tokenizer = BertTokenizer.from_pretrained('bert-base-multilingual-uncased')
-            bert = BertForMaskedLM.from_pretrained('bert-base-multilingual-uncased')
+            tokenizer = BertTokenizer.from_pretrained('bert-base-multilingual-cased')
+            bert = BertForMaskedLM.from_pretrained('bert-base-multilingual-cased')
         else:
             tokenizer = None
             bert = None
