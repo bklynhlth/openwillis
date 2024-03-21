@@ -19,3 +19,6 @@ sentence-transformers==2.2.2
 huggingface-hub==0.19.3
 boto3==1.26.106
 scipy==1.10.1
+forest @ git+https://github.com/onnela-lab/forest@5b9ba664cc09ac49f58e42cce3b271aa03a41967
+disvoice==0.1.8
+librosa==0.10.1
