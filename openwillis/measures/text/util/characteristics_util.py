@@ -765,15 +765,15 @@ def get_tag(word_df, word_list, measures):
     word_df[measures["part_of_speech"]] = tag_list_pos
 
     word_df[measures["first_person"]] = [word in FIRST_PERSON_PRONOUNS for word in word_list]
-    # make non pronouns None
-    word_df[measures["first_person"]] = word_df[measures["first_person"]].where(word_df[measures["part_of_speech"]] == "Pronoun", None)
+    # make non pronouns NaN
+    word_df[measures["first_person"]] = word_df[measures["first_person"]].where(word_df[measures["part_of_speech"]] == "Pronoun", np.nan)
 
     present_tense = ["VBP", "VBZ"]
     past_tense = ["VBD", "VBN"]
     tag_list_verb = ["Present" if tag[1] in present_tense else "Past" if tag[1] in past_tense else "Other" for tag in tag_list]
     word_df[measures["verb_tense"]] = tag_list_verb
-    # make non verbs None
-    word_df[measures["verb_tense"]] = word_df[measures["verb_tense"]].where(word_df[measures["part_of_speech"]] == "Verb", None)
+    # make non verbs NaN
+    word_df[measures["verb_tense"]] = word_df[measures["verb_tense"]].where(word_df[measures["part_of_speech"]] == "Verb", np.nan)
 
     return word_df
 
