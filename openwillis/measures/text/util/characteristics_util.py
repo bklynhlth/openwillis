@@ -765,15 +765,15 @@ def get_tag(word_df, word_list, measures):
     word_df[measures["part_of_speech"]] = tag_list_pos
 
     word_df[measures["first_person"]] = [word in FIRST_PERSON_PRONOUNS for word in word_list]
-    # make non pronouns None
-    word_df[measures["first_person"]] = word_df[measures["first_person"]].where(word_df[measures["part_of_speech"]] == "Pronoun", None)
+    # make non pronouns NaN
+    word_df[measures["first_person"]] = word_df[measures["first_person"]].where(word_df[measures["part_of_speech"]] == "Pronoun", np.nan)
 
     present_tense = ["VBP", "VBZ"]
     past_tense = ["VBD", "VBN"]
     tag_list_verb = ["Present" if tag[1] in present_tense else "Past" if tag[1] in past_tense else "Other" for tag in tag_list]
     word_df[measures["verb_tense"]] = tag_list_verb
-    # make non verbs None
-    word_df[measures["verb_tense"]] = word_df[measures["verb_tense"]].where(word_df[measures["part_of_speech"]] == "Verb", None)
+    # make non verbs NaN
+    word_df[measures["verb_tense"]] = word_df[measures["verb_tense"]].where(word_df[measures["part_of_speech"]] == "Verb", np.nan)
 
     return word_df
 
@@ -1338,8 +1338,8 @@ def calculate_perplexity(text, model, tokenizer):
     """
     # Tokenize input text
     clean_text = text.translate(str.maketrans('', '', string.punctuation))
-    clean_text = re.sub(r'\s+', ' ', clean_text)
-    if len(clean_text) == 0:
+    clean_text = re.sub(r'\s+', ' ', clean_text).strip()
+    if len(clean_text) == 0 or len(clean_text.split()) < 2:
         return np.nan
 
     tokens = tokenizer(clean_text, return_tensors='pt')
@@ -1418,7 +1418,7 @@ def calculate_phrase_tangeniality(phrases_texts, utterance_text, sentence_encode
 
         # calculate semantic similarity of each phrase to the immediately preceding phrase
         if len(phrases_texts) > 1:
-            sentence_tangeniality1 = np.mean([similarity_matrix[j, j-1] for j in range(1, len(phrases_texts))])
+            sentence_tangeniality1 = np.mean([similarity_matrix[j-1, j] for j in range(1, len(phrases_texts))])
         else:
             sentence_tangeniality1 = np.nan
 
