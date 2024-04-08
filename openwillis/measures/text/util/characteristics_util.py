@@ -1338,8 +1338,8 @@ def calculate_perplexity(text, model, tokenizer):
     """
     # Tokenize input text
     clean_text = text.translate(str.maketrans('', '', string.punctuation))
-    clean_text = re.sub(r'\s+', ' ', clean_text)
-    if len(clean_text) == 0:
+    clean_text = re.sub(r'\s+', ' ', clean_text).strip()
+    if len(clean_text) == 0 or len(clean_text.split()) < 2:
         return np.nan
 
     tokens = tokenizer(clean_text, return_tensors='pt')
@@ -1418,7 +1418,7 @@ def calculate_phrase_tangeniality(phrases_texts, utterance_text, sentence_encode
 
         # calculate semantic similarity of each phrase to the immediately preceding phrase
         if len(phrases_texts) > 1:
-            sentence_tangeniality1 = np.mean([similarity_matrix[j, j-1] for j in range(1, len(phrases_texts))])
+            sentence_tangeniality1 = np.mean([similarity_matrix[j-1, j] for j in range(1, len(phrases_texts))])
         else:
             sentence_tangeniality1 = np.nan
 
