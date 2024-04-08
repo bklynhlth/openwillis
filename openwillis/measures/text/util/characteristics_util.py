@@ -1138,7 +1138,6 @@ def get_word_embeddings(word_list, tokenizer, model):
             word_embeddings.append(outputs.last_hidden_state.mean(1).detach().numpy())
         word_embeddings = np.concatenate(word_embeddings, axis=0)
     else:
-
         inputs = tokenizer(word_list, return_tensors='pt', padding=True)
         outputs = model(**inputs)
         # Average pooling of the hidden states
@@ -1176,6 +1175,10 @@ def get_word_coherence_utterance(row, tokenizer, model, measures):
     ------------------------------------------------------------------------------------------------------
     """
     words_texts = row[measures['words_texts']]
+    if len(words_texts) == 0:
+        # return empty lists if no words in the utterance
+        return [np.nan]*len(words_texts), [np.nan]*len(words_texts), [np.nan]*len(words_texts), {k: [np.nan]*len(words_texts) for k in range(2, 11)}
+
     word_embeddings = get_word_embeddings(words_texts, tokenizer, model)
     similarity_matrix = cosine_similarity(word_embeddings)
 
@@ -1336,6 +1339,8 @@ def calculate_perplexity(text, model, tokenizer):
     # Tokenize input text
     clean_text = text.translate(str.maketrans('', '', string.punctuation))
     clean_text = re.sub(r'\s+', ' ', clean_text)
+    if len(clean_text) == 0:
+        return np.nan
 
     tokens = tokenizer(clean_text, return_tensors='pt')
     input_ids = tokens.input_ids
@@ -1355,21 +1360,23 @@ def calculate_perplexity(text, model, tokenizer):
             end = i + 256
 
         masked_input_ids[0, i] = tokenizer.mask_token_id
-        
-        input_ids2 = input_ids[:, start:end]
-        masked_input_ids2 = masked_input_ids[:, start:end]
+
+        input_ids2 = input_ids[:, start:(end+1)]
+        masked_input_ids2 = masked_input_ids[:, start:(end+1)]
+        # get new i from that
+        idx = i - start
 
         with torch.no_grad():
             outputs = model(input_ids=masked_input_ids2, labels=input_ids2)
-        
+
         # Calculate log probability of the original token
-        logit_prob = outputs.logits[0, i].softmax(dim=0)
+        logit_prob = outputs.logits[0, idx].softmax(dim=0)
         true_log_prob = logit_prob[input_ids[0, i]].log().item()
         log_probs.append(true_log_prob)
-        
+
         # Unmask the token for the next iteration
         masked_input_ids[0, i] = input_ids[0, i]
-    
+
     # Calculate perplexity
     perplexity = np.exp(-np.mean(log_probs))
     return perplexity
