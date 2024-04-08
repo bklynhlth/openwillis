@@ -1457,9 +1457,14 @@ def calculate_slope(y):
 
     ------------------------------------------------------------------------------------------------------
     """
+    # remove NaNs
+    y = [val for val in y if not np.isnan(val)]
 
     x = range(len(y))
-    slope, _ = np.polyfit(x, y, 1)
+    try:
+        slope, _ = np.polyfit(x, y, 1)
+    except:
+        slope = np.nan
 
     return slope
 
