@@ -2,12 +2,40 @@
 # website:   http://www.bklynhlth.com
 
 # import the required packages
+import os
+import json
 import logging
 
 from openwillis.measures.text.util import diarization_utils as dutil
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger()
+
+
+def get_config():
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    Load the configuration settings for the speech transcription.
+
+    Parameters:
+    ...........
+    None
+
+    Returns:
+    ...........
+    measures : dict
+        A dictionary containing the configuration settings.
+
+    ------------------------------------------------------------------------------------------------------
+    """
+    #Loading json config
+    dir_name = os.path.dirname(os.path.abspath(__file__))
+    measure_path = os.path.abspath(os.path.join(dir_name, 'config/speech.json'))
+
+    file = open(measure_path)
+    measures = json.load(file)
+    return measures
 
 
 def is_amazon_transcribe(transcript_json):
@@ -56,7 +84,7 @@ def is_whisper_transcribe(transcript_json):
     return False
 
 
-def diarization_correction(transcript_json, **kwargs):
+def diarization_correction(transcript_json, context = '', **kwargs):
     """
     ------------------------------------------------------------------------------------------------------
     This function corrects the speaker diarization of a transcript
@@ -66,6 +94,8 @@ def diarization_correction(transcript_json, **kwargs):
     ...........
     transcript_json: dict
         JSON response object.
+    context : str, optional
+        scale to use for identifying clinician/patient, if any.
     kwargs: dict
         Additional arguments for the AWS API call.
 
@@ -76,6 +106,7 @@ def diarization_correction(transcript_json, **kwargs):
     ------------------------------------------------------------------------------------------------------
     """
     transcript_json_corrected = transcript_json.copy()
+    measures = get_config()
 
     try:
 
@@ -93,6 +124,14 @@ def diarization_correction(transcript_json, **kwargs):
             transcript_json_corrected = dutil.correct_transcription(
                 transcript_json, prompts, results, translate_json, asr
             )
+
+            if context.lower() in measures['scale'].split(','):
+                # redo speaker identification
+                transcript_json_corrected = dutil.speaker_identification(
+                    transcript_json_corrected, context, asr, measures
+                )
+            elif len(context) > 0:
+                raise Exception("Invalid context")
 
     except Exception as e:
         logger.error(f"Error in Speaker Diarization Correction {e}")
