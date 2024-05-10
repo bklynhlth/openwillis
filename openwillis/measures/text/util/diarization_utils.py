@@ -749,6 +749,7 @@ def correct_transcription(transcript_json, prompts, results, translate_json, asr
 
     return transcript_json_corrected
 
+
 def speaker_identification(transcript_json, context, asr, measures):
     """
     ------------------------------------------------------------------------------------------------------
