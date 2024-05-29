@@ -71,7 +71,9 @@ def read_kwargs(kwargs):
     input_param['hf_token'] = kwargs.get('hf_token', '')
     input_param['del_model'] = kwargs.get('del_model', False) #Temp filter
     input_param['infra_model'] = kwargs.get('infra_model', [True, None, None]) #Temp filter
-    
+    input_param['compute_type'] = kwargs.get('compute_type', 'int16')
+    input_param['batch_size'] = kwargs.get('batch_size', 16)
+
     return input_param
 
 def run_whisperx(filepath, input_param):
