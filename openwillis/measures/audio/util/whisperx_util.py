@@ -110,7 +110,7 @@ def transcribe_whisper(filepath, model, device, compute_type, batch_size, infra_
         cpu vs gpu
     compute_type: str
         computation format
-    batch_size: str
+    batch_size: int
         batch size
     infra_model:list
         whisper model artifacts (this is optional param: to optimize willisInfra) 
@@ -153,8 +153,7 @@ def get_whisperx_diariazation(filepath, input_param):
     ------------------------------------------------------------------------------------------------------
     """
     device = 'cpu'
-    compute_type = "int16"
-    batch_size = 16
+    compute_type = input_param['compute_type']
     
     json_response = json.dumps({})
     transcript = ''
@@ -164,7 +163,7 @@ def get_whisperx_diariazation(filepath, input_param):
             device = 'cuda'
             compute_type = "float16"
     
-        transcribe_json, audio = transcribe_whisper(filepath, input_param['model'], device, compute_type, batch_size, input_param['infra_model'], input_param['language'])
+        transcribe_json, audio = transcribe_whisper(filepath, input_param['model'], device, compute_type, input_param['batch_size'], input_param['infra_model'], input_param['language'])
     
         # Align whisper output
         model_a, metadata = whisperx.load_align_model(language_code=input_param['language'], device=device)
