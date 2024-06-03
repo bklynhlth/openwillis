@@ -38,6 +38,33 @@ def get_config():
     return measures
 
 
+def read_kwargs(kwargs):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    Reads keyword arguments and returns a dictionary containing input parameters.
+
+    Parameters:
+    ...........
+    kwargs : dict
+        Keyword arguments to be processed.
+
+    Returns:
+    ...........
+    input_param: dict A dictionary containing input parameters with their corresponding values.
+
+    ------------------------------------------------------------------------------------------------------
+    """
+    input_param = {}
+    input_param['region'] = kwargs.get('region', 'us-east-1')
+
+    input_param['endpoint_name'] = kwargs.get('endpoint_name', '')
+
+    input_param['access_key'] = kwargs.get('access_key', '')
+    input_param['secret_key'] = kwargs.get('secret_key', '')
+    return input_param
+
+
 def is_amazon_transcribe(transcript_json):
     """
     ------------------------------------------------------------------------------------------------------
@@ -106,9 +133,13 @@ def diarization_correction(transcript_json, context = '', **kwargs):
     ------------------------------------------------------------------------------------------------------
     """
     transcript_json_corrected = transcript_json.copy()
+    input_param = read_kwargs(kwargs)
     measures = get_config()
 
     try:
+
+        if input_param['endpoint_name'] == '':
+            raise Exception("Endpoint name not provided")
 
         if bool(transcript_json):
 
@@ -120,7 +151,7 @@ def diarization_correction(transcript_json, context = '', **kwargs):
                 raise Exception("Transcript source not supported")
 
             prompts, translate_json = dutil.extract_prompts(transcript_json, asr)
-            results = dutil.call_diarization(prompts, **kwargs)
+            results = dutil.call_diarization(prompts, input_param)
             transcript_json_corrected = dutil.correct_transcription(
                 transcript_json, prompts, results, translate_json, asr
             )

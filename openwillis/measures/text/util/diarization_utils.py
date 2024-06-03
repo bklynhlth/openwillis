@@ -5,6 +5,8 @@
 import numpy as np
 from scipy import optimize
 from enum import Enum
+import json
+import boto3
 
 from openwillis.measures.audio.util.transcribe_util import (
     get_clinical_labels, get_whisperx_clinical_labels,
@@ -546,11 +548,18 @@ def apply_formatting(chunk):
 
     Returns:
     ...........
-    str: Formatted text chunk.
+    dict: Input data for the API call.
 
     ------------------------------------------------------------------------------------------------------
     """
-    return PROMPT_FORMAT.replace("{{ user_msg_1 }}", chunk)
+    prompt = PROMPT_FORMAT.replace("{{ user_msg_1 }}", chunk)
+    res = {
+        "inputs": prompt,
+        "parameters": {
+            "max_new_tokens":2048, "top_p":0.5, "temperature":0.2, "stop":["</s>", "###"]
+        }
+    }
+    return res
 
 
 def preprocess_str(text):
@@ -672,7 +681,7 @@ def extract_prompts(transcript_json, asr):
     return prompts, translate_json
 
 
-def call_diarization(prompts, **kwargs):
+def call_diarization(prompts, input_param):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -683,7 +692,7 @@ def call_diarization(prompts, **kwargs):
     prompts: dict
         Dictionary of diarized text chunks.
         key: chunk index, value: diarized text chunk.
-    kwargs: dict
+    input_param: dict
         Additional arguments for the API call.
 
     Returns:
@@ -694,13 +703,30 @@ def call_diarization(prompts, **kwargs):
 
     ------------------------------------------------------------------------------------------------------
     """
+
+    # initialize boto3 client
+    if input_param['access_key'] and input_param['secret_key']:
+        client = boto3.client('sagemaker-runtime', region_name = input_param['region'], 
+                                    aws_access_key_id = input_param['access_key'], 
+                                    aws_secret_access_key = input_param['secret_key'])
+    else:
+        client = boto3.client('sagemaker-runtime', region_name = input_param['region'])
+
     results = {}
     for idx in sorted(prompts.keys()):
-        prompt_llm = apply_formatting(preprocess_str(prompts[idx]))
-        ### call api
-        # for testing purposes
-        results[idx] = prompt_llm + prompts[idx]
-        ###
+        input_data = apply_formatting(preprocess_str(prompts[idx]))
+        # Convert input data to JSON string
+        payload = json.dumps(input_data)
+
+        # Invoke the endpoint
+        response = client.invoke_endpoint(
+            EndpointName=input_param['endpoint_name'],
+            Body=payload,
+            ContentType='application/json'
+        )
+
+        # Parse the response
+        results[idx] = json.loads(response['Body'].read().decode())[0]["generated_text"]
 
     return results
 
