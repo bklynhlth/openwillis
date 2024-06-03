@@ -681,7 +681,7 @@ def extract_prompts(transcript_json, asr):
     return prompts, translate_json
 
 
-def call_diarization(prompts, input_param):
+def call_diarization(prompts, endpoint_name, input_param):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -692,6 +692,8 @@ def call_diarization(prompts, input_param):
     prompts: dict
         Dictionary of diarized text chunks.
         key: chunk index, value: diarized text chunk.
+    endpoint_name: str
+        Name of the SageMaker endpoint.
     input_param: dict
         Additional arguments for the API call.
 
@@ -720,7 +722,7 @@ def call_diarization(prompts, input_param):
 
         # Invoke the endpoint
         response = client.invoke_endpoint(
-            EndpointName=input_param['endpoint_name'],
+            EndpointName=endpoint_name,
             Body=payload,
             ContentType='application/json'
         )

@@ -58,8 +58,6 @@ def read_kwargs(kwargs):
     input_param = {}
     input_param['region'] = kwargs.get('region', 'us-east-1')
 
-    input_param['endpoint_name'] = kwargs.get('endpoint_name', '')
-
     input_param['access_key'] = kwargs.get('access_key', '')
     input_param['secret_key'] = kwargs.get('secret_key', '')
     return input_param
@@ -111,7 +109,7 @@ def is_whisper_transcribe(transcript_json):
     return False
 
 
-def diarization_correction(transcript_json, context = '', **kwargs):
+def diarization_correction(transcript_json, endpoint_name, context = '', **kwargs):
     """
     ------------------------------------------------------------------------------------------------------
     This function corrects the speaker diarization of a transcript
@@ -138,9 +136,6 @@ def diarization_correction(transcript_json, context = '', **kwargs):
 
     try:
 
-        if input_param['endpoint_name'] == '':
-            raise Exception("Endpoint name not provided")
-
         if bool(transcript_json):
 
             if is_whisper_transcribe(transcript_json):
@@ -151,7 +146,7 @@ def diarization_correction(transcript_json, context = '', **kwargs):
                 raise Exception("Transcript source not supported")
 
             prompts, translate_json = dutil.extract_prompts(transcript_json, asr)
-            results = dutil.call_diarization(prompts, input_param)
+            results = dutil.call_diarization(prompts, endpoint_name, input_param)
             transcript_json_corrected = dutil.correct_transcription(
                 transcript_json, prompts, results, translate_json, asr
             )
