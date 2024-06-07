@@ -331,7 +331,7 @@ def extract_transcription_aws(transcript_json):
         labels_aws[i] = translate_json[label]
 
     # opposite to recreate original speaker labels
-    translate_json = {"1": translate_json[0], "2": labels_aws_set[1]}
+    translate_json = {"1": labels_aws_set[0], "2": labels_aws_set[1]}
     return labels_aws, words_aws, translate_json
 
 
@@ -503,11 +503,11 @@ def modify_transcription_whisperx(transcript_json, corrected_labels):
     return {"segments": res}
 
 
-def split_transcription(words, speakers, word_limit=2000):
+def split_transcription(words, speakers, character_limit=2250):
     """
     ------------------------------------------------------------------------------------------------------
 
-    This function splits a transcription into chunks of predefined word limit.
+    This function splits a transcription into chunks of predefined character limit.
     
     Parameters:
     ...........
@@ -515,8 +515,8 @@ def split_transcription(words, speakers, word_limit=2000):
         List of transcribed words.
     speakers:
         List of speaker labels.
-    word_limit:
-        Maximum number of words per chunk.
+    character_limit:
+        Maximum number of characters in each chunk.
 
     Returns:
     ...........
@@ -525,12 +525,24 @@ def split_transcription(words, speakers, word_limit=2000):
     """
 
     prompts = []
+    current_chunk_words = []
+    current_chunk_speakers = []
+    current_chunk_length = 0
 
-    # split the transcription into chunks of approximately 2,000 words each
-    for i in range(0, len(words), word_limit):
-        prompts.append(
-            create_diarized_text(words[i : i + word_limit], speakers[i : i + word_limit])
-        )
+    # split the transcription into chunks based on character limit
+    for word, speaker in zip(words, speakers):
+        if current_chunk_length + len(word) + 1 > character_limit:  # +1 for space or punctuation
+            prompts.append(create_diarized_text(current_chunk_words, current_chunk_speakers))
+            current_chunk_words = []
+            current_chunk_speakers = []
+            current_chunk_length = 0
+
+        current_chunk_words.append(word)
+        current_chunk_speakers.append(speaker)
+        current_chunk_length += len(word) + 1  # +1 for space or punctuation
+
+    if current_chunk_words:  # Add the last chunk if it exists
+        prompts.append(create_diarized_text(current_chunk_words, current_chunk_speakers))
 
     return prompts
 
