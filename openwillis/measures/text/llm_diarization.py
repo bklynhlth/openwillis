@@ -60,6 +60,8 @@ def read_kwargs(kwargs):
 
     input_param['access_key'] = kwargs.get('access_key', '')
     input_param['secret_key'] = kwargs.get('secret_key', '')
+
+    input_param['parallel_processing'] = kwargs.get('parallel_processing', 1)
     return input_param
 
 

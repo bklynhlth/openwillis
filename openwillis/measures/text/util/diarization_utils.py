@@ -7,6 +7,8 @@ from scipy import optimize
 from enum import Enum
 import json
 import boto3
+from concurrent.futures import ThreadPoolExecutor
+import concurrent
 
 from openwillis.measures.audio.util.transcribe_util import (
     get_clinical_labels, get_whisperx_clinical_labels,
@@ -693,6 +695,35 @@ def extract_prompts(transcript_json, asr):
     return prompts, translate_json
 
 
+def submit_call(client, payload, endpoint_name):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    This function submits a call to the SageMaker endpoint.
+
+    Parameters:
+    ...........
+    client: boto3.client
+        Boto3 client.
+    payload: str
+        Input data for the API call.
+    endpoint_name: str
+        Name of the SageMaker endpoint.
+
+    Returns:
+    ...........
+    dict: Model output.
+
+    ------------------------------------------------------------------------------------------------------
+    """
+    response = client.invoke_endpoint(
+        EndpointName=endpoint_name,
+        Body=payload,
+        ContentType='application/json'
+    )
+    return response
+
+
 def call_diarization(prompts, endpoint_name, input_param):
     """
     ------------------------------------------------------------------------------------------------------
@@ -727,20 +758,36 @@ def call_diarization(prompts, endpoint_name, input_param):
         client = boto3.client('sagemaker-runtime', region_name = input_param['region'])
 
     results = {}
-    for idx in sorted(prompts.keys()):
-        input_data = apply_formatting(preprocess_str(prompts[idx]))
-        # Convert input data to JSON string
-        payload = json.dumps(input_data)
+    if input_param['parallel_processing'] == 1:
+        workers = len(prompts)
 
-        # Invoke the endpoint
-        response = client.invoke_endpoint(
-            EndpointName=endpoint_name,
-            Body=payload,
-            ContentType='application/json'
-        )
+        with ThreadPoolExecutor(max_workers=workers) as executor:
+            future_to_index = {}
+ 
+            for idx in sorted(prompts.keys()):
+                input_data = apply_formatting(preprocess_str(prompts[idx]))
+                # Convert input data to JSON string
+                payload = json.dumps(input_data)
 
-        # Parse the response
-        results[idx] = json.loads(response['Body'].read().decode())[0]["generated_text"]
+                future = executor.submit(submit_call, client, payload, endpoint_name)
+                future_to_index[future] = (index, payload)
+
+            while future_to_index:
+                for future in concurrent.futures.as_completed(future_to_index):
+                    index, payload = future_to_index.pop(future)
+                    result = future.result()  # This gets the result from the future
+                    results[index] = json.loads(result['Body'].read().decode())[0]["generated_text"]
+    else:
+        for idx in sorted(prompts.keys()):
+            input_data = apply_formatting(preprocess_str(prompts[idx]))
+            # Convert input data to JSON string
+            payload = json.dumps(input_data)
+
+            # Invoke the endpoint
+            response = submit_call(client, payload, endpoint_name)
+
+            # Parse the response
+            results[idx] = json.loads(response['Body'].read().decode())[0]["generated_text"]
 
     return results
 
