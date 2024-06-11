@@ -2,13 +2,13 @@
 # website:   http://www.bklynhlth.com
 
 # import the required packages
+import json
+from enum import Enum
+from multiprocessing import Pool
+
+import boto3
 import numpy as np
 from scipy import optimize
-from enum import Enum
-import json
-import boto3
-from concurrent.futures import ThreadPoolExecutor
-import concurrent
 
 from openwillis.measures.audio.util.transcribe_util import (
     get_clinical_labels, get_whisperx_clinical_labels,
@@ -695,33 +695,46 @@ def extract_prompts(transcript_json, asr):
     return prompts, translate_json
 
 
-def submit_call(client, payload, endpoint_name):
+def process_chunk(args):
     """
     ------------------------------------------------------------------------------------------------------
 
-    This function submits a call to the SageMaker endpoint.
+    This function processes a diarized text chunk using the SageMaker endpoint;
+     it is used for parallel processing.
 
     Parameters:
     ...........
-    client: boto3.client
-        Boto3 client.
-    payload: str
-        Input data for the API call.
-    endpoint_name: str
-        Name of the SageMaker endpoint.
+    args: tuple
+        Tuple of arguments.
+        idx: int, chunk index.
+        prompt: str, diarized text chunk.
+        client: boto3.client, Boto3 client.
+        endpoint_name: str, name of the SageMaker endpoint.
 
     Returns:
     ...........
-    dict: Model output.
+    tuple: Tuple of chunk index and model output.
 
     ------------------------------------------------------------------------------------------------------
     """
+    idx, prompt, client, endpoint_name = args
+
+    input_data = apply_formatting(preprocess_str(prompt))
+
+    # Convert input data to JSON string
+    payload = json.dumps(input_data)
+
+    # Invoke the endpoint
     response = client.invoke_endpoint(
         EndpointName=endpoint_name,
         Body=payload,
         ContentType='application/json'
     )
-    return response
+
+    # Parse the response
+    result = json.loads(response['Body'].read().decode())[0]["generated_text"]
+
+    return idx, result
 
 
 def call_diarization(prompts, endpoint_name, input_param):
@@ -759,35 +772,13 @@ def call_diarization(prompts, endpoint_name, input_param):
 
     results = {}
     if input_param['parallel_processing'] == 1:
-        workers = len(prompts)
-
-        with ThreadPoolExecutor(max_workers=workers) as executor:
-            future_to_index = {}
- 
-            for idx in sorted(prompts.keys()):
-                input_data = apply_formatting(preprocess_str(prompts[idx]))
-                # Convert input data to JSON string
-                payload = json.dumps(input_data)
-
-                future = executor.submit(submit_call, client, payload, endpoint_name)
-                future_to_index[future] = (index, payload)
-
-            while future_to_index:
-                for future in concurrent.futures.as_completed(future_to_index):
-                    index, payload = future_to_index.pop(future)
-                    result = future.result()  # This gets the result from the future
-                    results[index] = json.loads(result['Body'].read().decode())[0]["generated_text"]
+        with Pool(processes=len(prompts)) as pool:
+            args = [(idx, prompts[idx], client, endpoint_name) for idx in sorted(prompts.keys())]
+            results = pool.map(process_chunk, args)
+            results = dict(results)
     else:
         for idx in sorted(prompts.keys()):
-            input_data = apply_formatting(preprocess_str(prompts[idx]))
-            # Convert input data to JSON string
-            payload = json.dumps(input_data)
-
-            # Invoke the endpoint
-            response = submit_call(client, payload, endpoint_name)
-
-            # Parse the response
-            results[idx] = json.loads(response['Body'].read().decode())[0]["generated_text"]
+            results[idx] = process_chunk((idx, prompts[idx], client, endpoint_name))[1]
 
     return results
 
