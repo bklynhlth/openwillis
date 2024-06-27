@@ -708,7 +708,7 @@ def process_chunk(args):
         Tuple of arguments.
         idx: int, chunk index.
         prompt: str, diarized text chunk.
-        client: boto3.client, Boto3 client.
+        input_param: dict, additional arguments for the API call.
         endpoint_name: str, name of the SageMaker endpoint.
 
     Returns:
@@ -717,7 +717,15 @@ def process_chunk(args):
 
     ------------------------------------------------------------------------------------------------------
     """
-    idx, prompt, client, endpoint_name = args
+    idx, prompt, input_param, endpoint_name = args
+
+    # initialize boto3 client
+    if input_param['access_key'] and input_param['secret_key']:
+        client = boto3.client('sagemaker-runtime', region_name = input_param['region'], 
+                                    aws_access_key_id = input_param['access_key'], 
+                                    aws_secret_access_key = input_param['secret_key'])
+    else:
+        client = boto3.client('sagemaker-runtime', region_name = input_param['region'])
 
     input_data = apply_formatting(preprocess_str(prompt))
 
@@ -762,23 +770,15 @@ def call_diarization(prompts, endpoint_name, input_param):
     ------------------------------------------------------------------------------------------------------
     """
 
-    # initialize boto3 client
-    if input_param['access_key'] and input_param['secret_key']:
-        client = boto3.client('sagemaker-runtime', region_name = input_param['region'], 
-                                    aws_access_key_id = input_param['access_key'], 
-                                    aws_secret_access_key = input_param['secret_key'])
-    else:
-        client = boto3.client('sagemaker-runtime', region_name = input_param['region'])
-
     results = {}
     if input_param['parallel_processing'] == 1:
         with Pool(processes=len(prompts)) as pool:
-            args = [(idx, prompts[idx], client, endpoint_name) for idx in sorted(prompts.keys())]
+            args = [(idx, prompts[idx], input_param, endpoint_name) for idx in sorted(prompts.keys())]
             results = pool.map(process_chunk, args)
             results = dict(results)
     else:
         for idx in sorted(prompts.keys()):
-            results[idx] = process_chunk((idx, prompts[idx], client, endpoint_name))[1]
+            results[idx] = process_chunk((idx, prompts[idx], input_param, endpoint_name))[1]
 
     return results
 
