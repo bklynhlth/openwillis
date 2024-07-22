@@ -1659,7 +1659,7 @@ def create_text_list(utterances_speaker, speaker_label, min_turn_length, measure
 
     return text_list, turn_indices
 
-def process_language_feature(df_list, transcribe_info, speaker_label, min_turn_length, language, time_index, measures):
+def process_language_feature(df_list, transcribe_info, speaker_label, min_turn_length, language, time_index, option, measures):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -1679,6 +1679,9 @@ def process_language_feature(df_list, transcribe_info, speaker_label, min_turn_l
         timepoint index (start/end)
     language: str
         Language of the transcribed text.
+    option: str
+        Option for processing language features
+         which to be processed
     measures: dict
         A dictionary containing the names of the columns in the output dataframes.
 
@@ -1724,8 +1727,10 @@ def process_language_feature(df_list, transcribe_info, speaker_label, min_turn_l
 
     df_list = get_pause_feature(json_conf_speaker, df_list, text_list, turn_indices, measures, time_index, language)
     df_list = get_repetitions(df_list, utterances_speaker, utterances_speaker_filtered, measures)
-    df_list = get_word_coherence(df_list, utterances_speaker, language, measures)
-    df_list = get_phrase_coherence(df_list, utterances_filtered, speaker_label, language, measures)
+
+    if option == 'advanced':
+        df_list = get_word_coherence(df_list, utterances_speaker, language, measures)
+        df_list = get_phrase_coherence(df_list, utterances_filtered, speaker_label, language, measures)
 
     if language in measures["english_langs"]:
         df_list = get_sentiment(df_list, text_list, measures)
