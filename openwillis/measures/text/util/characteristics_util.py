@@ -765,15 +765,15 @@ def get_tag(word_df, word_list, measures):
     word_df[measures["part_of_speech"]] = tag_list_pos
 
     word_df[measures["first_person"]] = [word in FIRST_PERSON_PRONOUNS for word in word_list]
-    # make non pronouns None
-    word_df[measures["first_person"]] = word_df[measures["first_person"]].where(word_df[measures["part_of_speech"]] == "Pronoun", None)
+    # make non pronouns NaN
+    word_df[measures["first_person"]] = word_df[measures["first_person"]].where(word_df[measures["part_of_speech"]] == "Pronoun", np.nan)
 
     present_tense = ["VBP", "VBZ"]
     past_tense = ["VBD", "VBN"]
     tag_list_verb = ["Present" if tag[1] in present_tense else "Past" if tag[1] in past_tense else "Other" for tag in tag_list]
     word_df[measures["verb_tense"]] = tag_list_verb
-    # make non verbs None
-    word_df[measures["verb_tense"]] = word_df[measures["verb_tense"]].where(word_df[measures["part_of_speech"]] == "Verb", None)
+    # make non verbs NaN
+    word_df[measures["verb_tense"]] = word_df[measures["verb_tense"]].where(word_df[measures["part_of_speech"]] == "Verb", np.nan)
 
     return word_df
 
@@ -1138,7 +1138,6 @@ def get_word_embeddings(word_list, tokenizer, model):
             word_embeddings.append(outputs.last_hidden_state.mean(1).detach().numpy())
         word_embeddings = np.concatenate(word_embeddings, axis=0)
     else:
-
         inputs = tokenizer(word_list, return_tensors='pt', padding=True)
         outputs = model(**inputs)
         # Average pooling of the hidden states
@@ -1176,6 +1175,10 @@ def get_word_coherence_utterance(row, tokenizer, model, measures):
     ------------------------------------------------------------------------------------------------------
     """
     words_texts = row[measures['words_texts']]
+    if len(words_texts) == 0:
+        # return empty lists if no words in the utterance
+        return [np.nan]*len(words_texts), [np.nan]*len(words_texts), [np.nan]*len(words_texts), {k: [np.nan]*len(words_texts) for k in range(2, 11)}
+
     word_embeddings = get_word_embeddings(words_texts, tokenizer, model)
     similarity_matrix = cosine_similarity(word_embeddings)
 
@@ -1335,7 +1338,9 @@ def calculate_perplexity(text, model, tokenizer):
     """
     # Tokenize input text
     clean_text = text.translate(str.maketrans('', '', string.punctuation))
-    clean_text = re.sub(r'\s+', ' ', clean_text)
+    clean_text = re.sub(r'\s+', ' ', clean_text).strip()
+    if len(clean_text) == 0 or len(clean_text.split()) < 2:
+        return np.nan
 
     tokens = tokenizer(clean_text, return_tensors='pt')
     input_ids = tokens.input_ids
@@ -1355,21 +1360,23 @@ def calculate_perplexity(text, model, tokenizer):
             end = i + 256
 
         masked_input_ids[0, i] = tokenizer.mask_token_id
-        
-        input_ids2 = input_ids[:, start:end]
-        masked_input_ids2 = masked_input_ids[:, start:end]
+
+        input_ids2 = input_ids[:, start:(end+1)]
+        masked_input_ids2 = masked_input_ids[:, start:(end+1)]
+        # get new i from that
+        idx = i - start
 
         with torch.no_grad():
             outputs = model(input_ids=masked_input_ids2, labels=input_ids2)
-        
+
         # Calculate log probability of the original token
-        logit_prob = outputs.logits[0, i].softmax(dim=0)
+        logit_prob = outputs.logits[0, idx].softmax(dim=0)
         true_log_prob = logit_prob[input_ids[0, i]].log().item()
         log_probs.append(true_log_prob)
-        
+
         # Unmask the token for the next iteration
         masked_input_ids[0, i] = input_ids[0, i]
-    
+
     # Calculate perplexity
     perplexity = np.exp(-np.mean(log_probs))
     return perplexity
@@ -1411,7 +1418,7 @@ def calculate_phrase_tangeniality(phrases_texts, utterance_text, sentence_encode
 
         # calculate semantic similarity of each phrase to the immediately preceding phrase
         if len(phrases_texts) > 1:
-            sentence_tangeniality1 = np.mean([similarity_matrix[j, j-1] for j in range(1, len(phrases_texts))])
+            sentence_tangeniality1 = np.mean([similarity_matrix[j-1, j] for j in range(1, len(phrases_texts))])
         else:
             sentence_tangeniality1 = np.nan
 
@@ -1450,9 +1457,14 @@ def calculate_slope(y):
 
     ------------------------------------------------------------------------------------------------------
     """
+    # remove NaNs
+    y = [val for val in y if not np.isnan(val)]
 
     x = range(len(y))
-    slope, _ = np.polyfit(x, y, 1)
+    try:
+        slope, _ = np.polyfit(x, y, 1)
+    except:
+        slope = np.nan
 
     return slope
 
