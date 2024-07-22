@@ -36,13 +36,13 @@ def process_chunk_hf(args):
     idx, prompt, input_param = args
 
     if input_param['quantized']:
-        # load quantized model from HuggingFace
-        tokenizer = AutoTokenizer.from_pretrained("bklynhlth/WillisDiarize-GPTQ")
-        model = AutoModelForCausalLM.from_pretrained("bklynhlth/WillisDiarize-GPTQ")
+        # load quantized model from HuggingFace - use hf token access
+        tokenizer = AutoTokenizer.from_pretrained("bklynhlth/WillisDiarize-GPTQ", token=input_param['huggingface_token'])
+        model = AutoModelForCausalLM.from_pretrained("bklynhlth/WillisDiarize-GPTQ", token=input_param['huggingface_token'])
     else:
         # load model from HuggingFace
-        tokenizer = AutoTokenizer.from_pretrained("bklynhlth/WillisDiarize")
-        model = AutoModelForCausalLM.from_pretrained("bklynhlth/WillisDiarize")
+        tokenizer = AutoTokenizer.from_pretrained("bklynhlth/WillisDiarize", token=input_param['huggingface_token'])
+        model = AutoModelForCausalLM.from_pretrained("bklynhlth/WillisDiarize", token=input_param['huggingface_token'])
 
     input_data = apply_formatting(preprocess_str(prompt))
 
