@@ -326,7 +326,7 @@ def get_time_columns(source):
     else:
         return ["start", "end"]
 
-def speech_characteristics(json_conf, language="en", speaker_label=None, min_turn_length=1, option='simple'):
+def speech_characteristics(json_conf, language="en", speaker_label=None, min_turn_length=1, option='advanced'):
     """
     ------------------------------------------------------------------------------------------------------
 
