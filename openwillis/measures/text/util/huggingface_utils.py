@@ -67,7 +67,7 @@ def process_chunk_hf(args):
     return idx, result
 
 
-def call_diarization_hf(prompts, endpoint_name, input_param):
+def call_diarization_hf(prompts, input_param):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -78,8 +78,6 @@ def call_diarization_hf(prompts, endpoint_name, input_param):
     prompts: dict
         Dictionary of diarized text chunks.
         key: chunk index, value: diarized text chunk.
-    endpoint_name: str
-        Name of the SageMaker endpoint.
     input_param: dict
         Additional arguments for the API call.
 
@@ -95,11 +93,11 @@ def call_diarization_hf(prompts, endpoint_name, input_param):
     results = {}
     if input_param['parallel_processing'] == 1:
         with Pool(processes=len(prompts)) as pool:
-            args = [(idx, prompts[idx], input_param, endpoint_name) for idx in sorted(prompts.keys())]
+            args = [(idx, prompts[idx], input_param) for idx in sorted(prompts.keys())]
             results = pool.map(process_chunk_hf, args)
             results = dict(results)
     else:
         for idx in sorted(prompts.keys()):
-            results[idx] = process_chunk_hf((idx, prompts[idx], input_param, endpoint_name))[1]
+            results[idx] = process_chunk_hf((idx, prompts[idx], input_param))[1]
 
     return results
