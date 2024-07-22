@@ -718,7 +718,7 @@ def extract_prompts(transcript_json, asr):
 
 
 @exponential_backoff_decorator(max_retries=3, base_delay=90)
-def process_chunk(args):
+def process_chunk_aws(args):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -797,11 +797,11 @@ def call_diarization(prompts, endpoint_name, input_param):
     if input_param['parallel_processing'] == 1:
         with Pool(processes=len(prompts)) as pool:
             args = [(idx, prompts[idx], input_param, endpoint_name) for idx in sorted(prompts.keys())]
-            results = pool.map(process_chunk, args)
+            results = pool.map(process_chunk_aws, args)
             results = dict(results)
     else:
         for idx in sorted(prompts.keys()):
-            results[idx] = process_chunk((idx, prompts[idx], input_param, endpoint_name))[1]
+            results[idx] = process_chunk_aws((idx, prompts[idx], input_param, endpoint_name))[1]
 
     return results
 
