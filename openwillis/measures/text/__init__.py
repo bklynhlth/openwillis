@@ -2,7 +2,7 @@ from openwillis.measures.text.speech_attribute import (
     speech_characteristics,
 )
 
-from openwillis.measures.text.llm_diarization import (
+from openwillis.measures.text.willisdiarize_aws import (
     diarization_correction,
 )
 
