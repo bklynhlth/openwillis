@@ -6,6 +6,9 @@ import os
 import json
 from enum import Enum
 from multiprocessing import Pool
+import time
+import random
+import logging
 
 import boto3
 import numpy as np
@@ -28,6 +31,25 @@ In the speaker diarization transcript below, some words are potentially misplace
 
 """
 
+
+def exponential_backoff_decorator(max_retries, base_delay):
+    def decorator(func):
+        def wrapper(*args, **kwargs):
+            retries = 0
+            while retries < max_retries:
+                try:
+                    result_func = func(*args, **kwargs)
+                    return result_func
+                except Exception as e:
+                    retries += 1
+                    delay = base_delay * 2**retries + random.uniform(0, 1)
+                    logging.error(f"Retrying in {delay:.2f} seconds...")
+                    time.sleep(delay)
+            raise Exception("Max retries reached, operation failed.")
+
+        return wrapper
+
+    return decorator
 
 ### Functions taken from https://github.com/google/speaker-id/tree/master/DiarizationLM
 ### Slightly modified to fit OpenWillis
@@ -698,7 +720,8 @@ def extract_prompts(transcript_json, asr):
     return prompts, translate_json
 
 
-def process_chunk(args):
+@exponential_backoff_decorator(max_retries=3, base_delay=90)
+def process_chunk_aws(args):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -777,11 +800,11 @@ def call_diarization(prompts, endpoint_name, input_param):
     if input_param['parallel_processing'] == 1:
         with Pool(processes=len(prompts)) as pool:
             args = [(idx, prompts[idx], input_param, endpoint_name) for idx in sorted(prompts.keys())]
-            results = pool.map(process_chunk, args)
+            results = pool.map(process_chunk_aws, args)
             results = dict(results)
     else:
         for idx in sorted(prompts.keys()):
-            results[idx] = process_chunk((idx, prompts[idx], input_param, endpoint_name))[1]
+            results[idx] = process_chunk_aws((idx, prompts[idx], input_param, endpoint_name))[1]
 
     return results
 
@@ -831,6 +854,7 @@ def correct_transcription(transcript_json, prompts, results, translate_json, asr
     return transcript_json_corrected
 
 
+@exponential_backoff_decorator(max_retries=3, base_delay=90)
 def speaker_identification(transcript_json, context, asr, measures):
     """
     ------------------------------------------------------------------------------------------------------
