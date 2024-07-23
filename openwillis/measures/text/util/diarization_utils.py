@@ -2,6 +2,7 @@
 # website:   http://www.bklynhlth.com
 
 # import the required packages
+import os
 import json
 from enum import Enum
 from multiprocessing import Pool
@@ -18,6 +19,8 @@ from openwillis.measures.audio.util.transcribe_util import (
     replace_speaker_labels, replace_whisperx_speaker_labels
 )
 
+# avoid warning about tokenizers parallelism
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 PROMPT_FORMAT = """### Instruction
 In the speaker diarization transcript below, some words are potentially misplaced. Please correct those words and move them to the right speaker. Directly show the corrected transcript without explaining what changes were made or why you made those changes.:
