@@ -110,7 +110,7 @@ def is_whisper_transcribe(transcript_json):
     return False
 
 
-def diarization_correction(transcript_json, endpoint_name, context = '', **kwargs):
+def diarization_correction(transcript_json, context = '', **kwargs):
     """
     ------------------------------------------------------------------------------------------------------
     This function corrects the speaker diarization of a transcript

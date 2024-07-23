@@ -3,15 +3,12 @@
 
 # import the required packages
 
-import numpy as np
-import pandas as pd
 import os
 import json
 import logging
 
-from pydub import AudioSegment
-from openwillis.measures.audio.util import util as ut
 from openwillis.measures.audio.util import transcribe_util as tutil
+from openwillis.measures.text import willisdiarize as wd
 
 logging.basicConfig(level=logging.INFO)
 logger=logging.getLogger()
@@ -73,6 +70,8 @@ def read_kwargs(kwargs):
     input_param['infra_model'] = kwargs.get('infra_model', [True, None, None]) #Temp filter
     input_param['compute_type'] = kwargs.get('compute_type', 'int16')
     input_param['batch_size'] = kwargs.get('batch_size', 16)
+
+    input_param['willisdiarize'] = kwargs.get('willisdiarize', '')
 
     return input_param
 
@@ -143,6 +142,14 @@ def speech_transcription_whisper(filepath, **kwargs):
     input_param = read_kwargs(kwargs)
     
     json_response, transcript = run_whisperx(filepath, input_param)
+
+    if input_param['language'].lower()[:2] == 'en' and input_param['willisdiarize'] in ['WillisDiarize-GPTQ', 'WillisDiarize']:
+        if 'GPTQ' in input_param['willisdiarize']:
+            quantized = 1
+        else:
+            quantized = 0
+        json_response = wd.diarization_correction(json_response, quantized=quantized, huggingface_token=input_param['hf_token'])
+
     if input_param['context'].lower() in measures['scale'].split(','):
         
         content_dict = tutil.get_whisperx_content(json_response)
