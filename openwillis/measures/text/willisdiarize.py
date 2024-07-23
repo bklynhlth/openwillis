@@ -59,8 +59,6 @@ def read_kwargs(kwargs):
     input_param = {}
     input_param['huggingface_token'] = kwargs.get('huggingface_token', '')
 
-    input_param['quantized'] = kwargs.get('quantized', 1)
-
     return input_param
 
 
@@ -110,7 +108,7 @@ def is_whisper_transcribe(transcript_json):
     return False
 
 
-def diarization_correction(transcript_json, endpoint_name, context = '', **kwargs):
+def diarization_correction(transcript_json, model_name, context = '', **kwargs):
     """
     ------------------------------------------------------------------------------------------------------
     This function corrects the speaker diarization of a transcript
@@ -120,6 +118,8 @@ def diarization_correction(transcript_json, endpoint_name, context = '', **kwarg
     ...........
     transcript_json: dict
         JSON response object.
+    model_name: str
+        The name of the model used for transcription in HuggingFace.
     context : str, optional
         scale to use for identifying clinician/patient, if any.
     kwargs: dict
@@ -147,7 +147,7 @@ def diarization_correction(transcript_json, endpoint_name, context = '', **kwarg
                 raise Exception("Transcript source not supported")
 
             prompts, translate_json = dutil.extract_prompts(transcript_json, asr)
-            results = hutil.call_diarization_hf(prompts, input_param)
+            results = hutil.call_diarization_hf(prompts, model_name, input_param)
             transcript_json_corrected = dutil.correct_transcription(
                 transcript_json, prompts, results, translate_json, asr
             )

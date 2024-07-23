@@ -58,7 +58,7 @@ def process_chunk_hf(args):
     return idx, result
 
 
-def call_diarization_hf(prompts, input_param):
+def call_diarization_hf(prompts, model_name, input_param):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -69,6 +69,8 @@ def call_diarization_hf(prompts, input_param):
     prompts: dict
         Dictionary of diarized text chunks.
         key: chunk index, value: diarized text chunk.
+    model_name: str
+        The name of the model used for transcription in HuggingFace.
     input_param: dict
         Additional arguments for the API call.
 
@@ -80,14 +82,8 @@ def call_diarization_hf(prompts, input_param):
 
     ------------------------------------------------------------------------------------------------------
     """
-    if input_param['quantized']:
-        # load quantized model from HuggingFace - use hf token access
-        tokenizer = AutoTokenizer.from_pretrained("bklynhlth/WillisDiarize-GPTQ", token=input_param['huggingface_token'])
-        model = AutoModelForCausalLM.from_pretrained("bklynhlth/WillisDiarize-GPTQ", token=input_param['huggingface_token'])
-    else:
-        # load model from HuggingFace
-        tokenizer = AutoTokenizer.from_pretrained("bklynhlth/WillisDiarize", token=input_param['huggingface_token'])
-        model = AutoModelForCausalLM.from_pretrained("bklynhlth/WillisDiarize", token=input_param['huggingface_token'])
+    tokenizer = AutoTokenizer.from_pretrained(model_name, token=input_param['huggingface_token'])
+    model = AutoModelForCausalLM.from_pretrained(model_name, token=input_param['huggingface_token'])
 
     results = {}
     for idx in sorted(prompts.keys()):
