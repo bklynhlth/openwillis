@@ -17,7 +17,8 @@ from openwillis.measures.audio import (
 )
 from openwillis.measures.text import (
     speech_characteristics,
-    diarization_correction_aws
+    diarization_correction_aws,
+    diarization_correction
 )
 from openwillis.measures.gps import (
     gps_analysis
