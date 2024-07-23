@@ -279,7 +279,7 @@ def process_transcript(df_list, json_conf, measures, min_turn_length, speaker_la
         Language type
     option: str
         option for which measures to calculate
-            can be 'simple' or 'advanced'
+            can be 'simple' or 'coherence'
     
     Returns:
     ...........
@@ -326,7 +326,7 @@ def get_time_columns(source):
     else:
         return ["start", "end"]
 
-def speech_characteristics(json_conf, language="en", speaker_label=None, min_turn_length=1, option='advanced'):
+def speech_characteristics(json_conf, language="en", speaker_label=None, min_turn_length=1, option='coherence'):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -344,7 +344,7 @@ def speech_characteristics(json_conf, language="en", speaker_label=None, min_tur
         minimum words required in each turn
     option: str
         option for which measures to calculate
-         can be 'simple' or 'advanced'
+         can be 'simple' or 'coherence'
 
     Returns:
     ...........
@@ -363,8 +363,8 @@ def speech_characteristics(json_conf, language="en", speaker_label=None, min_tur
         measures = get_config(os.path.abspath(__file__), "text.json")
         df_list = cutil.create_empty_dataframes(measures)
 
-        if option  not in ['simple', 'advanced']:
-            raise ValueError("Invalid option. Please use 'simple' or 'advanced'")
+        if option  not in ['simple', 'coherence']:
+            raise ValueError("Invalid option. Please use 'simple' or 'coherence'")
 
         if bool(json_conf):
             language = language[:2].lower() if (language and len(language) >= 2) else "na"

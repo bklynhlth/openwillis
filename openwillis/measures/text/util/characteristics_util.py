@@ -1740,7 +1740,7 @@ def process_language_feature(df_list, transcribe_info, speaker_label, min_turn_l
     df_list = get_pause_feature(json_conf_speaker, df_list, text_list, turn_indices, measures, time_index, language)
     df_list = get_repetitions(df_list, utterances_speaker, utterances_speaker_filtered, measures)
 
-    if option == 'advanced':
+    if option == 'coherence':
         df_list = get_word_coherence(df_list, utterances_speaker, language, measures)
         df_list = get_phrase_coherence(df_list, utterances_filtered, speaker_label, language, measures)
 
