@@ -7,11 +7,10 @@ from multiprocessing import Pool
 from transformers import AutoTokenizer, AutoModelForCausalLM
 
 from openwillis.measures.text.util.diarization_utils import (
-    exponential_backoff_decorator, preprocess_str, apply_formatting
+    preprocess_str, apply_formatting
 )
 
 
-@exponential_backoff_decorator(max_retries=3, base_delay=90)
 def process_chunk_hf(args):
     """
     ------------------------------------------------------------------------------------------------------
@@ -25,7 +24,8 @@ def process_chunk_hf(args):
         Tuple of arguments.
         idx: int, chunk index.
         prompt: str, diarized text chunk.
-        input_param: dict, additional arguments for the HF model.
+        model: HuggingFace model.
+        tokenizer: HuggingFace tokenizer.
 
     Returns:
     ...........
@@ -33,16 +33,7 @@ def process_chunk_hf(args):
 
     ------------------------------------------------------------------------------------------------------
     """
-    idx, prompt, input_param = args
-
-    if input_param['quantized']:
-        # load quantized model from HuggingFace - use hf token access
-        tokenizer = AutoTokenizer.from_pretrained("bklynhlth/WillisDiarize-GPTQ", token=input_param['huggingface_token'])
-        model = AutoModelForCausalLM.from_pretrained("bklynhlth/WillisDiarize-GPTQ", token=input_param['huggingface_token'])
-    else:
-        # load model from HuggingFace
-        tokenizer = AutoTokenizer.from_pretrained("bklynhlth/WillisDiarize", token=input_param['huggingface_token'])
-        model = AutoModelForCausalLM.from_pretrained("bklynhlth/WillisDiarize", token=input_param['huggingface_token'])
+    idx, prompt, model, tokenizer = args
 
     input_data = apply_formatting(preprocess_str(prompt))
 
@@ -89,15 +80,17 @@ def call_diarization_hf(prompts, input_param):
 
     ------------------------------------------------------------------------------------------------------
     """
+    if input_param['quantized']:
+        # load quantized model from HuggingFace - use hf token access
+        tokenizer = AutoTokenizer.from_pretrained("bklynhlth/WillisDiarize-GPTQ", token=input_param['huggingface_token'])
+        model = AutoModelForCausalLM.from_pretrained("bklynhlth/WillisDiarize-GPTQ", token=input_param['huggingface_token'])
+    else:
+        # load model from HuggingFace
+        tokenizer = AutoTokenizer.from_pretrained("bklynhlth/WillisDiarize", token=input_param['huggingface_token'])
+        model = AutoModelForCausalLM.from_pretrained("bklynhlth/WillisDiarize", token=input_param['huggingface_token'])
 
     results = {}
-    if input_param['parallel_processing'] == 1:
-        with Pool(processes=len(prompts)) as pool:
-            args = [(idx, prompts[idx], input_param) for idx in sorted(prompts.keys())]
-            results = pool.map(process_chunk_hf, args)
-            results = dict(results)
-    else:
-        for idx in sorted(prompts.keys()):
-            results[idx] = process_chunk_hf((idx, prompts[idx], input_param))[1]
+    for idx in sorted(prompts.keys()):
+        results[idx] = process_chunk_hf((idx, prompts[idx], model, tokenizer))[1]
 
     return results

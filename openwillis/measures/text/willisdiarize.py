@@ -61,7 +61,6 @@ def read_kwargs(kwargs):
 
     input_param['quantized'] = kwargs.get('quantized', 1)
 
-    input_param['parallel_processing'] = kwargs.get('parallel_processing', 1)
     return input_param
 
 
