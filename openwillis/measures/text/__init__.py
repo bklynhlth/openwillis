@@ -3,7 +3,7 @@ from openwillis.measures.text.speech_attribute import (
 )
 
 from openwillis.measures.text.willisdiarize_aws import (
-    diarization_correction,
+    diarization_correction_aws,
 )
 
 __all__ = ["speech_characteristics", "diarization_correction"]
