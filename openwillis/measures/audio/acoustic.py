@@ -47,11 +47,7 @@ def get_summary(sound, framewise, sig_df, df_silence, voiced_segments, measures)
     col_list = list(framewise.columns)
 
     if voiced_segments:
-        speech_indices = get_voiced_segments(df_silence, 100, measures)
-        if speech_indices is None or len(speech_indices) == 0:
-            speech_indices = np.arange(0, len(framewise))
-        elif speech_indices[-1] < len(framewise):
-            speech_indices = np.append(speech_indices, np.arange(speech_indices[-1], len(framewise)))
+        speech_indices = get_voiced_segments(df_silence, framewise, 100, measures)
 
         framewise2 = framewise.iloc[speech_indices]
     else:
@@ -69,7 +65,7 @@ def get_summary(sound, framewise, sig_df, df_silence, voiced_segments, measures)
     df_concat = pd.concat(df_list+ [sig_df, summ_silence, voice_pct, df_relative], axis=1)
     return df_concat
 
-def get_voiced_segments(df_silence, min_duration, measures):
+def get_voiced_segments(df_silence, framewise, min_duration, measures):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -116,6 +112,11 @@ def get_voiced_segments(df_silence, min_duration, measures):
 
         speech_indices_expanded = np.append(speech_indices_expanded, np.arange(speech_start, speech_end))
 
+    if speech_indices_expanded is None or len(speech_indices_expanded) == 0:
+        speech_indices_expanded = np.arange(0, len(framewise))
+    elif np.floor(df_silence[measures['silence_end']][idx] * 100) < len(framewise):
+        speech_indices_expanded = np.append(speech_indices_expanded, np.arange(np.floor(df_silence[measures['silence_end']][idx] * 100), len(framewise)))
+
     speech_indices_expanded = speech_indices_expanded.astype(int)
     return speech_indices_expanded
 
@@ -142,11 +143,7 @@ def calculate_relative_stds(framewise, df_silence, measures):
     ------------------------------------------------------------------------------------------------------
     """
 
-    speech_indices = get_voiced_segments(df_silence, 100, measures)
-    if speech_indices is None or len(speech_indices) == 0:
-        speech_indices = np.arange(0, len(framewise))
-    elif speech_indices[-1] < len(framewise):
-        speech_indices = np.append(speech_indices, np.arange(speech_indices[-1], len(framewise)))
+    speech_indices = get_voiced_segments(df_silence, framewise, 100, measures)
 
     f0 = framewise[measures['fundfreq']][speech_indices]
     loudness = framewise[measures['loudness']][speech_indices]
