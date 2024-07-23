@@ -143,12 +143,8 @@ def speech_transcription_whisper(filepath, **kwargs):
     
     json_response, transcript = run_whisperx(filepath, input_param)
 
-    if input_param['language'].lower()[:2] == 'en' and input_param['willisdiarize'] in ['WillisDiarize-GPTQ', 'WillisDiarize']:
-        if 'GPTQ' in input_param['willisdiarize']:
-            quantized = 1
-        else:
-            quantized = 0
-        json_response = wd.diarization_correction(json_response, quantized=quantized, huggingface_token=input_param['hf_token'])
+    if input_param['language'].lower()[:2] == 'en' and input_param['willisdiarize'] != '':
+        json_response = wd.diarization_correction(json_response, input_param['willisdiarize'], huggingface_token=input_param['hf_token'])
 
     if input_param['context'].lower() in measures['scale'].split(','):
         
