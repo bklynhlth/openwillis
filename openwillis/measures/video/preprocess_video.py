@@ -1,4 +1,5 @@
-# 
+# author:    Kieran McVeigh
+# website:   http://www.bklynhlth.com
 import numpy as np
 import pandas as pd
 import os
