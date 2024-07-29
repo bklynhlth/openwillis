@@ -129,12 +129,14 @@ def diarization_correction_aws(transcript_json, endpoint_name, context = '', **k
     Returns:
     ...........
     dict: JSON response object with corrected speaker diarization.
+    bool: True if the speaker diarization was corrected, False otherwise.
 
     ------------------------------------------------------------------------------------------------------
     """
     transcript_json_corrected = transcript_json.copy()
     input_param = read_kwargs(kwargs)
     measures = get_config()
+    willisdiarize_status = False
 
     try:
 
@@ -153,6 +155,7 @@ def diarization_correction_aws(transcript_json, endpoint_name, context = '', **k
                 transcript_json, prompts, results, translate_json, asr
             )
 
+            willisdiarize_status = True
             if context.lower() in measures['scale'].split(','):
                 # redo speaker identification
                 transcript_json_corrected = dutil.speaker_identification(
@@ -164,4 +167,4 @@ def diarization_correction_aws(transcript_json, endpoint_name, context = '', **k
     except Exception as e:
         logger.error(f"Error in Speaker Diarization Correction {e}")
 
-    return transcript_json_corrected
+    return transcript_json_corrected, willisdiarize_status

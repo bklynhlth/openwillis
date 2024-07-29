@@ -108,6 +108,8 @@ def speech_transcription_aws(s3_uri, **kwargs):
         A transcription response object in JSON format
     transcript : str
         The transcript of the recording.
+    willisdiarize_status : bool
+        The status of the Willisdiarize API.
 
     ------------------------------------------------------------------------------------------------------
     """
@@ -120,7 +122,7 @@ def speech_transcription_aws(s3_uri, **kwargs):
         return json_response, transcript
 
     if input_param['language'].lower()[:2] == 'en' and input_param['willisdiarize_endpoint'] != '':
-        json_response = wd.diarization_correction_aws(
+        json_response, willisdiarize_status = wd.diarization_correction_aws(
             json_response, input_param['willisdiarize_endpoint'],
             parallel_processing=input_param['willisdiarize_parallel'],
             region=input_param['region'], access_key=input_param['access_key'],
@@ -131,4 +133,4 @@ def speech_transcription_aws(s3_uri, **kwargs):
         content_dict = tutil.extract_content(json_response)
         
         json_response = tutil.get_clinical_labels(input_param['context'], measures, content_dict, json_response)
-    return json_response, transcript
+    return json_response, transcript, willisdiarize_status
