@@ -5,3 +5,11 @@ include openwillis/measures/video/config/facial.json
 include openwillis/measures/audio/config/speech.json
 include openwillis/measures/text/config/text.json
 include openwillis/measures/video/config/eye.json
+include openwillis/measures/audio/util/praat_tremor/vocal_tremor.praat
+include openwillis/measures/audio/util/praat_tremor/procedures/amptrem.praat
+include openwillis/measures/audio/util/praat_tremor/procedures/coninout.praat
+include openwillis/measures/audio/util/praat_tremor/procedures/freqtrem.praat
+include openwillis/measures/audio/util/praat_tremor/procedures/readPitchOb.praat
+include openwillis/measures/audio/util/praat_tremor/procedures/tremHNR.praat
+include openwillis/measures/audio/util/praat_tremor/procedures/tremIntIndex.praat
+include openwillis/measures/audio/util/praat_tremor/procedures/tremProdSum.praat
