@@ -15,7 +15,7 @@ logging.basicConfig(level=logging.INFO)
 logger=logging.getLogger()
 
 
-def get_summary(sound, framewise, sig_df, df_silence, measures):
+def get_summary(sound, framewise, sig_df, df_silence, voiced_segments, measures):
     """
     ------------------------------------------------------------------------------------------------------
     Calculates the summary statistics for a given audio file.
@@ -31,6 +31,8 @@ def get_summary(sound, framewise, sig_df, df_silence, measures):
         a dataframe containing the jitter, shimmer, GNE values and Cepstral features for the audio file.
     df_silence :pandas dataframe
         a dataframe containing the silence intervals in the audio file.
+    voiced_segments : bool
+        whether to summarize framewise measures on voiced segments over 100ms
     measures : dict
         a dictionary containing the measures names for the calculated statistics.
 
@@ -44,8 +46,15 @@ def get_summary(sound, framewise, sig_df, df_silence, measures):
     df_list = []
     col_list = list(framewise.columns)
 
+    if voiced_segments:
+        speech_indices = get_voiced_segments(df_silence, framewise, 100, measures)
+
+        framewise2 = framewise.iloc[speech_indices]
+    else:
+        framewise2 = framewise
+
     for col in col_list:
-        com_summ = autil.common_summary(framewise[col], col)
+        com_summ = autil.common_summary(framewise2[col], col)
         df_list.append(com_summ)
 
     summ_silence = autil.silence_summary(sound, df_silence, measures)
@@ -56,7 +65,7 @@ def get_summary(sound, framewise, sig_df, df_silence, measures):
     df_concat = pd.concat(df_list+ [sig_df, summ_silence, voice_pct, df_relative], axis=1)
     return df_concat
 
-def get_voiced_segments(df_silence, min_duration, measures):
+def get_voiced_segments(df_silence, framewise, min_duration, measures):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -103,6 +112,11 @@ def get_voiced_segments(df_silence, min_duration, measures):
 
         speech_indices_expanded = np.append(speech_indices_expanded, np.arange(speech_start, speech_end))
 
+    if len(speech_indices_expanded) == 0:
+        speech_indices_expanded = np.arange(0, len(framewise))
+    elif np.floor(df_silence[measures['silence_end']][idx] * 100) < len(framewise):
+        speech_indices_expanded = np.append(speech_indices_expanded, np.arange(np.floor(df_silence[measures['silence_end']][idx] * 100), len(framewise)))
+
     speech_indices_expanded = speech_indices_expanded.astype(int)
     return speech_indices_expanded
 
@@ -129,11 +143,7 @@ def calculate_relative_stds(framewise, df_silence, measures):
     ------------------------------------------------------------------------------------------------------
     """
 
-    speech_indices = get_voiced_segments(df_silence, 100, measures)
-    if speech_indices is None or len(speech_indices) == 0:
-        speech_indices = np.arange(0, len(framewise))
-    elif speech_indices[-1] < len(framewise):
-        speech_indices = np.append(speech_indices, np.arange(speech_indices[-1], len(framewise)))
+    speech_indices = get_voiced_segments(df_silence, framewise, 100, measures)
 
     f0 = framewise[measures['fundfreq']][speech_indices]
     loudness = framewise[measures['loudness']][speech_indices]
@@ -265,7 +275,7 @@ def get_advanced_summary(df_summary, audio_path, option, measures):
     df_summary = pd.concat([df_summary, glottal_summ, tremor_summ], axis=1)
     return df_summary
 
-def vocal_acoustics(audio_path, option='simple'):
+def vocal_acoustics(audio_path, voiced_segments = True, option='simple'):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -275,6 +285,8 @@ def vocal_acoustics(audio_path, option='simple'):
     ...........
     audio_path : str
         path to the audio file
+    voiced_segments : bool
+        whether to summarize framewise measures on voiced segments over 100ms
     option : str
         whether to calculate the advanced vocal acoustic variables
         can be either 'simple', 'advanced' or 'tremor'
@@ -310,7 +322,7 @@ def vocal_acoustics(audio_path, option='simple'):
         framewise = pd.concat([df_pitch, df_formant, df_loudness, df_hnr], axis=1)
         sig_df = pd.concat([df_jitter, df_shimmer, df_gne, df_cepstral], axis=1)
 
-        df_summary = get_summary(sound, framewise, sig_df, df_silence, measures)
+        df_summary = get_summary(sound, framewise, sig_df, df_silence, voiced_segments, measures)
         df_summary2 = get_advanced_summary(df_summary, audio_path, option, measures)
         return framewise, df_summary2
 
