@@ -175,6 +175,26 @@ def extract_content(data):
 
     return content_dict
 
+def exponential_backoff_decorator(max_retries, base_delay):
+    def decorator(func):
+        def wrapper(*args, **kwargs):
+            retries = 0
+            while retries < max_retries:
+                try:
+                    result_func = func(*args, **kwargs)
+                    return result_func
+                except Exception as e:
+                    retries += 1
+                    delay = base_delay * 2**retries + random.uniform(0, 1)
+                    logging.error(f"Retrying in {delay:.2f} seconds...")
+                    time.sleep(delay)
+            raise Exception("Max retries reached, operation failed.")
+
+        return wrapper
+
+    return decorator
+
+@exponential_backoff_decorator(max_retries=3, base_delay=90)
 def get_clinical_labels(scale, measures, content_dict, json_response):
     """
     ------------------------------------------------------------------------------------------------------
