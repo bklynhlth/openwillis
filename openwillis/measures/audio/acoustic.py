@@ -112,7 +112,7 @@ def get_voiced_segments(df_silence, framewise, min_duration, measures):
 
         speech_indices_expanded = np.append(speech_indices_expanded, np.arange(speech_start, speech_end))
 
-    if speech_indices_expanded is None or len(speech_indices_expanded) == 0:
+    if len(speech_indices_expanded) == 0:
         speech_indices_expanded = np.arange(0, len(framewise))
     elif np.floor(df_silence[measures['silence_end']][idx] * 100) < len(framewise):
         speech_indices_expanded = np.append(speech_indices_expanded, np.arange(np.floor(df_silence[measures['silence_end']][idx] * 100), len(framewise)))
@@ -275,7 +275,7 @@ def get_advanced_summary(df_summary, audio_path, option, measures):
     df_summary = pd.concat([df_summary, glottal_summ, tremor_summ], axis=1)
     return df_summary
 
-def vocal_acoustics(audio_path, voiced_segments = False, option='simple'):
+def vocal_acoustics(audio_path, voiced_segments = True, option='simple'):
     """
     ------------------------------------------------------------------------------------------------------
 
