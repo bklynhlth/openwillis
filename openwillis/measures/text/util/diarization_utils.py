@@ -349,8 +349,8 @@ def extract_transcription_aws(transcript_json):
 
     # get unique speaker labels
     labels_aws_set = list(set(labels_aws))
-    if len(list(set(labels_aws))) == 1:
-        raise ValueError("Only one speaker detected")
+    if len(list(set(labels_aws))) != 2:
+        raise ValueError("Only two speakers supported")
 
     translate_json = {labels_aws_set[0]: "1", labels_aws_set[1]: "2"}
     # transform speaker labels to '1' and '2'
@@ -393,8 +393,8 @@ def extract_transcription_whisperx(transcript_json):
 
     # get unique speaker labels
     labels_whisperx_set = list(set(labels_whisperx))
-    if len(list(set(labels_whisperx))) == 1:
-        raise ValueError("Only one speaker detected")
+    if len(list(set(labels_whisperx))) != 2:
+        raise ValueError("Only two speakers supported")
 
     translate_json = {labels_whisperx_set[0]: "1", labels_whisperx_set[1]: "2"}
     # transform speaker labels to '1' and '2'
