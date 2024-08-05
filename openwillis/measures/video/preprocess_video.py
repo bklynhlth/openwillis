@@ -12,8 +12,6 @@ from deepface import DeepFace
 from dataclasses import dataclass, field
 from sklearn.cluster import KMeans
 
-from vutil import get_config
-
 logging.basicConfig(level=logging.INFO)
 logger=logging.getLogger()
 
@@ -82,6 +80,33 @@ class FaceData:
 
         cropped_image = image[self.bb_y:self.bb_y + self.bb_h, self.bb_x:self.bb_x + self.bb_w]
         self.face = cropped_image
+
+def get_config(filepath, json_file):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    This function reads the configuration file containing the column names for the output dataframes,
+    and returns the contents of the file as a dictionary.
+
+    Parameters:
+    ...........
+    filepath : str
+        The path to the configuration file.
+    json_file : str
+        The name of the configuration file.
+
+    Returns:
+    ...........
+    measures: A dictionary containing the names of the columns in the output dataframes.
+
+    ------------------------------------------------------------------------------------------------------
+    """
+    dir_name = os.path.dirname(filepath)
+    measure_path = os.path.abspath(os.path.join(dir_name, f"config/{json_file}"))
+
+    file = open(measure_path)
+    measures = json.load(file)
+    return measures
 
 def deepface_dict_to_facedata(data_dict, frame_idx):
     """
@@ -401,8 +426,11 @@ def load_facedata_from_video(
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
         raise ValueError(f"Error opening video file: {video_path}")
-
+    
     fps = cap.get(cv2.CAP_PROP_FPS)
+    if capture_n_per_sec > fps:
+        raise ValueError(f"Capture rate per second cannot exceed the video's frames per second, video fps: {fps}")
+
     num_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     n_skip = round(fps / capture_n_per_sec)
     facedata_list = []
