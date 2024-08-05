@@ -88,9 +88,7 @@ def get_voiced_segments(df_silence, framewise, min_duration, measures):
     ------------------------------------------------------------------------------------------------------
     """
     if len(df_silence) == 0:
-        return None
-    elif len(df_silence) == 1:
-        return np.arange(0, df_silence[measures['silence_start']][0] * 100)
+        return np.arange(0, len(framewise))
 
     speech_durations = df_silence[measures['silence_start']] - df_silence[measures['silence_end']].shift(1)
     # first speech duration is the first silence start time - 0
@@ -112,10 +110,12 @@ def get_voiced_segments(df_silence, framewise, min_duration, measures):
 
         speech_indices_expanded = np.append(speech_indices_expanded, np.arange(speech_start, speech_end))
 
-    if len(speech_indices_expanded) == 0:
+    if len(speech_indices_expanded) == 0 or speech_indices_expanded is None:
         speech_indices_expanded = np.arange(0, len(framewise))
     elif np.floor(df_silence[measures['silence_end']][idx] * 100) < len(framewise):
-        speech_indices_expanded = np.append(speech_indices_expanded, np.arange(np.floor(df_silence[measures['silence_end']][idx] * 100), len(framewise)))
+        speech_dur = 1000 * (len(framewise)/100 - df_silence[measures['silence_end']][idx])
+        if speech_dur > min_duration:
+            speech_indices_expanded = np.append(speech_indices_expanded, np.arange(np.floor(df_silence[measures['silence_end']][idx] * 100), len(framewise)))
 
     speech_indices_expanded = speech_indices_expanded.astype(int)
     return speech_indices_expanded
