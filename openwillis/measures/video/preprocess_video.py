@@ -12,6 +12,8 @@ from deepface import DeepFace
 from dataclasses import dataclass, field
 from sklearn.cluster import KMeans
 
+from openwillis.measures.video.util import crop_utils as cu
+
 logging.basicConfig(level=logging.INFO)
 logger=logging.getLogger()
 
@@ -736,35 +738,37 @@ def preprocess_face_video(
     threshold=.95, 
     min_sec_face_present=3, 
     n_clusters=2,
-    n_frames=np.inf
+    n_frames=np.inf,
+    darken=True,
+    keep_original_timing=False,
+    default_size_for_cropped = (512,512)
 ):
     """
-    ---------------------------------------------------------------------------------------------------
-
     Preprocesses a face video by extracting face data, clustering the faces, and preparing the output.
 
     Parameters:
-    ............
     - video_path (str): Path to the input video file.
-    - capture_n_frames_per_second (int): Number of frames to capture per second, default 2 assumes videos are relatively slow smoothing - increasing this parameter should increase quality of clustering but will cause the function to run for longer.
-    - model_name (str): Name of the face recognition model to use Deepface library, default 'mtcnn'.
-    - detector_backend (str): Backend to use for face detection can be any model used in Deepface library, default 'Facenet'.
-    - threshold (float): Similarity threshold for clustering faces, default .95.
-    - min_sec_face_present (int): Minimum number of seconds a face must be present after clustering to not be filtered out.
-    - n_clusters (int): Number of clusters to create, default 2, as we assume this is a clinical interview.
-    - n_frames (int): Maximum number of frames to process, default np.inf (i.e. process all frames).
+    - capture_n_frames_per_second (int): Number of frames to capture per second. Increasing this parameter should increase the quality of clustering but will cause the function to run for longer. Default is 2.
+    - model_name (str): Name of the face recognition model to use. Default is 'Facenet'.
+    - detector_backend (str): Backend to use for face detection. Can be any model used in the Deepface library. Default is 'mtcnn'.
+    - threshold (float): Similarity threshold for clustering faces. Default is 0.95.
+    - min_sec_face_present (int): Minimum number of seconds a face must be present after clustering to not be filtered out. Default is 3.
+    - n_clusters (int): Number of clusters to create. Default is 2, assuming this is a clinical interview.
+    - n_frames (int): Maximum number of frames to process. Default is np.inf (i.e. process all frames).
+    - darken (bool): Whether to darken the cropped video all pixels out of face bounding box - but leave face at same location in frame. If false only frames within bounding box plus standardized boarder are returned. Default is True.
+    - keep_original_timing (bool): Whether to keep the original timing for the cropped video. If true all frames are retained
+      but frames with out a face of the identity are returned as black, if false only frames with the identity are returned. Default is False.
+    - default_size_for_cropped (tuple): Default size for the cropped video. Default is (512, 512).
 
     Returns:
-    ............
+    - fps (float): Frames per second of the processed video. Used for saving video
+    - cropped_video_list (list): List of cropped videos.
     - out_dict (dict): Dictionary containing the preprocessed face data.
     - facedata_df (pandas.DataFrame): DataFrame containing the face data and cluster info.
-    ---------------------------------------------------------------------------------------------------
-
     """
     config = get_config(os.path.abspath(__file__), 'preprocess.json')
 
     try:
-
         face_data_across_frames, fps, num_frames_vid = load_facedata_from_video(
             video_path,
             config['rgb_back_ends'],
@@ -789,8 +793,23 @@ def preprocess_face_video(
             num_frames_vid,
             n_clusters
         )
+
+        cropped_video_list = []
+        for key in out_dict.keys():
+            detections=out_dict[key]
+            fps, out_video = cu.create_cropped_video(
+                video_path,
+                detections,
+                darken=darken,
+                keep_original_timing=keep_original_timing,
+                default_size_for_cropped = default_size_for_cropped
+            )
+            cropped_video_list.append(out_video)
+
     except Exception as e:
         logger.error(f"Error preprocessing video: file: {video_path} & Error: {e}'")
         
-    return out_dict,facedata_df
+    return fps, cropped_video_list, out_dict, facedata_df
+
+
 

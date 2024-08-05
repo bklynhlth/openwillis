@@ -233,91 +233,122 @@ def blacken_outside_bounding_box(frame, bb_dict):
 
     return mask
 
-def create_video_with_blackened_frame(
-    video_path,
-    output_path,
-    detections,
-    keep_original_timing=True,
-    write_black_frame=False
-):
+def create_cropped_frame(
+    frame,
+    frame_dict,
+    darken=True,
+    default_size=(512,512),
+    ):
     """
-    Process the video by drawing bounding boxes based on the provided detections
-    and save the processed video.
+    Blackens the area outside a specified bounding box in the given frame or crops the frame with padding and centering.
 
     Parameters:
-        video_path (str): Path to the video file.
-        output_path (str): Path to save the processed video.
-        detections (list): List of dictionaries containing bounding box and frame index information.
-        keep_original_timing (bool, optional): Flag to indicate whether to keep the original timing of frames. Defaults to True.
-        write_black_frame (bool, optional): Flag to indicate whether to write a black frame when no detections are found or the original frame. Defaults to False so it can be used for debugging.
+    ----------
+    frame : numpy.ndarray
+        The input image frame in which the area outside the bounding box will be blackened or cropped.
+    frame_dict : dict
+        Dictionary containing bounding box coordinates and dimensions with keys:
+        - 'bb_x' (int): The x-coordinate of the top-left corner of the bounding box.
+        - 'bb_y' (int): The y-coordinate of the top-left corner of the bounding box.
+        - 'bb_w' (int): The width of the bounding box.
+        - 'bb_h' (int): The height of the bounding box.
+    darken : bool, optional
+        If True, blackens the area outside the bounding box. If False, crops the frame with padding and centering. Default is True.
+    default_size : tuple, optional
+        The size of the cropped frame if `darken` is False. Default is (512, 512).
 
     Returns:
-        None
+    -------
+    numpy.ndarray
+        The resulting image frame with the area outside the bounding box blackened or the cropped frame.
+
+    Notes:
+    ------
+    - If `darken` is True, the function uses the `blacken_outside_bounding_box` function to blacken the area outside the bounding box.
+    - If `darken` is False, the function uses the `crop_with_padding_and_center` function to crop the frame with padding and centering.
     """
-    cap = cv2.VideoCapture(video_path)
-    if not cap.isOpened():
-        raise ValueError(f"Error opening video file: {video_path}")
-
-    fps = cap.get(cv2.CAP_PROP_FPS)
-    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-
-    # Set up the video writer to save the output video
-    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
-
-    frame_index = 0
     
-    max_frame_index = len(detections)
+    if darken:
+        face_frame = blacken_outside_bounding_box(frame, frame_dict)
+    else:
+        face_frame = crop_with_padding_and_center(frame, frame_dict, frame_size=default_size)
     
-    while True:
-        ret, frame = cap.read()
-        if not ret:
-            break
-        if frame_index >= max_frame_index:
-            break
-            
-        frame_dict = detections[frame_index]
-        if len(frame_dict.keys()) != 0:
-            face_frame = blacken_outside_bounding_box(frame,frame_dict)
-            out.write(face_frame)
+    return face_frame
 
-        elif keep_original_timing:
-            if write_black_frame:
-                black_frame = np.zeros_like(frame,dtype=np.uint8)
-                out.write(black_frame)
-            else:
-                out.write(frame)
-        frame_index += 1
 
-    cap.release()
-    out.release()
+def create_face_frame(
+        frame_dict,
+        frame,
+        default_size=(512,512),
+        keep_original_timing=True,
+        darken=True
+        ):
+    """
+    Create a face frame by cropping the input frame based on the provided frame dictionary and booleans for
+    style of cropping.
 
+    Parameters:
+    ----------
+        frame_dict (dict): A dictionary containing the coordinates of the face region in the frame.
+        frame (numpy.ndarray): The input frame to be cropped.
+        default_size (tuple, optional): The default size of the cropped face frame. Defaults to (512, 512).
+        keep_original_timing (bool, optional): Whether to keep the original timing of the frame. Defaults to True.
+        darken (bool, optional): Whether to darken the cropped face frame. Defaults to True.
+
+    Returns:
+        numpy.ndarray: The cropped face frame.
+    """
+    
+    if len(frame_dict.keys()) != 0:
+        face_frame = create_cropped_frame(
+            frame,
+            frame_dict,
+            darken=darken,
+            default_size=default_size,
+        )
+    elif keep_original_timing:
+        
+        if darken:
+            face_frame = np.zeros_like(frame,dtype=np.uint8)
+        else:
+            face_frame = np.zeros(default_size+(3,),dtype=np.uint8)
+    else:
+        face_frame = np.array([])
+    return face_frame
 
 def create_cropped_video(
     video_path,
-    output_path,
     detections,
+    darken=True,
     keep_original_timing=False,
-    default_size = (512,512)
+    default_size_for_cropped = (512,512)
 ):
     """
-    ---------------------------------------------------------------------------------------------------
-
     Process the video by drawing bounding boxes based on the provided detections
     and save the processed video.
 
     Parameters:
-    ............
-        video_path (str): Path to the video file.
-        detections (list): List of dictionaries containing bounding box and frame index information.
-        output_path (str): Path to save the processed video.
-        capture_n_per_sec (int, optional): Number of frames to capture per second. Defaults to 30.
+    ----------
+    video_path : str
+        Path to the video file.
+    detections : list
+        List of dictionaries containing bounding box and frame index information.
+    darken : bool, optional
+        Flag to darken the cropped frames, by default True.
+    keep_original_timing : bool, optional
+        Flag to keep the original timing of the frames, by default False.
+    default_size_for_cropped : tuple, optional
+        Default size for the cropped frames, by default (512, 512).
 
     Returns:
-    ............
-        None    
-    ---------------------------------------------------------------------------------------------------
+    -------
+    tuple
+        A tuple containing the frames per second (fps) of the video and the array of cropped frames.
+
+    Raises:
+    ------
+    ValueError
+        If there is an error opening the video file.
 
     """
     cap = cv2.VideoCapture(video_path)
@@ -325,19 +356,15 @@ def create_cropped_video(
         raise ValueError(f"Error opening video file: {video_path}")
 
     fps = cap.get(cv2.CAP_PROP_FPS)
-    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-
-    # Set up the video writer to save the output video
-    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-
-    out = cv2.VideoWriter(output_path, fourcc, fps, default_size)
 
     frame_index = 0
     
     max_frame_index = len(detections)
     
+    out_frames = []
+
     while True:
+
         ret, frame = cap.read()
         if not ret:
             break
@@ -345,18 +372,20 @@ def create_cropped_video(
             break
             
         frame_dict = detections[frame_index]
-        if len(frame_dict.keys()) != 0:
-            face_frame = crop_with_padding_and_center(
-                frame,
-                frame_dict,
-                frame_size=default_size
-            )
-            out.write(face_frame)
-        elif keep_original_timing:
-            black_frame = np.zeros_like(frame,dtype=np.uint8)
-            out.write(black_frame)
+        face_frame = create_face_frame(
+            frame_dict,
+            frame,
+            default_size=default_size_for_cropped,
+            keep_original_timing=keep_original_timing,
+            darken=darken
+        )
+
+        #check if face_frame is empty (i.e. no face detected and keep_original_timing is False)
+        if face_frame.size!=0:
+            out_frames.append(face_frame)
 
         frame_index += 1
 
     cap.release()
-    out.release()
+
+    return fps, out_frames
