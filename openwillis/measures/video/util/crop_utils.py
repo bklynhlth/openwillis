@@ -355,8 +355,6 @@ def create_cropped_video(
     if not cap.isOpened():
         raise ValueError(f"Error opening video file: {video_path}")
 
-    fps = cap.get(cv2.CAP_PROP_FPS)
-
     frame_index = 0
     
     max_frame_index = len(detections)
@@ -388,4 +386,4 @@ def create_cropped_video(
 
     cap.release()
 
-    return fps, out_frames
+    return out_frames
