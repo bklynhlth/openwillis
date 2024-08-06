@@ -58,7 +58,7 @@ def run_deepface(path, measures):
                 img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
                 face_analysis = DeepFace.analyze(img_path = img_rgb, actions = ['emotion'])
-                df_face = pd.DataFrame([face_analysis['emotion'][0].values()], columns=cols)/100
+                df_face = pd.DataFrame([face_analysis[0]['emotion'].values()], columns=cols)/100
 
                 frame +=1
                 df_emotion = pd.concat([df_common, df_face], axis=1)
