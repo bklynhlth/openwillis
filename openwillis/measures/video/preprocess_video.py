@@ -7,7 +7,6 @@ import json
 import logging
 
 import cv2
-import tensorflow as tf
 from deepface import DeepFace
 from dataclasses import dataclass, field
 from sklearn.cluster import KMeans
@@ -454,9 +453,11 @@ def load_facedata_from_video(
                 model_name=model_name
             )
             facedata_list.extend(frame_facedata)
+
             n_frames_capture += 1 ## need to remove after testing
 
         frame_index += 1
+
         if n_frames_capture >= n_frames:## need to remove after testing
             break
 
@@ -766,6 +767,7 @@ def preprocess_face_video(
     - out_dict (dict): Dictionary containing the preprocessed face data.
     - facedata_df (pandas.DataFrame): DataFrame containing the face data and cluster info.
     """
+
     config = get_config(os.path.abspath(__file__), 'preprocess.json')
 
     try:
