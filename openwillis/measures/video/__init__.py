@@ -13,6 +13,4 @@ from openwillis.measures.video.preprocess_video import (
     preprocess_face_video
 )
 
-
-
 __all__ = ["facial_expressivity", "emotional_expressivity", "eye_blink_rate", "preprocess_face_video"]
