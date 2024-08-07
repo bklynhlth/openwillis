@@ -343,7 +343,7 @@ def create_cropped_video(
 ):
     """
     Process the video by drawing bounding boxes based on the provided detections
-    and save the processed video.
+    and save the processed video as an mp4.
 
     Parameters:
     ----------
