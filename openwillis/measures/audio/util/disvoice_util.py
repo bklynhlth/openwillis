@@ -6,14 +6,28 @@ and are modified for efficiency and speed
 # website:   http://www.bklynhlth.com
 
 import sys
+import os
 
 import numpy as np
 from scipy.io.wavfile import read
 from scipy.integrate import cumtrapz
 from scipy.signal import find_peaks
 
-from disvoice.glottal.GCI import iaif, compute_h1h2_hrf_frame, find_amid_t
-from disvoice.glottal.utils_gci import create_continuous_smooth_f0, GetLPCresidual, get_MBS, get_MBS_GCI_intervals, search_res_interval_peaks
+# Backup the original stderr
+original_stderr = sys.stderr
+
+try:
+    # Redirect stderr to null
+    sys.stderr = open(os.devnull, 'w')
+
+    # Import the packages that cause the warning
+    from disvoice.glottal.GCI import iaif, compute_h1h2_hrf_frame, find_amid_t
+    from disvoice.glottal.utils_gci import create_continuous_smooth_f0, GetLPCresidual, get_MBS, get_MBS_GCI_intervals, search_res_interval_peaks
+
+finally:
+    # Restore the original stderr
+    sys.stderr.close()
+    sys.stderr = original_stderr
 import pysptk
 
 
