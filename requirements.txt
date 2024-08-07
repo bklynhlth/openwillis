@@ -7,7 +7,7 @@ pandas==1.4.2
 protobuf3-to-dict==0.1.5
 praat-parselmouth==0.4.3
 pydub==0.25.1
-deepface==0.0.75
+deepface==0.0.92
 vosk==0.3.44
 vaderSentiment==3.3.2
 nltk==3.8.1
