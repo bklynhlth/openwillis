@@ -1,5 +1,9 @@
 import cv2
 import numpy as np
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger=logging.getLogger()
 
 def crop_img(img, bb_dict):
     """
@@ -281,6 +285,7 @@ def create_face_frame(
         frame,
         default_size=(512,512),
         keep_original_timing=True,
+        debug=False,
         darken=True
         ):
     """
@@ -300,28 +305,41 @@ def create_face_frame(
     """
     
     if len(frame_dict.keys()) != 0:
+
         face_frame = create_cropped_frame(
             frame,
             frame_dict,
             darken=darken,
             default_size=default_size,
         )
+
+    elif debug:
+
+        face_frame = frame
+
     elif keep_original_timing:
         
         if darken:
+
             face_frame = np.zeros_like(frame,dtype=np.uint8)
+
         else:
+
             face_frame = np.zeros(default_size+(3,),dtype=np.uint8)
     else:
+
         face_frame = np.array([])
+    
     return face_frame
 
 def create_cropped_video(
     video_path,
     detections,
+    output_path,
     darken=True,
     keep_original_timing=False,
-    default_size_for_cropped = (512,512)
+    debug=False,
+    default_size_for_cropped=(512, 512)
 ):
     """
     Process the video by drawing bounding boxes based on the provided detections
@@ -333,17 +351,16 @@ def create_cropped_video(
         Path to the video file.
     detections : list
         List of dictionaries containing bounding box and frame index information.
+    output_path : str
+        Path to save the output video.
     darken : bool, optional
         Flag to darken the cropped frames, by default True.
     keep_original_timing : bool, optional
         Flag to keep the original timing of the frames, by default False.
+    debug : bool, optional
+        Flag to keep the original frames when no face is detected, by default False.
     default_size_for_cropped : tuple, optional
         Default size for the cropped frames, by default (512, 512).
-
-    Returns:
-    -------
-    tuple
-        A tuple containing the frames per second (fps) of the video and the array of cropped frames.
 
     Raises:
     ------
@@ -352,38 +369,55 @@ def create_cropped_video(
 
     """
     cap = cv2.VideoCapture(video_path)
+
+    if debug:
+        if darken == False:
+            logger.warning("Debug mode is enabled. darken flag will be set to True.")
+            darken = True
+
+
     if not cap.isOpened():
         raise ValueError(f"Error opening video file: {video_path}")
 
+    # Get video properties
+    fps = cap.get(cv2.CAP_PROP_FPS)
+
+    frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+
+    if darken == False:
+        frame_width, frame_height = default_size_for_cropped
+
+    # Initialize the video writer
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # or 'XVID', 'MJPG', etc.
+    out = cv2.VideoWriter(output_path, fourcc, fps, (frame_width, frame_height))
+
     frame_index = 0
-    
     max_frame_index = len(detections)
-    
-    out_frames = []
 
     while True:
-
         ret, frame = cap.read()
         if not ret:
             break
         if frame_index >= max_frame_index:
             break
-            
+
         frame_dict = detections[frame_index]
+
         face_frame = create_face_frame(
             frame_dict,
             frame,
             default_size=default_size_for_cropped,
             keep_original_timing=keep_original_timing,
+            debug=debug,
             darken=darken
         )
 
-        #check if face_frame is empty (i.e. no face detected and keep_original_timing is False)
-        if face_frame.size!=0:
-            out_frames.append(face_frame)
+        # Check if face_frame is not empty (i.e., face detected)
+        if face_frame.size != 0:
+            out.write(face_frame)
 
         frame_index += 1
 
     cap.release()
-
-    return out_frames
+    out.release()

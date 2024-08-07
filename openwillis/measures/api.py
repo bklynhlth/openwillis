@@ -6,7 +6,8 @@ from openwillis.measures.video import (
     facial_expressivity,
     emotional_expressivity,
     eye_blink_rate,
-    preprocess_face_video
+    preprocess_face_video,
+    create_cropped_video
 )
 from openwillis.measures.audio import (
     vocal_acoustics,

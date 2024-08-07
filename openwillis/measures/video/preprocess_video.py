@@ -11,8 +11,6 @@ from deepface import DeepFace
 from dataclasses import dataclass, field
 from sklearn.cluster import KMeans
 
-from openwillis.measures.video.util import crop_utils as cu
-
 logging.basicConfig(level=logging.INFO)
 logger=logging.getLogger()
 
@@ -440,6 +438,7 @@ def load_facedata_from_video(
     n_frames_capture = 0
 
     while True:
+
         ret, frame = cap.read()
         if not ret:
             break
@@ -739,10 +738,7 @@ def preprocess_face_video(
     detector_backend='mtcnn', 
     face_threshold=.95, 
     min_sec_face_present=3, 
-    n_frames=np.inf,
-    darken=True,
-    keep_original_timing=False,
-    default_size_for_cropped = (512,512)
+    n_frames=np.inf
 ):
     """
     Preprocesses a face video by extracting face data, clustering the faces, and preparing the output.
@@ -756,22 +752,14 @@ def preprocess_face_video(
     - face_threshold (float): Similarity threshold for clustering faces. Default is 0.95.
     - min_sec_face_present (int): Minimum number of seconds a face must be present after clustering to not be filtered out. Default is 3.
     - n_frames (int): Maximum number of frames to process. Default is np.inf (i.e. process all frames).
-    - darken (bool): Whether to darken the cropped video all pixels out of face bounding box - but leave face at same location in frame. If false only frames within bounding box plus standardized boarder are returned. Default is True.
-    - keep_original_timing (bool): Whether to keep the original timing for the cropped video. If true all frames are retained
-      but frames with out a face of the identity are returned as black, if false only frames with the identity are returned. Default is False.
-    - default_size_for_cropped (tuple): Default size for the cropped video. Default is (512, 512).
-
+   
     Returns:
-    - cropped_video_dict (dict): Dictionary of cropped videos, keys are cluster numbers.
-    - fps (float): Frames per second of the processed video. Used for saving video
     - bb_dict (dict): Dictionary containing the framewise bounding boxes for each face of n_people in video. keys are zero indexed n_people integers.
     - facedata_df (pandas.DataFrame): DataFrame containing the face data and cluster info.
     """
 
     config = get_config(os.path.abspath(__file__), 'preprocess.json')
 
-    fps = -1
-    cropped_video_dict = {}
     bb_dict = {}
     facedata_df = pd.DataFrame()
 
@@ -801,21 +789,10 @@ def preprocess_face_video(
             n_people
         )
 
-        for key in bb_dict.keys():
-            detections= bb_dict[key]
-            out_video = cu.create_cropped_video(
-                video_path,
-                detections,
-                darken=darken,
-                keep_original_timing=keep_original_timing,
-                default_size_for_cropped = default_size_for_cropped
-            )
-            cropped_video_dict[key] = out_video
-
     except Exception as e:
         logger.error(f"Error preprocessing video: file: {video_path} & Error: {e}'")
         
-    return cropped_video_dict, fps, bb_dict, facedata_df
+    return  bb_dict, facedata_df
 
 
 
