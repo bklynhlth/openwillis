@@ -348,6 +348,9 @@ def embed_faces(face_data_list, model_name='Facenet'):
             model_name=model_name
         )
         face_data.face_embedding = deep_face_dict[0]['embedding']
+        
+        #save memory
+        face_data.face = np.array([])
 
     return face_data_list 
 
