@@ -2,8 +2,6 @@
 # website:   http://www.bklynhlth.com
 
 # import the required packages
-from multiprocessing import Pool
-
 from transformers import AutoTokenizer, AutoModelForCausalLM
 
 from openwillis.measures.text.util.diarization_utils import (
