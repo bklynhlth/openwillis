@@ -9,6 +9,7 @@ from multiprocessing import Pool
 import time
 import random
 import logging
+from functools import wraps
 
 import boto3
 import numpy as np
@@ -34,6 +35,7 @@ In the speaker diarization transcript below, some words are potentially misplace
 
 def exponential_backoff_decorator(max_retries, base_delay):
     def decorator(func):
+        @wraps(func)
         def wrapper(*args, **kwargs):
             retries = 0
             while retries < max_retries:
@@ -720,55 +722,57 @@ def extract_prompts(transcript_json, asr):
     return prompts, translate_json
 
 
-@exponential_backoff_decorator(max_retries=3, base_delay=90)
-def process_chunk_aws(args):
-    """
-    ------------------------------------------------------------------------------------------------------
+class AWSProcessor:
+    def __init__(self, endpoint_name, input_param):
+        self.endpoint_name = endpoint_name
+        self.input_param = input_param
 
-    This function processes a diarized text chunk using the SageMaker endpoint;
-     it is used for parallel processing.
+    @exponential_backoff_decorator(max_retries=3, base_delay=90)
+    def process_chunk(self, args):
+        """
+        ------------------------------------------------------------------------------------------------------
+        This function processes a diarized text chunk using the SageMaker endpoint;
+        it is used for parallel processing.
 
-    Parameters:
-    ...........
-    args: tuple
-        Tuple of arguments.
-        idx: int, chunk index.
-        prompt: str, diarized text chunk.
-        input_param: dict, additional arguments for the API call.
-        endpoint_name: str, name of the SageMaker endpoint.
+        Parameters:
+        ...........
+        args: tuple
+            Tuple of arguments.
+            idx: int, chunk index.
+            prompt: str, diarized text chunk.
 
-    Returns:
-    ...........
-    tuple: Tuple of chunk index and model output.
+        Returns:
+        ...........
+        tuple: Tuple of chunk index and model output.
 
-    ------------------------------------------------------------------------------------------------------
-    """
-    idx, prompt, input_param, endpoint_name = args
+        ------------------------------------------------------------------------------------------------------
+        """
+        idx, prompt = args
 
-    # initialize boto3 client
-    if input_param['access_key'] and input_param['secret_key']:
-        client = boto3.client('sagemaker-runtime', region_name = input_param['region'], 
-                                    aws_access_key_id = input_param['access_key'], 
-                                    aws_secret_access_key = input_param['secret_key'])
-    else:
-        client = boto3.client('sagemaker-runtime', region_name = input_param['region'])
+        # initialize boto3 client
+        if self.input_param['access_key'] and self.input_param['secret_key']:
+            client = boto3.client('sagemaker-runtime', region_name=self.input_param['region'], 
+                                        aws_access_key_id=self.input_param['access_key'], 
+                                        aws_secret_access_key=self.input_param['secret_key'])
+        else:
+            client = boto3.client('sagemaker-runtime', region_name=self.input_param['region'])
 
-    input_data = apply_formatting(preprocess_str(prompt))
+        input_data = apply_formatting(preprocess_str(prompt))
 
-    # Convert input data to JSON string
-    payload = json.dumps(input_data)
+        # Convert input data to JSON string
+        payload = json.dumps(input_data)
 
-    # Invoke the endpoint
-    response = client.invoke_endpoint(
-        EndpointName=endpoint_name,
-        Body=payload,
-        ContentType='application/json'
-    )
+        # Invoke the endpoint
+        response = client.invoke_endpoint(
+            EndpointName=self.endpoint_name,
+            Body=payload,
+            ContentType='application/json'
+        )
 
-    # Parse the response
-    result = json.loads(response['Body'].read().decode())[0]["generated_text"]
+        # Parse the response
+        result = json.loads(response['Body'].read().decode())[0]["generated_text"]
 
-    return idx, result
+        return idx, result
 
 
 def call_diarization(prompts, endpoint_name, input_param):
@@ -796,15 +800,16 @@ def call_diarization(prompts, endpoint_name, input_param):
     ------------------------------------------------------------------------------------------------------
     """
 
+    processor = AWSProcessor(endpoint_name, input_param)
     results = {}
     if input_param['parallel_processing'] == 1:
         with Pool(processes=len(prompts)) as pool:
-            args = [(idx, prompts[idx], input_param, endpoint_name) for idx in sorted(prompts.keys())]
-            results = pool.map(process_chunk_aws, args)
+            args = [(idx, prompts[idx]) for idx in sorted(prompts.keys())]
+            results = pool.map(processor.process_chunk, args)
             results = dict(results)
     else:
         for idx in sorted(prompts.keys()):
-            results[idx] = process_chunk_aws((idx, prompts[idx], input_param, endpoint_name))[1]
+            results[idx] = processor.process_chunk((idx, prompts[idx]))[1]
 
     return results
 

@@ -116,6 +116,7 @@ def speech_transcription_aws(s3_uri, **kwargs):
     input_param = read_kwargs(kwargs)
     measures = get_config()
     json_response, transcript = tutil.transcribe_audio(s3_uri, input_param)
+    willisdiarize_status = False
 
     present_labels = [x['speaker_label'] for x in json_response['results']['items'] if 'speaker_label' in x]
     if len(set(present_labels)) != 2:
