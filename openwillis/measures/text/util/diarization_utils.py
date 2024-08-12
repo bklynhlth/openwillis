@@ -15,11 +15,6 @@ import boto3
 import numpy as np
 from scipy import optimize
 
-from openwillis.measures.audio.util.transcribe_util import (
-    get_clinical_labels, get_whisperx_clinical_labels,
-    replace_speaker_labels, replace_whisperx_speaker_labels
-)
-
 # avoid warning about tokenizers parallelism
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
@@ -857,58 +852,3 @@ def correct_transcription(transcript_json, prompts, results, translate_json, asr
         raise ValueError("ASR not supported")
 
     return transcript_json_corrected
-
-
-@exponential_backoff_decorator(max_retries=3, base_delay=90)
-def speaker_identification(transcript_json, context, asr, measures):
-    """
-    ------------------------------------------------------------------------------------------------------
-
-    This function identifies the speakers in a transcript based on the context.
-
-    Parameters:
-    ...........
-    transcript_json: dict
-        JSON response object.
-    context: str
-        Context to use for identifying clinician/patient.
-    asr: str
-        Automatic Speech Recognition (ASR)
-            system used to transcribe the audio.
-    measures: dict
-        Configuration dictionary.
-
-    Returns:
-    ...........
-    dict: JSON response object with identified speakers.
-
-    ------------------------------------------------------------------------------------------------------
-    """
-    # if already speaker identified, return to speaker 0 and speaker 1 format
-    if asr == "aws":
-        speakers, words, _ = extract_transcription_aws(transcript_json)
-        unique_speakers = list(set(speakers))
-        transcript_json = replace_speaker_labels(transcript_json, unique_speakers, ['speaker0', 'speaker1'])
-    elif asr == "whisperx":
-        speakers, words, _ = extract_transcription_whisperx(transcript_json)
-        unique_speakers = list(set(speakers))
-        transcript_json = replace_whisperx_speaker_labels(transcript_json, unique_speakers, ['speaker0', 'speaker1'])
-
-    translate = {unique_speakers[0]: "speaker0", unique_speakers[1]: "speaker1"}
-
-    speakers = [translate[x] for x in speakers]
-    content_dict = {spk: "" for spk in ["speaker0", "speaker1"]}
-
-    # combine words of the same speaker
-    for word, speaker in zip(words, speakers):
-        content_dict[speaker] += word + " "
-    # strip the content
-    for spk in content_dict:
-        content_dict[spk] = content_dict[spk].strip()
-
-    if asr == "aws":
-        transcript_json2 = get_clinical_labels(context, measures, content_dict, transcript_json)
-    elif asr == "whisperx":
-        transcript_json2 = get_whisperx_clinical_labels(context, measures, content_dict, transcript_json)
-
-    return transcript_json2
