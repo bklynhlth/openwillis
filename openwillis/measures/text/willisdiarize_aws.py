@@ -111,7 +111,7 @@ def is_whisper_transcribe(transcript_json):
     return False
 
 
-def diarization_correction_aws(transcript_json, endpoint_name, context = '', **kwargs):
+def diarization_correction_aws(transcript_json, endpoint_name, **kwargs):
     """
     ------------------------------------------------------------------------------------------------------
     This function corrects the speaker diarization of a transcript
@@ -121,8 +121,6 @@ def diarization_correction_aws(transcript_json, endpoint_name, context = '', **k
     ...........
     transcript_json: dict
         JSON response object.
-    context : str, optional
-        scale to use for identifying clinician/patient, if any.
     kwargs: dict
         Additional arguments for the AWS API call.
 
@@ -156,13 +154,6 @@ def diarization_correction_aws(transcript_json, endpoint_name, context = '', **k
             )
 
             willisdiarize_status = True
-            if context.lower() in measures['scale'].split(','):
-                # redo speaker identification
-                transcript_json_corrected = dutil.speaker_identification(
-                    transcript_json_corrected, context, asr, measures
-                )
-            elif len(context) > 0:
-                raise Exception("Invalid context")
 
     except Exception as e:
         logger.error(f"Error in Speaker Diarization Correction {e}")

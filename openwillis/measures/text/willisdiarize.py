@@ -108,7 +108,7 @@ def is_whisper_transcribe(transcript_json):
     return False
 
 
-def diarization_correction(transcript_json, model_name, context = '', **kwargs):
+def diarization_correction(transcript_json, model_name, **kwargs):
     """
     ------------------------------------------------------------------------------------------------------
     This function corrects the speaker diarization of a transcript
@@ -120,8 +120,6 @@ def diarization_correction(transcript_json, model_name, context = '', **kwargs):
         JSON response object.
     model_name: str
         The name of the model used for transcription in HuggingFace.
-    context : str, optional
-        scale to use for identifying clinician/patient, if any.
     kwargs: dict
         Additional arguments for the AWS API call.
 
@@ -151,14 +149,6 @@ def diarization_correction(transcript_json, model_name, context = '', **kwargs):
             transcript_json_corrected = dutil.correct_transcription(
                 transcript_json, prompts, results, translate_json, asr
             )
-
-            if context.lower() in measures['scale'].split(','):
-                # redo speaker identification
-                transcript_json_corrected = dutil.speaker_identification(
-                    transcript_json_corrected, context, asr, measures
-                )
-            elif len(context) > 0:
-                raise Exception("Invalid context")
 
     except Exception as e:
         logger.error(f"Error in Speaker Diarization Correction {e}")
