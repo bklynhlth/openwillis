@@ -122,7 +122,7 @@ def speech_transcription_aws(s3_uri, **kwargs):
     if len(set(present_labels)) != 2:
         return json_response, transcript, willisdiarize_status
 
-    if input_param['language'].lower()[:2] == 'en' and input_param['willisdiarize_endpoint'] != '':
+    if input_param['language'].lower()[:2] == 'en' and input_param['willisdiarize_endpoint'].lower() not in ['', 'none']:
         json_response, willisdiarize_status = wd.diarization_correction_aws(
             json_response, input_param['willisdiarize_endpoint'],
             parallel_processing=input_param['willisdiarize_parallel'],
