@@ -257,9 +257,9 @@ def create_cropped_frame(
         - 'bb_w' (int): The width of the bounding box.
         - 'bb_h' (int): The height of the bounding box.
     crop : bool, optional
-        If True, blackens the area outside the bounding box. If False, crops the frame with padding and centering. Default is True.
+        If False, blackens the area outside the bounding box. If True, crops the frame with padding and centering. Default is True.
     default_size : tuple, optional
-        The size of the cropped frame if `crop` is False. Default is (512, 512).
+        The size of the cropped frame if `crop` is True. Default is (512, 512).
 
     Returns:
     -------
@@ -268,8 +268,8 @@ def create_cropped_frame(
 
     Notes:
     ------
-    - If `crop` is True, the function uses the `blacken_outside_bounding_box` function to blacken the area outside the bounding box.
-    - If `crop` is False, the function uses the `crop_with_padding_and_center` function to crop the frame with padding and centering.
+    - If `crop` is False, the function uses the `blacken_outside_bounding_box` function to blacken the area outside the bounding box.
+    - If `crop` is True, the function uses the `crop_with_padding_and_center` function to crop the frame with padding and centering.
     """
     
     if crop:
@@ -297,7 +297,7 @@ def create_face_frame(
         frame_dict (dict): A dictionary containing the coordinates of the face region in the frame.
         frame (numpy.ndarray): The input frame to be cropped.
         default_size (tuple, optional): The default size of the cropped face frame. Defaults to (512, 512).
-        trim (bool, optional): Whether to keep the original timing of the frame. Defaults to True.
+        trim (bool, optional): Whether to the trim video so only frames with face present are retained. Defaults to True.
         crop (bool, optional): Whether to crop the cropped face frame. Defaults to True.
 
     Returns:
