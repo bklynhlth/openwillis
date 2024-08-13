@@ -3,6 +3,7 @@
 
 # import the required packages
 from transformers import AutoTokenizer, AutoModelForCausalLM
+import torch
 
 from openwillis.measures.text.util.diarization_utils import (
     preprocess_str, apply_formatting
@@ -36,17 +37,16 @@ def process_chunk_hf(args):
     input_data = apply_formatting(preprocess_str(prompt))
 
     # Tokenize the input data
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     inputs = tokenizer(input_data["inputs"], return_tensors="pt")
+    inputs = {key: value.to(device) for key, value in inputs.items()}
 
     # Generate the output
     output = model.generate(
         **inputs,
-        max_length=2048,
-        top_p=0.5,
-        temperature=0.2,
-        stop_token="</s>",
-        eos_token_id=tokenizer.eos_token_id,
-        pad_token_id=tokenizer.pad_token_id,
+        max_new_tokens=2048,
+        stop_strings=["</s>", "###"],
+        tokenizer=tokenizer,
         return_dict_in_generate=True
     )
 
@@ -81,7 +81,10 @@ def call_diarization_hf(prompts, model_name, input_param):
     ------------------------------------------------------------------------------------------------------
     """
     tokenizer = AutoTokenizer.from_pretrained(model_name, token=input_param['huggingface_token'])
-    model = AutoModelForCausalLM.from_pretrained(model_name, token=input_param['huggingface_token'])
+    if torch.cuda.is_available():
+        model = AutoModelForCausalLM.from_pretrained(model_name, token=input_param['huggingface_token'], device_map="cuda:0")
+    else:
+        raise ValueError("CUDA is not available.")
 
     results = {}
     for idx in sorted(prompts.keys()):
