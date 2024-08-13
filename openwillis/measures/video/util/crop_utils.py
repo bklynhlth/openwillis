@@ -383,7 +383,7 @@ def create_cropped_video(
     frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
-    if crop == True:
+    if crop:
         frame_width, frame_height = default_size_for_cropped
 
     # Initialize the video writer
