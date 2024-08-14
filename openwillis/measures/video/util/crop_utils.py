@@ -240,7 +240,7 @@ def blacken_outside_bounding_box(frame, bb_dict):
 def create_cropped_frame(
     frame,
     frame_dict,
-    darken=True,
+    crop=True,
     default_size=(512,512),
     ):
     """
@@ -256,10 +256,10 @@ def create_cropped_frame(
         - 'bb_y' (int): The y-coordinate of the top-left corner of the bounding box.
         - 'bb_w' (int): The width of the bounding box.
         - 'bb_h' (int): The height of the bounding box.
-    darken : bool, optional
-        If True, blackens the area outside the bounding box. If False, crops the frame with padding and centering. Default is True.
+    crop : bool, optional
+        If False, blackens the area outside the bounding box. If True, crops the frame with padding and centering. Default is True.
     default_size : tuple, optional
-        The size of the cropped frame if `darken` is False. Default is (512, 512).
+        The size of the cropped frame if `crop` is True. Default is (512, 512).
 
     Returns:
     -------
@@ -268,15 +268,15 @@ def create_cropped_frame(
 
     Notes:
     ------
-    - If `darken` is True, the function uses the `blacken_outside_bounding_box` function to blacken the area outside the bounding box.
-    - If `darken` is False, the function uses the `crop_with_padding_and_center` function to crop the frame with padding and centering.
+    - If `crop` is False, the function uses the `blacken_outside_bounding_box` function to blacken the area outside the bounding box.
+    - If `crop` is True, the function uses the `crop_with_padding_and_center` function to crop the frame with padding and centering.
     """
     
-    if darken:
-        face_frame = blacken_outside_bounding_box(frame, frame_dict)
-    else:
+    if crop:
         face_frame = crop_with_padding_and_center(frame, frame_dict, frame_size=default_size)
-    
+    else:
+        face_frame = blacken_outside_bounding_box(frame, frame_dict)
+        
     return face_frame
 
 
@@ -284,9 +284,9 @@ def create_face_frame(
         frame_dict,
         frame,
         default_size=(512,512),
-        keep_original_timing=True,
+        trim=True,
         debug=False,
-        darken=True
+        crop=True
         ):
     """
     Create a face frame by cropping the input frame based on the provided frame dictionary and booleans for
@@ -297,8 +297,8 @@ def create_face_frame(
         frame_dict (dict): A dictionary containing the coordinates of the face region in the frame.
         frame (numpy.ndarray): The input frame to be cropped.
         default_size (tuple, optional): The default size of the cropped face frame. Defaults to (512, 512).
-        keep_original_timing (bool, optional): Whether to keep the original timing of the frame. Defaults to True.
-        darken (bool, optional): Whether to darken the cropped face frame. Defaults to True.
+        trim (bool, optional): Whether to the trim video so only frames with face present are retained. Defaults to True.
+        crop (bool, optional): Whether to crop the cropped face frame. Defaults to True.
 
     Returns:
         numpy.ndarray: The cropped face frame.
@@ -309,7 +309,7 @@ def create_face_frame(
         face_frame = create_cropped_frame(
             frame,
             frame_dict,
-            darken=darken,
+            crop=crop,
             default_size=default_size,
         )
 
@@ -317,15 +317,13 @@ def create_face_frame(
 
         face_frame = frame
 
-    elif keep_original_timing:
+    elif not trim:
         
-        if darken:
-
-            face_frame = np.zeros_like(frame,dtype=np.uint8)
-
+        if crop:
+            face_frame = np.zeros(default_size+(3,),dtype=np.uint8)     
         else:
-
-            face_frame = np.zeros(default_size+(3,),dtype=np.uint8)
+            face_frame = np.zeros_like(frame,dtype=np.uint8)
+            
     else:
 
         face_frame = np.array([])
@@ -336,8 +334,8 @@ def create_cropped_video(
     video_path,
     detections,
     output_path,
-    darken=True,
-    keep_original_timing=False,
+    crop=False,
+    trim=True,
     debug=False,
     default_size_for_cropped=(512, 512)
 ):
@@ -353,10 +351,10 @@ def create_cropped_video(
         List of dictionaries containing bounding box and frame index information.
     output_path : str
         Path to save the output video.
-    darken : bool, optional
-        Flag to darken the cropped frames, by default True.
-    keep_original_timing : bool, optional
-        Flag to keep the original timing of the frames, by default False.
+    crop : bool, optional
+        Flag to crop frame so that only bounding box is retained versus setting all pixels outside bounxing box to black but retaining original framesize (crop == False). by default False.
+    trim : bool, optional
+        Flag to only return frames with bounding box information, effectively altering the length of the video by. If false black frames are appended when no bounding box info is present default True
     debug : bool, optional
         Flag to keep the original frames when no face is detected, by default False.
     default_size_for_cropped : tuple, optional
@@ -371,9 +369,9 @@ def create_cropped_video(
     cap = cv2.VideoCapture(video_path)
 
     if debug:
-        if darken == False:
-            logger.warning("Debug mode is enabled. darken flag will be set to True.")
-            darken = True
+        if crop:
+            logger.warning("Debug mode is enabled. crop flag will be set to False.")
+            crop = False
 
 
     if not cap.isOpened():
@@ -385,7 +383,7 @@ def create_cropped_video(
     frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
-    if darken == False:
+    if crop:
         frame_width, frame_height = default_size_for_cropped
 
     # Initialize the video writer
@@ -408,9 +406,9 @@ def create_cropped_video(
             frame_dict,
             frame,
             default_size=default_size_for_cropped,
-            keep_original_timing=keep_original_timing,
+            trim=trim,
             debug=debug,
-            darken=darken
+            crop=crop
         )
 
         # Check if face_frame is not empty (i.e., face detected)
