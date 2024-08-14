@@ -2,6 +2,12 @@
 # website:   http://www.bklynhlth.com
 
 # import the required packages
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger=logging.getLogger()
+logging.getLogger('torch.distributed.nn.jit.instantiator').setLevel(logging.WARNING)
+
 from pyannote.audio import Pipeline
 from openwillis.measures.audio.util import separation_util as sutil
 from pydub import AudioSegment
@@ -9,10 +15,6 @@ from pydub import AudioSegment
 import os
 import json
 import pandas as pd
-import logging
-
-logging.basicConfig(level=logging.INFO)
-logger=logging.getLogger()
 
 def get_config():
     """

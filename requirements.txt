@@ -7,13 +7,13 @@ pandas==1.4.2
 protobuf3-to-dict==0.1.5
 praat-parselmouth==0.4.3
 pydub==0.25.1
-deepface==0.0.75
+deepface==0.0.92
 vosk==0.3.44
 vaderSentiment==3.3.2
 nltk==3.8.1
 lexicalrichness==0.5.0
 torch==2.0.0
-pyannote.audio==3.0.0
+pyannote.audio==3.1.1
 transformers==4.36.0
 sentence-transformers==2.2.2
 huggingface-hub==0.19.3

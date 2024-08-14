@@ -6,6 +6,7 @@ import os
 import json
 import logging
 from openwillis.measures.audio.util import transcribe_util as tutil
+from openwillis.measures.text import willisdiarize_aws as wd
 
 logging.basicConfig(level=logging.INFO)
 logger=logging.getLogger()
@@ -63,6 +64,10 @@ def read_kwargs(kwargs):
     input_param['context'] = kwargs.get('context', '')
     input_param['access_key'] = kwargs.get('access_key', '')
     input_param['secret_key'] = kwargs.get('secret_key', '')
+
+    input_param['willisdiarize_endpoint'] = kwargs.get('willisdiarize_endpoint', '')
+    input_param['willisdiarize_parallel'] = kwargs.get('willisdiarize_parallel', 1)
+
     return input_param
 
 def speech_transcription_aws(s3_uri, **kwargs):
@@ -92,6 +97,10 @@ def speech_transcription_aws(s3_uri, **kwargs):
             Max number of speakers
         context : str, optional
             scale to use for slicing the separated audio files, if any.
+        willisdiarize_endpoint : str, optional
+            The SageMaker endpoint for the Willisdiarize API.
+        willisdiarize_parallel : int, optional
+            Whether to use parallel processing for Willisdiarize API.
             
     Returns:
     ...........
@@ -99,19 +108,30 @@ def speech_transcription_aws(s3_uri, **kwargs):
         A transcription response object in JSON format
     transcript : str
         The transcript of the recording.
+    willisdiarize_status : bool
+        The status of the Willisdiarize API.
 
     ------------------------------------------------------------------------------------------------------
     """
     input_param = read_kwargs(kwargs)
     measures = get_config()
     json_response, transcript = tutil.transcribe_audio(s3_uri, input_param)
+    willisdiarize_status = False
 
     present_labels = [x['speaker_label'] for x in json_response['results']['items'] if 'speaker_label' in x]
     if len(set(present_labels)) != 2:
-        return json_response, transcript
+        return json_response, transcript, willisdiarize_status
+
+    if input_param['language'].lower()[:2] == 'en' and input_param['willisdiarize_endpoint'].lower() not in ['', 'none']:
+        json_response, willisdiarize_status = wd.diarization_correction_aws(
+            json_response, input_param['willisdiarize_endpoint'],
+            parallel_processing=input_param['willisdiarize_parallel'],
+            region=input_param['region'], access_key=input_param['access_key'],
+            secret_key=input_param['secret_key']
+        )
 
     if input_param['speaker_labels'] == True and input_param['context'].lower() in measures['scale'].split(','):
         content_dict = tutil.extract_content(json_response)
         
         json_response = tutil.get_clinical_labels(input_param['context'], measures, content_dict, json_response)
-    return json_response, transcript
+    return json_response, transcript, willisdiarize_status
