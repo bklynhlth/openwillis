@@ -287,13 +287,13 @@ def create_turns_whisper(item_data, measures):
 
     for item in item_data:
         if item['speaker'] == current_speaker:
-            idxs = [word[measures["old_index"]] for word in item['words']]
+            idxs = [word[measures["old_index"]] for word in item['words'] if 'start' in word]
             # Continue aggregating text and ids for the current speaker
             aggregated_text += " " + item['text']
             aggregated_ids.extend(idxs)
 
             word_ids.extend(idxs)
-            word_texts.extend([word['word'] for word in item['words']])
+            word_texts.extend([word['word'] for word in item['words'] if 'start' in word])
 
             phrase_ids.append((idxs[0], idxs[-1]))
             phrase_texts.append(item['text'])
@@ -314,10 +314,10 @@ def create_turns_whisper(item_data, measures):
             # Reset aggregation for the new speaker
             current_speaker = item['speaker']
             aggregated_text = item['text']
-            aggregated_ids = [word[measures["old_index"]] for word in item['words']]
+            aggregated_ids = [word[measures["old_index"]] for word in item['words'] if 'start' in word]
 
-            word_ids = [word[measures["old_index"]] for word in item['words']]
-            word_texts = [word['word'] for word in item['words']]
+            word_ids = [word[measures["old_index"]] for word in item['words'] if 'start' in word]
+            word_texts = [word['word'] for word in item['words'] if 'start' in word]
 
             phrase_ids = [(word_ids[0], word_ids[-1])]
             phrase_texts = [item['text']]
