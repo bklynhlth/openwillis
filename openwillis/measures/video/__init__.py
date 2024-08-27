@@ -13,7 +13,7 @@ from openwillis.measures.video.preprocess_video import (
     preprocess_face_video
 )
 
-from openwillis.measures.video.util.crop_utils import (
+from openwillis.measures.video.util import (
     create_cropped_video
 )
 
