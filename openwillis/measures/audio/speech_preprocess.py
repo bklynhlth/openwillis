@@ -13,11 +13,47 @@ logging.basicConfig(level=logging.INFO)
 logger=logging.getLogger()
 
 def resample(audio_signal, sample_rate):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    Resamples the audio signal to the target sample rate.
+
+    Parameters:
+    ...........
+    audio_signal : pydub.AudioSegment
+        input audio signal
+    sample_rate : int
+        target sample rate
+
+    Returns:
+    ...........
+    pydub.AudioSegment
+        resampled audio signal
+
+    ------------------------------------------------------------------------------------------------------
+    """
 
     audio_signal = audio_signal.set_frame_rate(sample_rate)
     return audio_signal
 
 def dc_offset(audio_signal):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    Removes the DC offset from the audio signal.
+
+    Parameters:
+    ...........
+    audio_signal : pydub.AudioSegment
+        input audio signal
+
+    Returns:
+    ...........
+    pydub.AudioSegment
+        audio signal with DC offset removed
+
+    ------------------------------------------------------------------------------------------------------
+    """
 
     num_channels = audio_signal.channels
 
@@ -40,11 +76,51 @@ def dc_offset(audio_signal):
     return audio_signal
 
 def volume_normalization(audio_signal, target_dBFS):
+    """
+    ------------------------------------------------------------------------------------------------------
+    
+    Normalizes the volume of the audio signal to the target dBFS.
+    
+    Parameters:
+    ...........
+    audio_signal : pydub.AudioSegment
+        input audio signal
+    target_dBFS : float
+        target dBFS
+        
+    Returns:
+    ...........
+    pydub.AudioSegment
+        normalized audio signal
+
+    ------------------------------------------------------------------------------------------------------
+    """
 
     audio_signal = audio_signal.apply_gain(target_dBFS - audio_signal.dBFS)
     return audio_signal
 
 def find_silence(audio_signal, silence_threshold, silence_duration):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    Finds the silence in the audio signal.
+
+    Parameters:
+    ...........
+    audio_signal : pydub.AudioSegment
+        input audio signal
+    silence_threshold : float
+        silence threshold in dBfs
+    silence_duration : float
+        minimum silence duration in seconds
+
+    Returns:
+    ...........
+    pydub.AudioSegment
+        silence audio signal
+
+    ------------------------------------------------------------------------------------------------------
+    """
 
     # save audio signal to a temporary file
     audio_file = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
@@ -98,6 +174,27 @@ def find_silence(audio_signal, silence_threshold, silence_duration):
     return silence_audio
 
 def remove_background_noise(audio_signal, audio_silence, sensitivity):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    Removes background noise from audio signal using the silence as a noise profile.
+
+    Parameters:
+    ...........
+    audio_signal : pydub.AudioSegment
+        input audio signal
+    audio_silence : pydub.AudioSegment
+        silence audio signal
+    sensitivity : float
+        noise reduction sensitivity
+
+    Returns:
+    ...........
+    pydub.AudioSegment
+        noise-reduced audio signal
+
+    ------------------------------------------------------------------------------------------------------
+    """
 
     audio_file = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
     audio_silence_file = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
@@ -139,17 +236,60 @@ def remove_background_noise(audio_signal, audio_silence, sensitivity):
 
     return audio_signal
 
-def denoise(audio_signal):
+def denoise(audio_signal, silence_threshold, silence_duration, sensitivity):
+    """
+    ------------------------------------------------------------------------------------------------------
+    
+    Denoises audio signal by first finding the silence in the audio signal and then removing the background noise
+    using the silence as a noise profile.
+    
+    Parameters:
+    ...........
+    audio_signal : pydub.AudioSegment
+        input audio signal
+    silence_threshold : float
+        silence threshold in dBfs
+    silence_duration : float
+        minimum silence duration in seconds
+    sensitivity : float
+        noise reduction sensitivity
 
-    audio_silence = find_silence(audio_signal, -30, 0.5)
+    Returns:
+    ...........
+    pydub.AudioSegment
+        denoised audio signal
+
+    ------------------------------------------------------------------------------------------------------
+    """
+
+    audio_silence = find_silence(audio_signal, silence_threshold, silence_duration)
     if audio_silence is None:
         return audio_signal
     
-    audio_signal = remove_background_noise(audio_signal, audio_silence, 0.21)
+    audio_signal = remove_background_noise(audio_signal, audio_silence, sensitivity)
 
     return audio_signal
 
 def audio_preprocess(audio_in, audio_out):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    Preprocesses audio signal by resampling, removing DC offset, normalizing volume, and denoising.
+
+    Parameters:
+    ...........
+    audio_in : str
+        path to the input audio file
+    audio_out: str
+        path to the output audio file
+
+    Returns:
+    ...........
+    None
+
+    ------------------------------------------------------------------------------------------------------
+    """
+
 
     try:
         if not audio_in.endswith(".wav") and not audio_in.endswith(".mp3"):
@@ -165,7 +305,7 @@ def audio_preprocess(audio_in, audio_out):
         audio_signal = resample(audio_signal, 16000)
         audio_signal = dc_offset(audio_signal)
         audio_signal = volume_normalization(audio_signal, -20)
-        audio_signal = denoise(audio_signal)
+        audio_signal = denoise(audio_signal, -30, 0.5, 0.2)
 
         audio_signal.export(audio_out, format="wav" if audio_out.endswith(".wav") else "mp3")
 
