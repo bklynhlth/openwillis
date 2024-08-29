@@ -15,6 +15,7 @@ from lexicalrichness import LexicalRichness
 from transformers import BertTokenizer, BertModel, BertForMaskedLM
 from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
+import spacy
 import torch
 
 logging.basicConfig(level=logging.INFO)
@@ -1013,7 +1014,7 @@ def get_sentiment(df_list, text_list, measures):
     df_list = [word_df, turn_df, summ_df]
     return df_list
 
-def calculate_repetitions(words_texts, phrases_texts):
+def calculate_repetitions(words_texts, phrases_texts, lemmatizer):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -1025,6 +1026,8 @@ def calculate_repetitions(words_texts, phrases_texts):
         List of transcribed text at the word level.
     phrases_texts: list
         List of transcribed text at the phrase level.
+    lemmatizer: spacy object or None
+        A lemmatizer object.
 
     Returns:
     ...........
@@ -1043,6 +1046,11 @@ def calculate_repetitions(words_texts, phrases_texts):
     words_texts = [word for word in words_texts if word != '']
     phrases_texts = [phrase for phrase in phrases_texts if phrase != '']
 
+    # lemmatize
+    if lemmatizer:
+        words_texts = [token.lemma_ for token in lemmatizer(' '.join(words_texts))]
+        phrase_texts = [" ".join([token.lemma_ for token in lemmatizer(p) if token.lemma_ != ' ']) for p in phrases_texts]
+
     # calculate repetitions
     word_reps = len(words_texts) - len(set(words_texts))
     phrase_reps = len(phrases_texts) - len(set(phrases_texts))
@@ -1053,7 +1061,7 @@ def calculate_repetitions(words_texts, phrases_texts):
     return 100*word_reps/len(words_texts), 100*phrase_reps/len(phrases_texts)
 
 
-def get_repetitions(df_list, utterances_speaker, utterances_speaker_filtered, measures):
+def get_repetitions(df_list, utterances_speaker, utterances_speaker_filtered, language, measures):
     """
 
     This function calculates the percentage of repeated words and phrases in the input text
@@ -1068,6 +1076,8 @@ def get_repetitions(df_list, utterances_speaker, utterances_speaker_filtered, me
     utterances_speaker_filtered: pandas dataframe
         A dataframe containing the turns extracted from the JSON object for the specified speaker
         after filtering out turns with less than min_turn_length words.
+    language: str
+        Language of the transcribed text.
     measures: dict
         A dictionary containing the names of the columns in the output dataframes.
 
@@ -1080,6 +1090,10 @@ def get_repetitions(df_list, utterances_speaker, utterances_speaker_filtered, me
     
     word_df, turn_df, summ_df = df_list
 
+    lemmatizer = None
+    if language in measures["english_langs"]:
+        lemmatizer = spacy.load('en_core_web_sm')        
+
     # turn-level
     if len(turn_df) > 0:
         for i in range(len(utterances_speaker_filtered)):
@@ -1087,7 +1101,7 @@ def get_repetitions(df_list, utterances_speaker, utterances_speaker_filtered, me
             words_texts = row[measures['words_texts']]
             phrases_texts = row[measures['phrases_texts']]
 
-            word_reps_perc, phrase_reps_perc = calculate_repetitions(words_texts, phrases_texts)
+            word_reps_perc, phrase_reps_perc = calculate_repetitions(words_texts, phrases_texts, lemmatizer)
 
             turn_df.loc[i, measures['word_repeat_percentage']] = word_reps_perc
             turn_df.loc[i, measures['phrase_repeat_percentage']] = phrase_reps_perc
@@ -1100,7 +1114,7 @@ def get_repetitions(df_list, utterances_speaker, utterances_speaker_filtered, me
         words_texts = [word for words in utterances_speaker[measures['words_texts']] for word in words]
         phrases_texts = [phrase for phrases in utterances_speaker[measures['phrases_texts']] for phrase in phrases]
 
-        word_reps_perc, phrase_reps_perc = calculate_repetitions(words_texts, phrases_texts)
+        word_reps_perc, phrase_reps_perc = calculate_repetitions(words_texts, phrases_texts, lemmatizer)
 
         summ_df[measures['word_repeat_percentage']] = word_reps_perc
         summ_df[measures['phrase_repeat_percentage']] = phrase_reps_perc
@@ -1738,7 +1752,7 @@ def process_language_feature(df_list, transcribe_info, speaker_label, min_turn_l
         utterances_filtered = utterances.copy()
 
     df_list = get_pause_feature(json_conf_speaker, df_list, text_list, turn_indices, measures, time_index, language)
-    df_list = get_repetitions(df_list, utterances_speaker, utterances_speaker_filtered, measures)
+    df_list = get_repetitions(df_list, utterances_speaker, utterances_speaker_filtered, language, measures)
 
     if option == 'coherence':
         df_list = get_word_coherence(df_list, utterances_speaker, language, measures)
