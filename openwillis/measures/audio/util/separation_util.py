@@ -3,19 +3,18 @@
 
 # import the required packages
 
-import os
-import shutil
-
 import pandas as pd
 import numpy as np
 import logging
 
 from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
-from openwillis.measures.audio.util import util as ut
+import string
 
 logging.basicConfig(level=logging.INFO)
 logger=logging.getLogger()
+
+PHONATIONS = ['uh', 'mm', 'um', 'mhm', 'huh', 'ah', 'oh', 'eh', 'uhhuh', 'uhuh', 'hmm']
 
 def get_similarity_prob(sentence_embeddings):
     """
@@ -404,3 +403,75 @@ def whisperx_to_dataframe(json_response):
 
     speakers = df['speaker_label'].nunique()
     return df, speakers
+
+def extract_phonation(speaker_df):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    Extracts phonation samples for each speaker.
+
+    Parameters:
+    ----------
+    speaker_df : pandas DataFrame
+        The speaker data.
+
+    Returns:
+    -------
+    phonation_df : pandas DataFrame
+        The phonation data.
+
+    ------------------------------------------------------------------------------------------------------
+    """
+    speaker_df_clean = speaker_df.copy()
+    speaker_df_clean['content'] = speaker_df_clean['content'].apply(lambda x: x.translate(str.maketrans('', '', string.punctuation)).lower())
+
+    phonation_df = speaker_df_clean[speaker_df_clean['content'].isin(PHONATIONS)]
+    phonation_df = phonation_df[phonation_df['end_time'].astype(float) - phonation_df['start_time'].astype(float) > 0.7]
+
+    return phonation_df
+
+def segment_phonations(audio_signal, phonation_df):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    Segments phonations from an audio signal based on a DataFrame.
+
+    Parameters:
+    ----------
+    audio_signal : AudioSignal
+        The audio signal.
+    phonation_df : pandas DataFrame
+        The DataFrame containing phonation information.
+
+    Returns:
+    -------
+    phonation_dict : dict
+        A dictionary with key as the speaker label and value as a numpy array representing the phonation segment.
+
+    ------------------------------------------------------------------------------------------------------
+    """
+    phonation_df['start_time'] = phonation_df['start_time'].astype(float) * 1000
+    phonation_df['end_time'] = phonation_df['end_time'].astype(float) * 1000
+
+    phonation_dict = {}
+    phonation_counts = {spk: 0 for spk in phonation_df['speaker_label'].unique()}
+
+    for _, row in phonation_df.iterrows():
+        start_time = row['start_time']
+        end_time = row['end_time']
+
+        speaker_label = row['speaker_label']
+
+        speaker_audio = audio_signal[start_time:end_time]
+        # strip silence more than 100ms in the beginning and end
+        speaker_audio = speaker_audio.strip_silence(silence_len=100, silence_thresh=-30)
+
+        if len(speaker_audio) < 500:
+            continue
+
+        speaker_array = np.array(speaker_audio.get_array_of_samples())
+
+        phonation_dict[f'{speaker_label}_{phonation_counts[speaker_label]}'] = speaker_array
+        phonation_counts[speaker_label] += 1
+
+    return phonation_dict
