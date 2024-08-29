@@ -359,19 +359,15 @@ def extract_data(segment_info):
 
     ------------------------------------------------------------------------------------------------------
     """
-    phrase = segment_info.get("text", "")
-    start = segment_info.get("start", np.nan)
-    
-    end = segment_info.get("end", np.nan)
     words = segment_info.get("words", None)
 
-    if words is not None and len(words) > 0:
-        score = words[0].get("score", 0)
-    else:
-        score = 0
+    starts = [word.get("start", np.nan) for word in words]
+    ends = [word.get("end", np.nan) for word in words]
+    phrases = [word.get("word", "") for word in words]
+    scores = [word.get("score", 0) for word in words]
+    speakers = [segment_info.get("speaker", "no_speaker") for _ in words]
 
-    speaker = segment_info.get("speaker", "no_speaker")
-    return pd.Series([start, end, phrase, score, speaker], index=["start", "end", "phrase", "score", "speaker"])
+    return pd.DataFrame({"start": starts, "end": ends, "phrase": phrases, "score": scores, "speaker": speakers})
 
 def whisperx_to_dataframe(json_response):
     """
@@ -398,6 +394,7 @@ def whisperx_to_dataframe(json_response):
         
         segment_infos = json_response["segments"]
         df = pd.DataFrame(segment_infos).apply(extract_data, axis=1)
+        df = pd.concat(df.tolist(), ignore_index=True)
 
         df = df[df["score"] > 0].reset_index(drop=True)
         df = df.dropna(subset=["start", "end"]).reset_index(drop=True)
