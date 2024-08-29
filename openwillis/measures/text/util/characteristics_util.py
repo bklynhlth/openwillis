@@ -1619,11 +1619,18 @@ def get_phrase_coherence(df_list, utterances_filtered, min_coherence_turn_length
 
     # turn-level
     if len(turn_df) > 0:
+
+        ## semantic similarity of current turn to previous turn of the other speaker
+        utterances_texts = utterances_filtered[measures['utterance_text']].values.tolist()
+        utterances_embeddings = sentence_encoder.encode(utterances_texts)
+        similarity_matrix = cosine_similarity(utterances_embeddings)
+
         sentence_tangeniality1_list = []
         sentence_tangeniality2_list = []
         perplexity_list = []
         perplexity_5_list = []
         perplexity_11_list = []
+        turn_to_turn_tangeniality_list = []
         for i in range(len(utterances_filtered)):
             row = utterances_filtered.iloc[i]
             current_speaker = row[measures['speaker_label']]
@@ -1638,6 +1645,7 @@ def get_phrase_coherence(df_list, utterances_filtered, min_coherence_turn_length
                     perplexity_list.append(np.nan)
                     perplexity_5_list.append(np.nan)
                     perplexity_11_list.append(np.nan)
+                    turn_to_turn_tangeniality_list.append(np.nan)
                     continue
                 
                 sentence_tangeniality1, sentence_tangeniality2, perplexity, perplexity_5, perplexity_11 = calculate_phrase_tangeniality(
@@ -1650,30 +1658,12 @@ def get_phrase_coherence(df_list, utterances_filtered, min_coherence_turn_length
                 perplexity_5_list.append(perplexity_5)
                 perplexity_11_list.append(perplexity_11)
 
-        ## semantic similarity of current turn to previous turn of the other speaker
-        utterances_texts = utterances_filtered[measures['utterance_text']].values.tolist()
-        utterances_embeddings = sentence_encoder.encode(utterances_texts)
-        similarity_matrix = cosine_similarity(utterances_embeddings)
-
-        ## get the indices of the turns of our speaker
-        # utterances_speaker = utterances_filtered[utterances_filtered[measures['speaker_label']] == speaker_label]
-        turn_to_turn_tangeniality_list = []
-        for i in range(len(utterances_filtered)):
-            if utterances_filtered.iloc[i][measures['speaker_label']] != speaker_label:
-                continue
-
-            if i == 0:
-                turn_to_turn_tangeniality_list.append(np.nan)
-                continue
-
-            current_turn_words = len(utterances_filtered.iloc[i][measures['words_texts']])
-            previous_turn_words = len(utterances_filtered.iloc[i-1][measures['words_texts']])
-
-            if min(current_turn_words, previous_turn_words) < min_coherence_turn_length:
-                turn_to_turn_tangeniality_list.append(np.nan)
-            else:
-                turn_to_turn_tangeniality_list.append(similarity_matrix[i, i-1])
-
+                if i == 0:
+                    turn_to_turn_tangeniality_list.append(np.nan)
+                elif len(utterances_filtered.iloc[i-1][measures['words_texts']]) < min_coherence_turn_length:
+                    turn_to_turn_tangeniality_list.append(np.nan)
+                else:
+                    turn_to_turn_tangeniality_list.append(similarity_matrix[i, i-1])
 
         turn_df[measures['sentence_tangeniality1']] = sentence_tangeniality1_list
         turn_df[measures['sentence_tangeniality2']] = sentence_tangeniality2_list
