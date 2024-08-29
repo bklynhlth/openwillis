@@ -65,6 +65,7 @@ def create_empty_dataframes(measures):
                                     measures["word_repeat_percentage"], measures["phrase_repeat_percentage"],
                                     measures["sentence_tangeniality1"], measures["sentence_tangeniality2"],
                                     measures["turn_to_turn_tangeniality"], measures["perplexity"],
+                                    measures["perplexity_5"], measures["perplexity_11"],
                                     measures["interrupt_flag"]])
 
     summ_df = pd.DataFrame(
@@ -92,7 +93,8 @@ def create_empty_dataframes(measures):
                 measures["sentence_tangeniality2_mean"], measures["sentence_tangeniality2_var"],
                 measures["turn_to_turn_tangeniality_mean"], measures["turn_to_turn_tangeniality_var"],
                 measures["turn_to_turn_tangeniality_slope"], measures["perplexity_mean"], measures["perplexity_var"],
-                measures["num_interrupts"]])
+                measures["perplexity_5_mean"], measures["perplexity_5_var"], measures["perplexity_11_mean"],
+                measures["perplexity_11_var"], measures["num_interrupts"]])
 
     return word_df, turn_df, summ_df
 
@@ -1363,8 +1365,10 @@ def calculate_perplexity(text, model, tokenizer):
 
     Returns:
     ...........
-    float
+    Tuple of floats
         The calculated pseudo-perplexity of the input text.
+        The calculated pseudo-perplexity of the input text using 2 words before and after the masked token.
+        The calculated pseudo-perplexity of the input text using 5 words before and after the masked token.
 
     ------------------------------------------------------------------------------------------------------
     """
@@ -1379,6 +1383,8 @@ def calculate_perplexity(text, model, tokenizer):
     masked_input_ids = input_ids.clone()
 
     log_probs = []
+    log_probs_5 = []
+    log_probs_11 = []
     # Iterate over each token in the input
     for i in range(input_ids.size(1)):
         # filter so that all input_ids include the masked location +- 256 tokens
@@ -1393,25 +1399,65 @@ def calculate_perplexity(text, model, tokenizer):
 
         masked_input_ids[0, i] = tokenizer.mask_token_id
 
-        input_ids2 = input_ids[:, start:(end+1)]
-        masked_input_ids2 = masked_input_ids[:, start:(end+1)]
+        input_ids_filtered = input_ids[:, start:(end+1)]
+        masked_input_ids_filtered = masked_input_ids[:, start:(end+1)]
         # get new i from that
         idx = i - start
 
+        # use only 2 words before and after the masked token
+        if i < 2:
+            start_5 = 0
+        else:
+            start_5 = i - 2
+        if i > input_ids.size(1) - 2:
+            end_5 = input_ids.size(1)
+        else:
+            end_5 = i + 2
+
+        input_ids_filtered_5 = input_ids[:, start_5:(end_5+1)]
+        masked_input_ids_filtered_5 = masked_input_ids[:, start_5:(end_5+1)]
+        idx_5 = i - start_5
+
+        # use only 5 words before and after the masked token
+        if i < 5:
+            start_11 = 0
+        else:
+            start_11 = i - 5
+        if i > input_ids.size(1) - 5:
+            end_11 = input_ids.size(1)
+        else:
+            end_11 = i + 5
+
+        input_ids_filtered_11 = input_ids[:, start_11:(end_11+1)]
+        masked_input_ids_filtered_11 = masked_input_ids[:, start_11:(end_11+1)]
+        idx_11 = i - start_11
+
         with torch.no_grad():
-            outputs = model(input_ids=masked_input_ids2, labels=input_ids2)
+            outputs = model(input_ids=masked_input_ids_filtered, labels=input_ids_filtered)
+            outputs_5 = model(input_ids=masked_input_ids_filtered_5, labels=input_ids_filtered_5)
+            outputs_11 = model(input_ids=masked_input_ids_filtered_11, labels=input_ids_filtered_11)
 
         # Calculate log probability of the original token
         logit_prob = outputs.logits[0, idx].softmax(dim=0)
         true_log_prob = logit_prob[input_ids[0, i]].log().item()
         log_probs.append(true_log_prob)
 
+        logit_prob_5 = outputs_5.logits[0, idx_5].softmax(dim=0)
+        true_log_prob_5 = logit_prob_5[input_ids[0, i]].log().item()
+        log_probs_5.append(true_log_prob_5)
+
+        logit_prob_11 = outputs_11.logits[0, idx_11].softmax(dim=0)
+        true_log_prob_11 = logit_prob_11[input_ids[0, i]].log().item()
+        log_probs_11.append(true_log_prob_11)
+
         # Unmask the token for the next iteration
         masked_input_ids[0, i] = input_ids[0, i]
 
     # Calculate perplexity
     perplexity = np.exp(-np.mean(log_probs))
-    return perplexity
+    perplexity_5 = np.exp(-np.mean(log_probs_5))
+    perplexity_11 = np.exp(-np.mean(log_probs_11))
+    return perplexity, perplexity_5, perplexity_11
 
 def calculate_phrase_tangeniality(phrases_texts, utterance_text, sentence_encoder, bert, tokenizer):
     """
@@ -1441,6 +1487,10 @@ def calculate_phrase_tangeniality(phrases_texts, utterance_text, sentence_encode
         The semantic similarity of each phrase to the phrase 2 turns before.
     perplexity: float
         The pseudo-perplexity of the turn.
+    perplexity_5: float
+        The pseudo-perplexity of the turn using 2 words before and after the masked token.
+    perplexity_11: float
+        The pseudo-perplexity of the turn using 5 words before and after the masked token.
 
     ------------------------------------------------------------------------------------------------------
     """
@@ -1465,11 +1515,11 @@ def calculate_phrase_tangeniality(phrases_texts, utterance_text, sentence_encode
 
     if tokenizer is not None and bert is not None:
         # calculate pseudo-perplexity of the turn and indicating how predictable the turn is
-        perplexity = calculate_perplexity(utterance_text, bert, tokenizer)
+        perplexity, perplexity_5, perplexity_11 = calculate_perplexity(utterance_text, bert, tokenizer)
     else:
-        perplexity = np.nan
+        perplexity, perplexity_5, perplexity_11 = np.nan, np.nan, np.nan
 
-    return sentence_tangeniality1, sentence_tangeniality2, perplexity
+    return sentence_tangeniality1, sentence_tangeniality2, perplexity, perplexity_5, perplexity_11
 
 def calculate_slope(y):
     """
@@ -1560,6 +1610,8 @@ def get_phrase_coherence(df_list, utterances_filtered, speaker_label, language, 
         sentence_tangeniality1_list = []
         sentence_tangeniality2_list = []
         perplexity_list = []
+        perplexity_5_list = []
+        perplexity_11_list = []
         for i in range(len(utterances_filtered)):
             row = utterances_filtered.iloc[i]
             current_speaker = row[measures['speaker_label']]
@@ -1568,13 +1620,15 @@ def get_phrase_coherence(df_list, utterances_filtered, speaker_label, language, 
                 phrases_texts = row[measures['phrases_texts']]
                 utterance_text = row[measures['utterance_text']]
                 
-                sentence_tangeniality1, sentence_tangeniality2, perplexity = calculate_phrase_tangeniality(
+                sentence_tangeniality1, sentence_tangeniality2, perplexity, perplexity_5, perplexity_11 = calculate_phrase_tangeniality(
                     phrases_texts, utterance_text, sentence_encoder, bert, tokenizer
                 )
                 
                 sentence_tangeniality1_list.append(sentence_tangeniality1)
                 sentence_tangeniality2_list.append(sentence_tangeniality2)
                 perplexity_list.append(perplexity)
+                perplexity_5_list.append(perplexity_5)
+                perplexity_11_list.append(perplexity_11)
 
         ## semantic similarity of current turn to previous turn of the other speaker
         utterances_texts = utterances_filtered[measures['utterance_text']].values.tolist()
@@ -1591,19 +1645,17 @@ def get_phrase_coherence(df_list, utterances_filtered, speaker_label, language, 
         turn_df[measures['sentence_tangeniality1']] = sentence_tangeniality1_list
         turn_df[measures['sentence_tangeniality2']] = sentence_tangeniality2_list
         turn_df[measures['perplexity']] = perplexity_list
+        turn_df[measures['perplexity_5']] = perplexity_5_list
+        turn_df[measures['perplexity_11']] = perplexity_11_list
         turn_df[measures['turn_to_turn_tangeniality']] = turn_to_turn_tangeniality_list
 
 
     # summary-level
     if len(turn_df) > 0:
-        summ_df[measures['sentence_tangeniality1_mean']] = turn_df[measures['sentence_tangeniality1']].mean(skipna=True)
-        summ_df[measures['sentence_tangeniality1_var']] = turn_df[measures['sentence_tangeniality1']].var(skipna=True)
-        summ_df[measures['sentence_tangeniality2_mean']] = turn_df[measures['sentence_tangeniality2']].mean(skipna=True)
-        summ_df[measures['sentence_tangeniality2_var']] = turn_df[measures['sentence_tangeniality2']].var(skipna=True)
-        summ_df[measures['perplexity_mean']] = turn_df[measures['perplexity']].mean(skipna=True)
-        summ_df[measures['perplexity_var']] = turn_df[measures['perplexity']].var(skipna=True)
-        summ_df[measures['turn_to_turn_tangeniality_mean']] = turn_df[measures['turn_to_turn_tangeniality']].mean(skipna=True)
-        summ_df[measures['turn_to_turn_tangeniality_var']] = turn_df[measures['turn_to_turn_tangeniality']].var(skipna=True)
+        for measure in ['sentence_tangeniality1', 'sentence_tangeniality2', 'perplexity', 'perplexity_5', 'perplexity_11', 'turn_to_turn_tangeniality']:
+            summ_df[measures[measure + '_mean']] = turn_df[measures[measure]].mean(skipna=True)
+            summ_df[measures[measure + '_var']] = turn_df[measures[measure]].var(skipna=True)
+
         summ_df[measures['turn_to_turn_tangeniality_slope']] = calculate_slope(turn_df[measures['turn_to_turn_tangeniality']])
 
     df_list = [word_df, turn_df, summ_df]
