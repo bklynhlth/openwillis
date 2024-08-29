@@ -255,7 +255,7 @@ def common_summary_feature(df_summ, json_data, model, speaker_label):
         logger.error("Error in file length calculation")
     return df_summ
 
-def process_transcript(df_list, json_conf, measures, min_turn_length, speaker_label, source, language, option):
+def process_transcript(df_list, json_conf, measures, min_turn_length, min_coherence_turn_length, speaker_label, source, language, option):
     """
     ------------------------------------------------------------------------------------------------------
     
@@ -271,6 +271,8 @@ def process_transcript(df_list, json_conf, measures, min_turn_length, speaker_la
         A dictionary containing the names of the columns in the output dataframes.
     min_turn_length: int
         minimum words required in each turn
+    min_coherence_turn_length: int
+        minimum words required in each turn for coherence calculation
     speaker_label: str
         Speaker label
     source: str
@@ -300,7 +302,7 @@ def process_transcript(df_list, json_conf, measures, min_turn_length, speaker_la
         info = filter_vosk(json_conf, measures)
 
     if len(info[0]) > 0 and len(info[1]) > 0:
-        df_list = cutil.process_language_feature(df_list, info, speaker_label, min_turn_length, language, get_time_columns(source), option, measures)
+        df_list = cutil.process_language_feature(df_list, info, speaker_label, min_turn_length, min_coherence_turn_length, language, get_time_columns(source), option, measures)
     return df_list
 
 def get_time_columns(source):
@@ -326,7 +328,7 @@ def get_time_columns(source):
     else:
         return ["start", "end"]
 
-def speech_characteristics(json_conf, language="en", speaker_label=None, min_turn_length=1, option='coherence'):
+def speech_characteristics(json_conf, language="en", speaker_label=None, min_turn_length=1, min_coherence_turn_length=5, option='coherence'):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -342,6 +344,8 @@ def speech_characteristics(json_conf, language="en", speaker_label=None, min_tur
         Speaker label
     min_turn_length: int
         minimum words required in each turn
+    min_coherence_turn_length: int
+        minimum words required in each turn for coherence calculation
     option: str
         option for which measures to calculate
          can be 'simple' or 'coherence'
@@ -373,13 +377,13 @@ def speech_characteristics(json_conf, language="en", speaker_label=None, min_tur
                 cutil.download_nltk_resources()
 
             if is_whisper_transcribe(json_conf):
-                df_list = process_transcript(df_list, json_conf, measures, min_turn_length, speaker_label, 'whisper', language, option)
+                df_list = process_transcript(df_list, json_conf, measures, min_turn_length, min_coherence_turn_length, speaker_label, 'whisper', language, option)
 
             elif is_amazon_transcribe(json_conf):
-                df_list = process_transcript(df_list, json_conf, measures, min_turn_length, speaker_label, 'aws', language, option)
+                df_list = process_transcript(df_list, json_conf, measures, min_turn_length, min_coherence_turn_length, speaker_label, 'aws', language, option)
 
             else:
-                df_list = process_transcript(df_list, json_conf, measures, min_turn_length, speaker_label, 'vosk', language, option)
+                df_list = process_transcript(df_list, json_conf, measures, min_turn_length, min_coherence_turn_length, speaker_label, 'vosk', language, option)
 
     except Exception as e:
         logger.error(f"Error in Speech Characteristics {e}")

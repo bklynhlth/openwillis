@@ -1280,7 +1280,7 @@ def get_word_coherence_summary(word_df, summ_df, measures):
 
     return summ_df
 
-def get_word_coherence(df_list, utterances_speaker, language, measures):
+def get_word_coherence(df_list, utterances_speaker, min_coherence_turn_length, language, measures):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -1292,6 +1292,8 @@ def get_word_coherence(df_list, utterances_speaker, language, measures):
         List of pandas dataframes.
     utterances_speaker: pandas dataframe
         A dataframe containing the turns extracted from the JSON object for the specified speaker.
+    min_coherence_turn_length: int
+        Minimum number of words in a turn for word coherence analysis.
     language: str
         Language of the transcribed text.
     measures: dict
@@ -1327,6 +1329,14 @@ def get_word_coherence(df_list, utterances_speaker, language, measures):
     }
     for i in range(len(utterances_speaker)):
         row = utterances_speaker.iloc[i]
+
+        if len(row[measures['words_texts']]) < min_coherence_turn_length:
+            word_coherence_list += [np.nan]*len(row[measures['words_texts']])
+            word_coherence_5_list += [np.nan]*len(row[measures['words_texts']])
+            word_coherence_10_list += [np.nan]*len(row[measures['words_texts']])
+            for k in range(2, 11):
+                word_coherence_variability[k] += [np.nan]*len(row[measures['words_texts']])
+            continue
 
         word_coherence, word_coherence_5, word_coherence_10, word_word_variability = get_word_coherence_utterance(row, tokenizer, model, measures)
 
@@ -1551,7 +1561,7 @@ def calculate_slope(y):
     return slope
 
 
-def get_phrase_coherence(df_list, utterances_filtered, speaker_label, language, measures):
+def get_phrase_coherence(df_list, utterances_filtered, min_coherence_turn_length, speaker_label, language, measures):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -1564,6 +1574,8 @@ def get_phrase_coherence(df_list, utterances_filtered, speaker_label, language, 
     utterances_filtered: pandas dataframe
         A dataframe containing the turns extracted from the JSON object
         after filtering out turns with less than min_turn_length words of the specified speaker.
+    min_coherence_turn_length: int
+        Minimum number of words in a turn for word coherence analysis.
     speaker_label: str
         Speaker label
     language: str
@@ -1619,6 +1631,14 @@ def get_phrase_coherence(df_list, utterances_filtered, speaker_label, language, 
             if current_speaker == speaker_label:
                 phrases_texts = row[measures['phrases_texts']]
                 utterance_text = row[measures['utterance_text']]
+
+                if len(row[measures['words_texts']]) < min_coherence_turn_length:
+                    sentence_tangeniality1_list.append(np.nan)
+                    sentence_tangeniality2_list.append(np.nan)
+                    perplexity_list.append(np.nan)
+                    perplexity_5_list.append(np.nan)
+                    perplexity_11_list.append(np.nan)
+                    continue
                 
                 sentence_tangeniality1, sentence_tangeniality2, perplexity, perplexity_5, perplexity_11 = calculate_phrase_tangeniality(
                     phrases_texts, utterance_text, sentence_encoder, bert, tokenizer
@@ -1636,11 +1656,24 @@ def get_phrase_coherence(df_list, utterances_filtered, speaker_label, language, 
         similarity_matrix = cosine_similarity(utterances_embeddings)
 
         ## get the indices of the turns of our speaker
-        speaker_indices = utterances_filtered[utterances_filtered[measures['speaker_label']] == speaker_label].index.tolist()
-        if speaker_indices[0] == 0:
-            turn_to_turn_tangeniality_list = [np.nan] + [similarity_matrix[i, i-1] for i in speaker_indices[1:]]
-        else:
-            turn_to_turn_tangeniality_list = [similarity_matrix[i, i-1] for i in speaker_indices]
+        # utterances_speaker = utterances_filtered[utterances_filtered[measures['speaker_label']] == speaker_label]
+        turn_to_turn_tangeniality_list = []
+        for i in range(len(utterances_filtered)):
+            if utterances_filtered.iloc[i][measures['speaker_label']] != speaker_label:
+                continue
+
+            if i == 0:
+                turn_to_turn_tangeniality_list.append(np.nan)
+                continue
+
+            current_turn_words = len(utterances_filtered.iloc[i][measures['words_texts']])
+            previous_turn_words = len(utterances_filtered.iloc[i-1][measures['words_texts']])
+
+            if min(current_turn_words, previous_turn_words) < min_coherence_turn_length:
+                turn_to_turn_tangeniality_list.append(np.nan)
+            else:
+                turn_to_turn_tangeniality_list.append(similarity_matrix[i, i-1])
+
 
         turn_df[measures['sentence_tangeniality1']] = sentence_tangeniality1_list
         turn_df[measures['sentence_tangeniality2']] = sentence_tangeniality2_list
@@ -1755,7 +1788,7 @@ def create_text_list(utterances_speaker, speaker_label, min_turn_length, measure
 
     return text_list, turn_indices
 
-def process_language_feature(df_list, transcribe_info, speaker_label, min_turn_length, language, time_index, option, measures):
+def process_language_feature(df_list, transcribe_info, speaker_label, min_turn_length, min_coherence_turn_length, language, time_index, option, measures):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -1769,6 +1802,8 @@ def process_language_feature(df_list, transcribe_info, speaker_label, min_turn_l
         transcribed info
     min_turn_length: int
         minimum words required in each turn
+    min_coherence_turn_length: int
+        minimum words required in each turn for coherence analysis
     speaker_label: str
         Speaker label
     time_index: list
@@ -1825,8 +1860,8 @@ def process_language_feature(df_list, transcribe_info, speaker_label, min_turn_l
     df_list = get_repetitions(df_list, utterances_speaker, utterances_speaker_filtered, language, measures)
 
     if option == 'coherence':
-        df_list = get_word_coherence(df_list, utterances_speaker, language, measures)
-        df_list = get_phrase_coherence(df_list, utterances_filtered, speaker_label, language, measures)
+        df_list = get_word_coherence(df_list, utterances_speaker, min_coherence_turn_length, language, measures)
+        df_list = get_phrase_coherence(df_list, utterances_filtered, min_coherence_turn_length, speaker_label, language, measures)
 
     if language in measures["english_langs"]:
         df_list = get_sentiment(df_list, text_list, measures)
