@@ -1049,16 +1049,34 @@ def calculate_repetitions(words_texts, phrases_texts, lemmatizer):
     # lemmatize
     if lemmatizer:
         words_texts = [token.lemma_ for token in lemmatizer(' '.join(words_texts))]
-        phrase_texts = [" ".join([token.lemma_ for token in lemmatizer(p) if token.lemma_ != ' ']) for p in phrases_texts]
+        phrases_texts = [" ".join([token.lemma_ for token in lemmatizer(p) if token.lemma_ != ' ']) for p in phrases_texts]
 
-    # calculate repetitions
-    word_reps = len(words_texts) - len(set(words_texts))
-    phrase_reps = len(phrases_texts) - len(set(phrases_texts))
+    # sliding window of 10 words for repetitions
+    if len(words_texts) <= 10:
+        word_reps = len(words_texts) - len(set(words_texts))
+        word_perc = 100*word_reps/len(words_texts)
+    else:
+        word_reps_list = []
+        for i in range(len(words_texts) - 9):
+            window = words_texts[i:i+10]
+            word_reps_list.append(100*(len(window) - len(set(window))) / len(window))
+        word_perc = np.mean(word_reps_list)
 
     if len(phrases_texts) == 0:
-        return 100*word_reps/len(words_texts), np.nan
+        return word_perc, np.nan
+    
+    # sliding window of 3 phrases for repetitions
+    if len(phrases_texts) <= 3:
+        phrase_reps = len(phrases_texts) - len(set(phrases_texts))
+        phrase_perc = 100*phrase_reps/len(phrases_texts)
+    else:
+        phrase_reps_list = []
+        for i in range(len(phrases_texts) - 3):
+            window = phrases_texts[i:i+3]
+            phrase_reps_list.append(100*(len(window) - len(set(window))) / len(window))
+        phrase_perc = np.mean(phrase_reps_list)
 
-    return 100*word_reps/len(words_texts), 100*phrase_reps/len(phrases_texts)
+    return word_perc, phrase_perc
 
 
 def get_repetitions(df_list, utterances_speaker, utterances_speaker_filtered, language, measures):
