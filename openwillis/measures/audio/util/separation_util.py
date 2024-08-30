@@ -291,12 +291,11 @@ def get_speaker_identification(df1, df2):
                             (merged_df['end'] <= merged_df['end_time'])]
 
     # Groupby and aggregate word and conf
-    grouped_df = filtered_df.groupby(['start_time', 'end_time', 'speaker']).agg({'word': ' '.join, 'conf': 'mean'}).reset_index()
-    grouped_df = grouped_df.rename(columns={'conf': 'confidence', 'speaker': 'speaker_label', 'word': 'content'})
+    filtered_df = filtered_df.rename(columns={'conf': 'confidence', 'speaker': 'speaker_label', 'word': 'content', 'start': 'start_time', 'end': 'end_time'}).iloc[:, 2:]
 
-    grouped_df = grouped_df[["start_time", "end_time", "confidence", "speaker_label", "content"]]
-    speaker_count = grouped_df['speaker_label'].nunique()
-    return grouped_df, speaker_count
+    filtered_df = filtered_df[["start_time", "end_time", "confidence", "speaker_label", "content"]]
+    speaker_count = filtered_df['speaker_label'].nunique()
+    return filtered_df, speaker_count
 
 def transcribe_response_to_dataframe(response):
     """
