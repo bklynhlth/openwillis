@@ -270,7 +270,7 @@ def denoise(audio_signal, silence_threshold, silence_duration, sensitivity):
 
     return audio_signal
 
-def audio_preprocess(audio_in, audio_out):
+def audio_preprocess(audio_in, audio_out, noise_reduction=True):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -282,6 +282,8 @@ def audio_preprocess(audio_in, audio_out):
         path to the input audio file
     audio_out: str
         path to the output audio file
+    noise_reduction : bool
+        whether to perform noise reduction
 
     Returns:
     ...........
@@ -305,7 +307,8 @@ def audio_preprocess(audio_in, audio_out):
         audio_signal = resample(audio_signal, 16000)
         audio_signal = dc_offset(audio_signal)
         audio_signal = volume_normalization(audio_signal, -20)
-        audio_signal = denoise(audio_signal, -30, 0.5, 0.2)
+        if noise_reduction:
+            audio_signal = denoise(audio_signal, -30, 0.5, 0.2)
 
         audio_signal.export(audio_out, format="wav" if audio_out.endswith(".wav") else "mp3")
 
