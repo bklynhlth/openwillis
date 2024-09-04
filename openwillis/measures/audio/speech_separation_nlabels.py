@@ -160,7 +160,7 @@ def speaker_separation_nolabels(filepath, **kwargs):
 
     try:
         if not os.path.exists(filepath) or 'transcript_json' not in kwargs:
-            return signal_label
+            return signal_label, phonation_dict
 
         speaker_df, speaker_count = get_pyannote(input_param, filepath)
         audio_signal = AudioSegment.from_file(file = filepath, format = "wav")

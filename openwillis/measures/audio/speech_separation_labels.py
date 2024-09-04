@@ -82,7 +82,7 @@ def speaker_separation_labels(filepath, transcript_json, extract_phonation=False
 
     try:
         if not os.path.exists(filepath):
-            return signal_label
+            return signal_label, phonation_dict
 
         audio_signal = AudioSegment.from_file(file = filepath, format = "wav")
         if not is_amazon_transcribe(transcript_json):

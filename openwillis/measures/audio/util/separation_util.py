@@ -19,7 +19,7 @@ PHONATIONS = {
     'e': ['eh'],
     'i': [],
     'o': ['oh'],
-    'u': ['oo'],
+    'u': [],
     'm': ['mm', 'hmm', 'hm', 'um']
 }
 
@@ -409,6 +409,36 @@ def whisperx_to_dataframe(json_response):
 
     speakers = df['speaker_label'].nunique()
     return df, speakers
+
+def vosk_to_dataframe(json_response):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    Transcribes(local:vosk) a json response into a pandas DataFrame.
+
+    Parameters:
+    ----------
+    json_response : dict
+        The response object
+
+    Returns:
+    -------
+    df : pandas DataFrame
+        The transcribed data in a DataFrame.
+
+    ------------------------------------------------------------------------------------------------------
+    """
+    df = pd.DataFrame(columns=["start_time", "end_time", "content", "confidence", "speaker_label"])
+        
+    df = pd.DataFrame(json_response)
+
+    df = df[df["conf"] > 0].reset_index(drop=True)
+    df = df.dropna(subset=["start", "end"]).reset_index(drop=True)
+    
+    df = df.rename(columns={"start": "start_time", "end": "end_time", "conf": "confidence", "word": "content"})
+    df['speaker_label'] = 'speaker0'
+
+    return df
 
 def extract_phonation(speaker_df):
     """
