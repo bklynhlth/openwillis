@@ -14,7 +14,14 @@ import string
 logging.basicConfig(level=logging.INFO)
 logger=logging.getLogger()
 
-PHONATIONS = ['uh', 'mm', 'um', 'mhm', 'huh', 'ah', 'oh', 'eh', 'uhhuh', 'uhuh', 'hmm']
+PHONATIONS = {
+    'a': ['ah', 'uh', 'huh'],
+    'e': ['eh'],
+    'i': [],
+    'o': ['oh'],
+    'u': ['oo'],
+    'm': ['mm', 'hmm', 'hm', 'um']
+}
 
 def get_similarity_prob(sentence_embeddings):
     """
@@ -424,7 +431,14 @@ def extract_phonation(speaker_df):
     speaker_df_clean = speaker_df.copy()
     speaker_df_clean['content'] = speaker_df_clean['content'].apply(lambda x: x.translate(str.maketrans('', '', string.punctuation)).lower())
 
-    phonation_df = speaker_df_clean[speaker_df_clean['content'].isin(PHONATIONS)]
+    phonation_df = pd.DataFrame()
+    for phonation in PHONATIONS:
+        phonation_list = PHONATIONS[phonation]
+        phonation_df_temp = speaker_df_clean[speaker_df_clean['content'].isin(phonation_list)]
+        phonation_df_temp['phonation'] = phonation
+
+        phonation_df = pd.concat([phonation_df, phonation_df_temp])
+
     phonation_df = phonation_df[phonation_df['end_time'].astype(float) - phonation_df['start_time'].astype(float) > 0.7]
 
     return phonation_df
@@ -453,7 +467,7 @@ def segment_phonations(audio_signal, phonation_df):
     phonation_df['end_time'] = phonation_df['end_time'].astype(float) * 1000
 
     phonation_dict = {}
-    phonation_counts = {spk: 0 for spk in phonation_df['speaker_label'].unique()}
+    phonation_counts = {spk + ph: 0 for spk in phonation_df['speaker_label'].unique() for ph in phonation_df['phonation'].unique()}
 
     for _, row in phonation_df.iterrows():
         start_time = row['start_time']
@@ -470,7 +484,7 @@ def segment_phonations(audio_signal, phonation_df):
 
         speaker_array = np.array(speaker_audio.get_array_of_samples())
 
-        phonation_dict[f'{speaker_label}_{phonation_counts[speaker_label]}'] = speaker_array
-        phonation_counts[speaker_label] += 1
+        phonation_dict[f"{speaker_label}_{row['phonation']}{phonation_counts[speaker_label+row['phonation']]}"] = speaker_array
+        phonation_counts[speaker_label + row['phonation']] += 1
 
     return phonation_dict
