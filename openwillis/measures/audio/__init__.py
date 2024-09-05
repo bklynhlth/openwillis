@@ -22,4 +22,8 @@ from openwillis.measures.audio.speech_transcribe_vosk import (
     speech_transcription_vosk,
 )
 
-__all__ = ["vocal_acoustics", "speech_transcription_whisper", "speaker_separation", "speaker_separation_cloud", "speech_transcription_aws", "speech_transcription_vosk"]
+from openwillis.measures.audio.speech_preprocess import (
+    preprocess_audio,
+)
+
+__all__ = ["vocal_acoustics", "speech_transcription_whisper", "speaker_separation", "speaker_separation_cloud", "speech_transcription_aws", "speech_transcription_vosk", "preprocess_audio"]
