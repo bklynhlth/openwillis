@@ -304,7 +304,7 @@ def audio_preprocess(audio_in, audio_out, noise_reduction=True):
 
         audio_signal = AudioSegment.from_file(audio_in, format="wav" if audio_in.endswith(".wav") else "mp3")
 
-        audio_signal = resample(audio_signal, 16000)
+        audio_signal = resample(audio_signal, 44100)
         audio_signal = dc_offset(audio_signal)
         audio_signal = volume_normalization(audio_signal, -20)
         if noise_reduction:
