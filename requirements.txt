@@ -21,3 +21,4 @@ boto3==1.26.106
 scipy==1.10.1
 disvoice==0.1.8
 librosa==0.10.1
+spacy==3.7.6
