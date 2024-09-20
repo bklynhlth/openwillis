@@ -3,6 +3,7 @@
 
 # import the required packages
 from openwillis.measures.audio.util import separation_util as sutil
+from openwillis.measures.audio.util import phonation_util as putil
 from pydub import AudioSegment
 
 import os
@@ -52,7 +53,7 @@ def is_whisper_transcribe(json_conf):
                 return True
     return False
 
-def phonation_extraction(filepath, transcript_json):
+def phonation_extraction(filepath, transcript_json, speaker_label=''):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -64,6 +65,8 @@ def phonation_extraction(filepath, transcript_json):
         Path to the input audio file.
     transcript_json : json
         Speech transcription json response.
+    speaker_label : str
+        Speaker label.
 
     Returns:
     ...........
@@ -86,10 +89,13 @@ def phonation_extraction(filepath, transcript_json):
         else:
             speaker_df = sutil.vosk_to_dataframe(transcript_json)
 
-        phonation_df = sutil.extract_phonation(speaker_df)
+        if speaker_label:
+            speaker_df = speaker_df[speaker_df['speaker_label']==speaker_label]
+
+        phonation_df = putil.extract_phonation(speaker_df)
 
         if len(phonation_df)>0:
-            phonation_dict = sutil.segment_phonations(audio_signal, phonation_df)
+            phonation_dict = putil.segment_phonations(audio_signal, phonation_df)
 
     except Exception as e:
         logger.error(f'Error phonation extraction: {e} & File: {filepath}')
