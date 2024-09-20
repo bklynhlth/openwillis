@@ -93,7 +93,6 @@ def read_kwargs(kwargs):
     
     input_param['transcript_json'] = kwargs.get('transcript_json', json.dumps({}))
     input_param['context'] = kwargs.get('context', '')
-    input_param['extract_phonation'] = kwargs.get('extract_phonation', False)
 
     return input_param
 
@@ -138,8 +137,6 @@ def speaker_separation_nolabels(filepath, **kwargs):
         Path to the input audio file.
     transcript_json : json
         Speech transcription json response.
-    extract_phonation : bool
-        A boolean value to extract phonation samples for each speaker.
     hf_token : str
         Access token for HuggingFace to access pre-trained models.
     context : str, optional
@@ -153,30 +150,21 @@ def speaker_separation_nolabels(filepath, **kwargs):
     ------------------------------------------------------------------------------------------------------
     """
     signal_label = {}
-    phonation_dict = {}
     input_param = read_kwargs(kwargs)
 
     measures = get_config()
 
     try:
         if not os.path.exists(filepath) or 'transcript_json' not in kwargs:
-            return signal_label, phonation_dict
+            return signal_label
 
         speaker_df, speaker_count = get_pyannote(input_param, filepath)
         audio_signal = AudioSegment.from_file(file = filepath, format = "wav")
 
-        if input_param['extract_phonation']:
-            phonation_df = sutil.extract_phonation(speaker_df)
-        else:
-            phonation_df = None
-
         if len(speaker_df)>0 and speaker_count>1:
             signal_label = sutil.generate_audio_signal(speaker_df, audio_signal, input_param['context'], measures)
-
-            if input_param['extract_phonation'] and len(phonation_df)>0:
-                phonation_dict = sutil.segment_phonations(audio_signal, phonation_df)
 
     except Exception as e:
         logger.error(f'Error in diard processing: {e} & File: {filepath}')
 
-    return signal_label, phonation_dict
+    return signal_label

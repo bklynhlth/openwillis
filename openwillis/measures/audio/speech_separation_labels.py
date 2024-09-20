@@ -54,7 +54,7 @@ def is_amazon_transcribe(json_conf):
     """
     return "jobName" in json_conf and "results" in json_conf
 
-def speaker_separation_labels(filepath, transcript_json, extract_phonation=False):
+def speaker_separation_labels(filepath, transcript_json):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -66,8 +66,6 @@ def speaker_separation_labels(filepath, transcript_json, extract_phonation=False
         Path to the input audio file.
     transcript_json : json
         Speech transcription json response.
-    extract_phonation : bool
-        A boolean value to extract phonation samples for each speaker.
 
     Returns:
     ...........
@@ -77,31 +75,22 @@ def speaker_separation_labels(filepath, transcript_json, extract_phonation=False
     ------------------------------------------------------------------------------------------------------
     """
     signal_label = {}
-    phonation_dict = {}
     measures = get_config()
 
     try:
         if not os.path.exists(filepath):
-            return signal_label, phonation_dict
+            return signal_label
 
         audio_signal = AudioSegment.from_file(file = filepath, format = "wav")
         if not is_amazon_transcribe(transcript_json):
             speaker_df, speaker_count = sutil.whisperx_to_dataframe(transcript_json)
         else:
             speaker_df, speaker_count = sutil.transcribe_response_to_dataframe(transcript_json)
-
-        if extract_phonation:
-            phonation_df = sutil.extract_phonation(speaker_df)
-        else:
-            phonation_df = None
             
         if len(speaker_df)>0 and speaker_count>1:
             signal_label = sutil.generate_audio_signal(speaker_df , audio_signal, '', measures)
 
-            if extract_phonation and len(phonation_df)>0:
-                phonation_dict = sutil.segment_phonations(audio_signal, phonation_df)
-
     except Exception as e:
         logger.error(f'Error in diard processing: {e} & File: {filepath}')
 
-    return signal_label, phonation_dict
+    return signal_label
