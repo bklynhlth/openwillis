@@ -60,7 +60,8 @@ def create_empty_dataframes(measures):
     turn_df = pd.DataFrame(columns=[measures["turn_pause"], measures["turn_minutes"], measures["turn_words"], 
                                     measures["word_rate"], measures["syllable_rate"], measures["speech_percentage"], 
                                     measures["pause_meandur"], measures["pause_var"], measures["pos"], measures["neg"], 
-                                    measures["neu"], measures["compound"], measures["speech_mattr"],
+                                    measures["neu"], measures["compound"], measures["speech_mattr_5"],
+                                    measures["speech_mattr_10"], measures["speech_mattr_25"], measures["speech_mattr_50"], measures["speech_mattr_100"],
                                     measures["first_person_percentage"], measures["first_person_sentiment_positive"], measures["first_person_sentiment_negative"],
                                     measures["word_repeat_percentage"], measures["phrase_repeat_percentage"],
                                     measures["sentence_tangeniality1"], measures["sentence_tangeniality2"],
@@ -71,8 +72,9 @@ def create_empty_dataframes(measures):
     summ_df = pd.DataFrame(
         columns=[measures["file_length"], measures["speech_minutes"], measures["speech_words"], measures["word_rate"],
                 measures["syllable_rate"], measures["word_pause_mean"], measures["word_pause_var"], 
-                measures["speech_percentage"], measures["pos"], measures["neg"], measures["neu"], measures["compound"], 
-                measures["speech_mattr"], measures["first_person_percentage"], measures["first_person_sentiment_positive"],
+                measures["speech_percentage"], measures["pos"], measures["neg"], measures["neu"], measures["compound"],
+                measures["speech_mattr_5"], measures["speech_mattr_10"], measures["speech_mattr_25"], measures["speech_mattr_50"], measures["speech_mattr_100"],
+                measures["first_person_percentage"], measures["first_person_sentiment_positive"],
                 measures["first_person_sentiment_negative"], measures["first_person_sentiment_overall"],
                 measures["word_repeat_percentage"], measures["phrase_repeat_percentage"],
                 measures["word_coherence_mean"], measures["word_coherence_var"],
@@ -709,7 +711,7 @@ def get_pause_feature(json_conf, df_list, text_list, turn_index, measures, time_
     df_feature = [word_df, turn_df, summ_df]
     return df_feature
 
-def get_mattr(text):
+def get_mattr(text, lemmatizer, window_size=50):
     """
     ------------------------------------------------------------------------------------------------------
     This function calculates the Moving Average Type-Token Ratio (MATTR)
@@ -720,6 +722,10 @@ def get_mattr(text):
     ...........
     text : str
         The input text to be analyzed.
+    lemmatizer : spacy lemmatizer
+        The lemmatizer to be used in the calculation.
+    window_size : int
+        The size of the window to be used in the calculation.
 
     Returns:
     ...........
@@ -728,14 +734,17 @@ def get_mattr(text):
 
     ------------------------------------------------------------------------------------------------------
     """
-    word = nltk.word_tokenize(text)
-    filter_punc = list(value for value in word if value not in [".", "!", "?"])
-    filter_punc = " ".join(filter_punc)
+
+    words = nltk.word_tokenize(text)
+    words = [w.translate(str.maketrans('', '', string.punctuation)).lower() for w in words]
+    words = [w for w in words if w != '']
+    words_texts = [token.lemma_ for token in lemmatizer(' '.join(words))]
+    filter_punc = " ".join(words_texts)
     mattr = np.nan
 
     lex_richness = LexicalRichness(filter_punc)
     if lex_richness.words > 0:
-        mattr = lex_richness.mattr(window_size=lex_richness.words)
+        mattr = lex_richness.mattr(window_size=min(window_size, lex_richness.words))
 
     return mattr
 
@@ -994,7 +1003,8 @@ def get_sentiment(df_list, text_list, measures):
     ------------------------------------------------------------------------------------------------------
     """
     word_df, turn_df, summ_df = df_list
-    word_list, turn_list, full_text = text_list
+    _, turn_list, full_text = text_list
+    lemmatizer = spacy.load('en_core_web_sm')
 
     sentiment = SentimentIntensityAnalyzer()
     cols = [measures["neg"], measures["neu"], measures["pos"], measures["compound"], measures["speech_mattr"]]
@@ -1003,21 +1013,21 @@ def get_sentiment(df_list, text_list, measures):
         try:
             
             sentiment_dict = sentiment.polarity_scores(u)
-            mattr = get_mattr(u)
-            turn_df.loc[idx, cols] = list(sentiment_dict.values()) + [mattr]
+            mattrs = [get_mattr(u, lemmatizer, window_size=ws) for ws in [5, 10, 25, 50, 100]]
+            turn_df.loc[idx, cols] = list(sentiment_dict.values()) + mattrs
             
         except Exception as e:
             logger.error(f"Error in sentiment analysis: {e}")
             continue
             
     sentiment_dict = sentiment.polarity_scores(full_text)
-    mattr = get_mattr(full_text)
+    mattrs = [get_mattr(full_text, lemmatizer, window_size=ws) for ws in [5, 10, 25, 50, 100]]
 
-    summ_df.loc[0, cols] = list(sentiment_dict.values()) + [mattr]
+    summ_df.loc[0, cols] = list(sentiment_dict.values()) + mattrs
     df_list = [word_df, turn_df, summ_df]
     return df_list
 
-def calculate_repetitions(words_texts, phrases_texts, lemmatizer):
+def calculate_repetitions(words_texts, phrases_texts):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -1029,8 +1039,6 @@ def calculate_repetitions(words_texts, phrases_texts, lemmatizer):
         List of transcribed text at the word level.
     phrases_texts: list
         List of transcribed text at the phrase level.
-    lemmatizer: spacy object or None
-        A lemmatizer object.
 
     Returns:
     ...........
@@ -1048,11 +1056,6 @@ def calculate_repetitions(words_texts, phrases_texts, lemmatizer):
     # remove empty strings
     words_texts = [word for word in words_texts if word != '']
     phrases_texts = [phrase for phrase in phrases_texts if phrase != '']
-
-    # lemmatize
-    if lemmatizer:
-        words_texts = [token.lemma_ for token in lemmatizer(' '.join(words_texts))]
-        phrases_texts = [" ".join([token.lemma_ for token in lemmatizer(p) if token.lemma_ != ' ']) for p in phrases_texts]
 
     # sliding window of 10 words for repetitions
     if len(words_texts) <= 10:
@@ -1111,10 +1114,6 @@ def get_repetitions(df_list, utterances_speaker, utterances_speaker_filtered, la
     
     word_df, turn_df, summ_df = df_list
 
-    lemmatizer = None
-    if language in measures["english_langs"]:
-        lemmatizer = spacy.load('en_core_web_sm')        
-
     # turn-level
     if len(turn_df) > 0:
         for i in range(len(utterances_speaker_filtered)):
@@ -1122,7 +1121,7 @@ def get_repetitions(df_list, utterances_speaker, utterances_speaker_filtered, la
             words_texts = row[measures['words_texts']]
             phrases_texts = row[measures['phrases_texts']]
 
-            word_reps_perc, phrase_reps_perc = calculate_repetitions(words_texts, phrases_texts, lemmatizer)
+            word_reps_perc, phrase_reps_perc = calculate_repetitions(words_texts, phrases_texts)
 
             turn_df.loc[i, measures['word_repeat_percentage']] = word_reps_perc
             turn_df.loc[i, measures['phrase_repeat_percentage']] = phrase_reps_perc
@@ -1135,7 +1134,7 @@ def get_repetitions(df_list, utterances_speaker, utterances_speaker_filtered, la
         words_texts = [word for words in utterances_speaker[measures['words_texts']] for word in words]
         phrases_texts = [phrase for phrases in utterances_speaker[measures['phrases_texts']] for phrase in phrases]
 
-        word_reps_perc, phrase_reps_perc = calculate_repetitions(words_texts, phrases_texts, lemmatizer)
+        word_reps_perc, phrase_reps_perc = calculate_repetitions(words_texts, phrases_texts)
 
         summ_df[measures['word_repeat_percentage']] = word_reps_perc
         summ_df[measures['phrase_repeat_percentage']] = phrase_reps_perc
