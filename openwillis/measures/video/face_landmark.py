@@ -8,11 +8,14 @@ import cv2
 import json
 import os
 import math
+import logging
 
+import tensorflow as tf
 import mediapipe as mp
 from PIL import Image
 from protobuf_to_dict import protobuf_to_dict
-import logging
+
+from openwillis.measures.video.util.crop_utils import crop_img
 
 logging.basicConfig(level=logging.INFO)
 logger=logging.getLogger()
@@ -43,6 +46,7 @@ def get_config(filepath, json_file):
     file = open(measure_path)
     measures = json.load(file)
     return measures
+
 
 def init_facemesh():
     """
@@ -156,14 +160,56 @@ def filter_coord(result):
 
     if len(keypoints)>0:
         df_x = filter_landmarks('x', keypoints)
-
         df_y = filter_landmarks('y', keypoints)
         df_z = filter_landmarks('z', keypoints)
         df_coord = pd.concat([df_x, df_y, df_z], axis=1)
 
     return df_coord
 
-def run_facemesh(path):
+def process_and_format_face_mesh(img, face_mesh, df_common):
+    """
+    Process the given image using the face_mesh model and format the resulting face landmarks.
+
+    Args:
+        img (numpy.ndarray): The input image.
+        face_mesh: The face_mesh model.
+        df_common (pandas.DataFrame): The common dataframe.
+
+    Returns:
+        pandas.DataFrame: The formatted dataframe containing the face landmarks.
+    """
+    result = face_mesh.process(img)
+    df_coord = filter_coord(result)
+    df_landmark = pd.concat([df_common, df_coord], axis=1)
+    return df_landmark
+
+def crop_and_process_face_mesh(img, face_mesh, df_common, bbox, frame):
+    """
+    Crop and process the face mesh on the given image.
+
+    Args:
+        img (numpy.ndarray): The input image.
+        face_mesh (object): The face mesh object.
+        df_common (pd.Dataframe): The common dataframe.
+        bbox (dict): The bounding box coordinates of the face.
+        frame (int): The frame index
+
+    Returns:
+        pandas.DataFrame: The processed face landmarks dataframe.
+    """
+    if bbox:
+        cropped_img = crop_img(img, bbox)
+        df_landmark = process_and_format_face_mesh(
+            cropped_img,
+            face_mesh,
+            df_common
+        )
+    else:
+        df_landmark = get_undected_markers(frame)
+    return df_landmark
+
+
+def run_facemesh(path, bbox_list=[]):
     """
     ---------------------------------------------------------------------------------------------------
 
@@ -189,6 +235,13 @@ def run_facemesh(path):
     try:
 
         cap = cv2.VideoCapture(path)
+        num_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        len_bbox_list = len(bbox_list)
+        print(num_frames, len_bbox_list)
+
+        if (len_bbox_list>0) & (num_frames != len_bbox_list):
+            raise ValueError('Number of frames in video and number of bounding boxes do not match')
+        
         face_mesh = init_facemesh()
 
         while True:
@@ -197,21 +250,33 @@ def run_facemesh(path):
                 ret_type, img = cap.read()
                 if ret_type is not True:
                     break
-
                 df_common = pd.DataFrame([[frame]], columns=['frame'])
                 img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
-                result = face_mesh.process(img_rgb)
-                df_coord = filter_coord(result)
+                if len_bbox_list==0:
 
-                frame +=1
-                df_landmark = pd.concat([df_common, df_coord], axis=1)
-                df_list.append(df_landmark)
+                    df_landmark = process_and_format_face_mesh(
+                        img_rgb,
+                        face_mesh,
+                        df_common
+                    )
+                else:
+                    
+                    bbox = bbox_list[frame]
+                    df_landmark = crop_and_process_face_mesh(
+                        img_rgb,
+                        face_mesh,
+                        df_common,
+                        bbox,
+                        frame
+                    )
 
             except Exception as e:
+                print(e,frame)
                 df_landmark = get_undected_markers(frame)
-                df_list.append(df_landmark)
-                frame +=1
+
+            df_list.append(df_landmark)
+            frame +=1
 
     except Exception as e:
         logger.error(f'Face not detected by mediapipe file: {path} & Error: {e}')
@@ -251,7 +316,7 @@ def get_undected_markers(frame):
     df_landmark = pd.concat([df_common, df_coord], axis=1)
     return df_landmark
 
-def get_landmarks(path, error_info):
+def get_landmarks(path, error_info,bbox_list=[]):
     """
     ---------------------------------------------------------------------------------------------------
 
@@ -273,7 +338,7 @@ def get_landmarks(path, error_info):
     ---------------------------------------------------------------------------------------------------
     """
 
-    landmark_list = run_facemesh(path)
+    landmark_list = run_facemesh(path,bbox_list=bbox_list)
 
     if len(landmark_list)>0:
         df_landmark = pd.concat(landmark_list).reset_index(drop=True)
@@ -429,7 +494,7 @@ def get_mouth_openness(df, measures):
 
     return mouth_openness
 
-def baseline(base_path):
+def baseline(base_path, bbox_list=[]):
     """
     ---------------------------------------------------------------------------------------------------
 
@@ -449,7 +514,7 @@ def baseline(base_path):
     ---------------------------------------------------------------------------------------------------
     """
 
-    base_landmark = get_landmarks(base_path, 'baseline')
+    base_landmark = get_landmarks(base_path, 'baseline',bbox_list=bbox_list)
     disp_base_df = get_distance(base_landmark)
 
     disp_base_df['overall'] = pd.DataFrame(disp_base_df.mean(axis=1))
@@ -483,7 +548,7 @@ def get_empty_dataframe():
     empty_df = pd.DataFrame(columns=columns)
     return empty_df
 
-def get_displacement(lmk_df, base_path, measures):
+def get_displacement(lmk_df, base_path, measures,base_bbox_list=[]):
     """
     ---------------------------------------------------------------------------------------------------
 
@@ -518,7 +583,7 @@ def get_displacement(lmk_df, base_path, measures):
             disp_actual_df['overall'] = pd.DataFrame(disp_actual_df.mean(axis=1))
 
             if os.path.exists(base_path):
-                disp_base_df = baseline(base_path)
+                disp_base_df = baseline(base_path,bbox_list=base_bbox_list)
                 check_na = disp_base_df.iloc[:,1:].isna().all().all()
 
                 if len(disp_base_df)> 0 and not check_na:
@@ -601,7 +666,80 @@ def get_summary(df):
         df_summ = pd.concat([df_mean, df_std], axis =1).reset_index(drop=True)
     return df_summ
 
-def facial_expressivity(filepath, baseline_filepath=''):
+def get_vertices_for_col(df,col_name):
+    """
+    Retrieves the x, y, and z columns for a given column name from a DataFrame.
+
+    Parameters:
+    df (DataFrame): The DataFrame containing the columns.
+    col_name (str): The name of the column.
+
+    Returns:
+    x_col (Series): The x column.
+    y_col (Series): The y column.
+    z_col (Series): The z column.
+    """
+    x_col = df[f'{col_name}_x']
+    y_col = df[f'{col_name}_y']
+    z_col = df[f'{col_name}_z']
+
+    return x_col, y_col, z_col
+
+
+# Adjusted function with performance improvement
+def normalize_face_landmarks(
+    df, 
+    nose_tip = 'lmk001',
+    left_eye = 'lmk144',
+    right_eye = 'lmk373'
+):
+    # Extract the x, y, z coordinates of the key points
+    
+    left_eye_x, left_eye_y, left_eye_z = get_vertices_for_col(df,left_eye)
+    right_eye_x, right_eye_y, right_eye_z = get_vertices_for_col(df,right_eye)
+    # Scale based on the distance between the eye
+    eye_distance = np.sqrt(
+        (right_eye_x - left_eye_x)**2 +
+         (right_eye_y - left_eye_y)**2 +
+         (right_eye_z - left_eye_z)**2
+    )
+
+    # ok so right now scaling factor is a based on an individuals
+    # average face which will vary from person to person and based on how far individuals
+    # are from the camera - I think we'll want to standardize more strongly
+    # the problem is that it makes it hard for faces with different geometries
+    # to be compared - so we'll need to think about how to handle that
+    # but it could be someting like you preserve width to height ratios
+    # then stanardize to one of them so you keep things somewhat consistent
+    scaling_factor = eye_distance / np.mean(eye_distance)
+
+
+    nose_x, nose_y, nose_z = get_vertices_for_col(df,nose_tip)
+    # Center the landmarks by translating them so the nose is at the origin
+    norm_data = {}
+    for axis in ['x', 'y', 'z']:
+        for i in range(1, 469):
+            col_name = f'lmk{str(i).zfill(3)}_{axis}'
+            norm_data[col_name] = df[col_name] - df[f'{nose_tip}_{axis}']
+    
+    # right now the orientation is sort of the opposite of what you'd expect
+    # negative is up and positive is down on the y axis
+    norm_df = pd.DataFrame(norm_data)
+    
+    # Normalize relative to the average face size
+    norm_df = norm_df.divide(scaling_factor, axis=0)
+
+    norm_df['frame']=df['frame']
+
+    return norm_df
+
+def facial_expressivity(
+    filepath,
+    baseline_filepath='',
+    bbox_list=[],
+    base_bbox_list=[],
+    normalize=True
+):
     """
     ---------------------------------------------------------------------------------------------------
 
@@ -644,8 +782,10 @@ def facial_expressivity(filepath, baseline_filepath=''):
     config = get_config(os.path.abspath(__file__), "facial.json")
 
     try:
-        df_landmark = get_landmarks(filepath, 'input')
-        df_disp = get_displacement(df_landmark, baseline_filepath, config)
+        df_landmark = get_landmarks(filepath, 'input',bbox_list=bbox_list)
+        if normalize:
+            df_landmark = normalize_face_landmarks(df_landmark)
+        df_disp = get_displacement(df_landmark, baseline_filepath, config,base_bbox_list=base_bbox_list)
 
         # use mouth height to calculate mouth openness
         df_disp['mouth_openness'] = get_mouth_openness(df_landmark, config)
