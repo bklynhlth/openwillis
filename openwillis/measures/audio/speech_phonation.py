@@ -236,6 +236,10 @@ def phonations_acoustics(audio_path, transcript_json, speaker_label=''):
 
         # summarize the phonation acoustics into dfs
         summ_df = phonations_df.groupby(measures['phonation_type']).mean().reset_index()
+        # clear the temp directory
+        for file in os.listdir(temp_dir):
+            os.remove(os.path.join(temp_dir, file))
+        os.rmdir(temp_dir)
     
     except Exception as e:
         logger.error(f'Error in phonation acoustic calculation- file: {audio_path} & Error: {e}')
