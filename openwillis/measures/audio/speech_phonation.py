@@ -141,6 +141,39 @@ def volume_normalization(audio_signal, target_dBFS):
     audio_signal = audio_signal.apply_gain(gain_adjustment)
     return audio_signal
 
+def clean_acoustic_df(df, file, duration):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    This function cleans the acoustic dataframe.
+
+    Parameters:
+    ...........
+    df : pandas.DataFrame
+        input dataframe
+    file : str
+        file name
+    duration : float
+        duration of the audio signal in seconds
+
+    Returns:
+    ...........
+    pandas.DataFrame
+        cleaned dataframe
+
+    ------------------------------------------------------------------------------------------------------
+    """
+    df['phonation_type'] = file.split('_')[-1][0]
+    df = df[['phonation_type'] + [col for col in df.columns if col != 'phonation_type']]
+    df['duration'] = duration
+
+    # remove unused columns
+    ## pause related measures
+    for col in ['spir', 'dur_med', 'dur_mad']:
+        if col in df.columns:
+            df = df.drop(col, axis=1)
+
+    return df
 
 def phonations_acoustics(audio_path, transcript_json, speaker_label=''):
     """
@@ -191,9 +224,7 @@ def phonations_acoustics(audio_path, transcript_json, speaker_label=''):
 
             # compute advanced vocal acoustics measures
             _, df = vocal_acoustics(os.path.join(temp_dir, file), option='advanced')
-            df['phonation_type'] = file.split('_')[-1][0]
-            df = df[['phonation_type'] + [col for col in df.columns if col != 'phonation_type']]
-            df['duration'] = audio_signal.duration_seconds
+            df = clean_acoustic_df(df, audio_signal.duration_seconds)
 
             phonations_df = pd.concat([phonations_df, df])
 
