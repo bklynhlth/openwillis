@@ -2,12 +2,16 @@
 # website:   http://www.bklynhlth.com
 
 # import the required packages
-from openwillis.measures.audio.util import separation_util as sutil
-from openwillis.measures.audio.util import phonation_util as putil
-from pydub import AudioSegment
-
+import tempfile
 import os
 import logging
+
+from openwillis.measures.audio.util import separation_util as sutil
+from openwillis.measures.audio.util import phonation_util as putil
+from openwillis.measures.audio.acoustic import vocal_acoustics
+from openwillis.measures.commons.common import to_audio
+from pydub import AudioSegment
+import pandas as pd
 
 logging.basicConfig(level=logging.INFO)
 logger=logging.getLogger()
@@ -91,6 +95,11 @@ def phonation_extraction(filepath, transcript_json, speaker_label=''):
 
         if speaker_label:
             speaker_df = speaker_df[speaker_df['speaker_label']==speaker_label]
+            if len(speaker_df)==0:
+                raise Exception(f'Speaker label {speaker_label} not found in the transcript')
+        else:
+            if speaker_df['speaker_label'].unique().shape[0]>1:
+                raise Exception('Multiple speakers found in the transcript. Please provide a speaker label')
 
         phonation_df = putil.extract_phonation(speaker_df)
 
@@ -101,3 +110,96 @@ def phonation_extraction(filepath, transcript_json, speaker_label=''):
         logger.error(f'Error phonation extraction: {e} & File: {filepath}')
 
     return phonation_dict
+
+def volume_normalization(audio_signal, target_dBFS):
+    """
+    ------------------------------------------------------------------------------------------------------
+    
+    Normalizes the volume of the audio signal to the target dBFS.
+    
+    Parameters:
+    ...........
+    audio_signal : pydub.AudioSegment
+        input audio signal
+    target_dBFS : float
+        target dBFS
+        
+    Returns:
+    ...........
+    pydub.AudioSegment
+        normalized audio signal
+
+    ------------------------------------------------------------------------------------------------------
+    """
+
+    headroom = -audio_signal.max_dBFS
+    gain_adjustment = target_dBFS - audio_signal.dBFS
+
+    if gain_adjustment > headroom:
+        gain_adjustment = headroom
+
+    audio_signal = audio_signal.apply_gain(gain_adjustment)
+    return audio_signal
+
+
+def phonations_acoustics(audio_path, transcript_json, speaker_label=''):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    This function extracts phonation acoustics from the audio signal based on the transcripted information,
+     then computes advanced vocal acoustics measures.
+
+    Parameters:
+    ...........
+    audio_path : str
+        Path to the input audio file.
+    transcript_json : json
+        Speech transcription json response.
+    speaker_label : str
+        Speaker label.
+
+    Returns:
+    ...........
+    phonations_df : pandas.DataFrame
+        A pandas dataframe containing the phonation-level measures.
+    summ_df : pandas.DataFrame
+        A pandas dataframe containing the summarized phonation acoustics measures.
+
+    ------------------------------------------------------------------------------------------------------
+    """
+
+    phonations_df, summ_df = pd.DataFrame(), pd.DataFrame()
+
+    try:
+        if not os.path.exists(audio_path) or not transcript_json:
+            return phonations_df, summ_df
+
+        # extract phonation segments
+        phonation_dict = phonation_extraction(audio_path, transcript_json, speaker_label)
+        if not phonation_dict:
+            return phonations_df, summ_df
+
+        # save phonation segments
+        temp_dir = tempfile.mkdtemp()
+        to_audio(audio_path, phonation_dict, temp_dir)
+
+        for file in os.listdir(temp_dir):
+            # standardize volume level
+            audio_signal = AudioSegment.from_file(file = os.path.join(temp_dir, file), format = "wav")
+            audio_signal = volume_normalization(audio_signal, -20)
+            audio_signal.export(file, format="wav")
+
+            # compute advanced vocal acoustics measures
+            _, df = vocal_acoustics(os.path.join(temp_dir, file), option='advanced')
+            df['phonation_type'] = file.split('_')[-1][0]
+            df['duration'] = audio_signal.duration_seconds
+
+            phonations_df = pd.concat([phonations_df, df])
+
+        # summarize the phonation acoustics into dfs
+        summ_df = phonations_df.groupby('phonation_type').mean().reset_index()
+    
+    except Exception as e:
+        logger.error(f'Error in phonation acoustic calculation- file: {audio_path} & Error: {e}')
+
+    return phonations_df, summ_df
