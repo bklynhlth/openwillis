@@ -226,7 +226,7 @@ def phonations_acoustics(audio_path, transcript_json, speaker_label=''):
             # standardize volume level
             audio_signal = AudioSegment.from_file(file = os.path.join(temp_dir, file), format = "wav")
             audio_signal = volume_normalization(audio_signal, -20)
-            audio_signal.export(file, format="wav")
+            audio_signal.export(os.path.join(temp_dir, file), format="wav")
 
             # compute advanced vocal acoustics measures
             _, df = vocal_acoustics(os.path.join(temp_dir, file), option='advanced')
