@@ -9,7 +9,6 @@ import logging
 
 from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
-import string
 
 logging.basicConfig(level=logging.INFO)
 logger=logging.getLogger()
