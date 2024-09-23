@@ -4,6 +4,7 @@
 # import the required packages
 import tempfile
 import os
+import json
 import logging
 
 from openwillis.measures.audio.util import separation_util as sutil
@@ -141,7 +142,7 @@ def volume_normalization(audio_signal, target_dBFS):
     audio_signal = audio_signal.apply_gain(gain_adjustment)
     return audio_signal
 
-def clean_acoustic_df(df, file, duration):
+def clean_acoustic_df(df, file, duration, measures):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -155,6 +156,8 @@ def clean_acoustic_df(df, file, duration):
         file name
     duration : float
         duration of the audio signal in seconds
+    measures : dict
+        column names configuration
 
     Returns:
     ...........
@@ -163,13 +166,13 @@ def clean_acoustic_df(df, file, duration):
 
     ------------------------------------------------------------------------------------------------------
     """
-    df['phonation_type'] = file.split('_')[-1][0]
-    df = df[['phonation_type'] + [col for col in df.columns if col != 'phonation_type']]
-    df['duration'] = duration
+    df[measures['phonation_type']] = file.split('_')[-1][0]
+    df = df[[measures['phonation_type']] + [col for col in df.columns if col != measures['phonation_type']]]
+    df[measures['duration']] = duration
 
     # remove unused columns
     ## pause related measures
-    for col in ['spir', 'dur_med', 'dur_mad']:
+    for col in [measures['spir'], measures['pause_meddur'], measures['pause_maddur']]:
         if col in df.columns:
             df = df.drop(col, axis=1)
 
@@ -202,6 +205,9 @@ def phonations_acoustics(audio_path, transcript_json, speaker_label=''):
     """
 
     phonations_df, summ_df = pd.DataFrame(), pd.DataFrame()
+    measure_path = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), './config/acoustic.json'))
+    file = open(measure_path)
+    measures = json.load(file)
 
     try:
         if not os.path.exists(audio_path) or not transcript_json:
@@ -224,12 +230,12 @@ def phonations_acoustics(audio_path, transcript_json, speaker_label=''):
 
             # compute advanced vocal acoustics measures
             _, df = vocal_acoustics(os.path.join(temp_dir, file), option='advanced')
-            df = clean_acoustic_df(df, file, audio_signal.duration_seconds)
+            df = clean_acoustic_df(df, file, audio_signal.duration_seconds, measures)
 
             phonations_df = pd.concat([phonations_df, df])
 
         # summarize the phonation acoustics into dfs
-        summ_df = phonations_df.groupby('phonation_type').mean().reset_index()
+        summ_df = phonations_df.groupby(measures['phonation_type']).mean().reset_index()
     
     except Exception as e:
         logger.error(f'Error in phonation acoustic calculation- file: {audio_path} & Error: {e}')
