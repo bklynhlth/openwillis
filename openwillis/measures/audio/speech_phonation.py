@@ -172,7 +172,7 @@ def clean_acoustic_df(df, file, duration, measures):
 
     # remove unused columns
     ## pause related measures
-    for col in [measures['spir'], measures['pause_meddur'], measures['pause_maddur']]:
+    for col in [measures['spir'], measures['pause_meddur'], measures['pause_maddur'], measures['silence_ratio']]:
         if col in df.columns:
             df = df.drop(col, axis=1)
 
