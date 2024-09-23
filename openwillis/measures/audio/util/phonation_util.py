@@ -10,9 +10,6 @@ import pandas as pd
 import numpy as np
 import logging
 
-import os
-import tempfile
-import soundfile as sf
 import string
 
 logging.basicConfig(level=logging.INFO)
