@@ -224,7 +224,7 @@ def phonations_acoustics(audio_path, transcript_json, speaker_label=''):
 
             # compute advanced vocal acoustics measures
             _, df = vocal_acoustics(os.path.join(temp_dir, file), option='advanced')
-            df = clean_acoustic_df(df, audio_signal.duration_seconds)
+            df = clean_acoustic_df(df, file, audio_signal.duration_seconds)
 
             phonations_df = pd.concat([phonations_df, df])
 
