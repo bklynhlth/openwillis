@@ -172,7 +172,7 @@ def phonations_acoustics(audio_path, transcript_json, speaker_label=''):
 
     try:
         if not os.path.exists(audio_path) or not transcript_json:
-            return phonations_df, summ_df
+            raise Exception('Audio file or transcript json not found')
 
         # extract phonation segments
         phonation_dict = phonation_extraction(audio_path, transcript_json, speaker_label)
@@ -192,6 +192,7 @@ def phonations_acoustics(audio_path, transcript_json, speaker_label=''):
             # compute advanced vocal acoustics measures
             _, df = vocal_acoustics(os.path.join(temp_dir, file), option='advanced')
             df['phonation_type'] = file.split('_')[-1][0]
+            df = df[['phonation_type'] + [col for col in df.columns if col != 'phonation_type']]
             df['duration'] = audio_signal.duration_seconds
 
             phonations_df = pd.concat([phonations_df, df])
