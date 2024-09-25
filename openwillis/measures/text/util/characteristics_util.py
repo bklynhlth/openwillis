@@ -1874,15 +1874,33 @@ def process_language_feature(df_list, transcribe_info, speaker_label, min_turn_l
     else:
         utterances_filtered = utterances.copy()
 
-    df_list = get_pause_feature(json_conf_speaker, df_list, text_list, turn_indices, measures, time_index, language)
-    df_list = get_repetitions(df_list, utterances_speaker, utterances_speaker_filtered, language, measures)
+    try:
+        df_list = get_pause_feature(json_conf_speaker, df_list, text_list, turn_indices, measures, time_index, language)
+    except Exception as e:
+        logger.error(f"Error in pause feature calculation: {e}")
+    try:
+        df_list = get_repetitions(df_list, utterances_speaker, utterances_speaker_filtered, language, measures)
+    except Exception as e:
+        logger.error(f"Error in repetitions feature calculation: {e}")
 
     if option == 'coherence':
-        df_list = get_word_coherence(df_list, utterances_speaker, min_coherence_turn_length, language, measures)
-        df_list = get_phrase_coherence(df_list, utterances_filtered, min_coherence_turn_length, speaker_label, language, measures)
+        try:
+            df_list = get_word_coherence(df_list, utterances_speaker, min_coherence_turn_length, language, measures)
+        except Exception as e:
+            logger.error(f"Error in word coherence feature calculation: {e}")
+        try:
+            df_list = get_phrase_coherence(df_list, utterances_filtered, min_coherence_turn_length, speaker_label, language, measures)
+        except Exception as e:
+            logger.error(f"Error in phrase coherence feature calculation: {e}")
 
     if language in measures["english_langs"]:
-        df_list = get_sentiment(df_list, text_list, measures)
-        df_list = get_pos_tag(df_list, text_list, measures)
+        try:
+            df_list = get_sentiment(df_list, text_list, measures)
+        except Exception as e:
+            logger.error(f"Error in sentiment feature calculation: {e}")
+        try:
+            df_list = get_pos_tag(df_list, text_list, measures)
+        except Exception as e:
+            logger.error(f"Error in pos tag feature calculation: {e}")
 
     return df_list
