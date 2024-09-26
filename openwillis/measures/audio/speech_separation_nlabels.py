@@ -166,7 +166,8 @@ def speaker_separation_nolabels(filepath, **kwargs):
         audio_signal = AudioSegment.from_file(file = filepath, format = "wav")
 
         if len(speaker_df)>0 and speaker_count>1:
-            signal_label = sutil.generate_audio_signal(speaker_df, audio_signal, input_param['context'], measures)
+            combined_df = sutil.combine_turns(speaker_df)
+            signal_label = sutil.generate_audio_signal(combined_df, audio_signal, input_param['context'], measures)
 
             if input_param['volume_normalization']:
                 if type(input_param['volume_normalization']) != int or input_param['volume_normalization'] < -60 or input_param['volume_normalization'] > 0:

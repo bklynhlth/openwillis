@@ -501,3 +501,35 @@ def adjust_volume(audio_path, signal_label, volume_level):
     os.rmdir(temp_dir)
 
     return signal_label
+
+def combine_turns(df):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    Combines consecutive words of the same speaker into a single turn.
+
+    Parameters:
+    ...........
+    df : pandas.DataFrame
+        The dataframe containing the speaker diarization information.
+
+    Returns:
+    ...........
+    combined_df : pandas.DataFrame
+        The dataframe with combined turns.
+
+    ------------------------------------------------------------------------------------------------------
+    """
+    change_mask = df['speaker_label'] != df['speaker_label'].shift()
+    
+    groups = np.cumsum(change_mask)
+    
+    combined_df = df.groupby(groups).agg({
+        'start_time': 'first',
+        'end_time': 'last',
+        'confidence': 'mean',
+        'speaker_label': 'first',
+        'content': ' '.join
+    }).reset_index(drop=True)
+    
+    return combined_df
