@@ -5,6 +5,7 @@
 import json
 import os
 from pydub import AudioSegment
+import numpy as np
 
 def make_dir(dir_name):
     """
@@ -53,6 +54,45 @@ def to_audio(filepath, speaker_dict, output_dir):
 
         output_file = os.path.join(output_dir, file_name + '_' + key + '.wav')
         spk_signal.export(output_file, format="wav")
+
+def from_audio(audio_dir):
+    """
+    ------------------------------------------------------------------------------------------------------
+    
+    Load multiple speaker-specific audio files and reconstruct a dictionary with speaker labels as keys 
+    and corresponding segments (NumPy arrays) as values.
+
+    Parameters:
+    ----------
+        audio_dir : str
+            The directory containing the speaker-specific audio files.
+
+    Returns:
+    ----------
+        speaker_dict : dict
+            A dictionary with speaker labels as keys and corresponding audio data (NumPy arrays) as values.
+
+    ------------------------------------------------------------------------------------------------------
+    """
+    speaker_dict = {}
+    
+    # Iterate over the files in the directory
+    for file_name in os.listdir(audio_dir):
+        if file_name.endswith('.wav'):
+            # Extract speaker key from the file name (assuming the format 'filename_speaker.wav')
+            speaker_key = file_name.split('_')[-1].replace('.wav', '')
+            
+            # Load the audio file
+            audio_file_path = os.path.join(audio_dir, file_name)
+            audio = AudioSegment.from_file(audio_file_path, format="wav")
+            
+            # Convert audio to raw bytes and then to a numpy array
+            audio_array = np.array(audio.get_array_of_samples())
+            
+            # Store in the dictionary with speaker key
+            speaker_dict[speaker_key] = audio_array
+    
+    return speaker_dict
 
 def get_config(filepath, json_file):
     """
