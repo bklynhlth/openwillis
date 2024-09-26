@@ -112,36 +112,6 @@ def phonation_extraction(filepath, transcript_json, speaker_label=''):
 
     return phonation_dict
 
-def volume_normalization(audio_signal, target_dBFS):
-    """
-    ------------------------------------------------------------------------------------------------------
-    
-    Normalizes the volume of the audio signal to the target dBFS.
-    
-    Parameters:
-    ...........
-    audio_signal : pydub.AudioSegment
-        input audio signal
-    target_dBFS : float
-        target dBFS
-        
-    Returns:
-    ...........
-    pydub.AudioSegment
-        normalized audio signal
-
-    ------------------------------------------------------------------------------------------------------
-    """
-
-    headroom = -audio_signal.max_dBFS
-    gain_adjustment = target_dBFS - audio_signal.dBFS
-
-    if gain_adjustment > headroom:
-        gain_adjustment = headroom
-
-    audio_signal = audio_signal.apply_gain(gain_adjustment)
-    return audio_signal
-
 def clean_acoustic_df(df, file, duration, measures):
     """
     ------------------------------------------------------------------------------------------------------
@@ -225,7 +195,7 @@ def phonations_acoustics(audio_path, transcript_json, speaker_label=''):
         for file in os.listdir(temp_dir):
             # standardize volume level
             audio_signal = AudioSegment.from_file(file = os.path.join(temp_dir, file), format = "wav")
-            audio_signal = volume_normalization(audio_signal, -20)
+            audio_signal = sutil.volume_normalization(audio_signal, -20)
             audio_signal.export(os.path.join(temp_dir, file), format="wav")
 
             # compute advanced vocal acoustics measures

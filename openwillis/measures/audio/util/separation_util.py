@@ -429,3 +429,33 @@ def vosk_to_dataframe(json_response):
     df['speaker_label'] = 'speaker0'
 
     return df
+
+def volume_normalization(audio_signal, target_dBFS):
+    """
+    ------------------------------------------------------------------------------------------------------
+    
+    Normalizes the volume of the audio signal to the target dBFS.
+    
+    Parameters:
+    ...........
+    audio_signal : pydub.AudioSegment
+        input audio signal
+    target_dBFS : float
+        target dBFS
+        
+    Returns:
+    ...........
+    pydub.AudioSegment
+        normalized audio signal
+
+    ------------------------------------------------------------------------------------------------------
+    """
+
+    headroom = -audio_signal.max_dBFS
+    gain_adjustment = target_dBFS - audio_signal.dBFS
+
+    if gain_adjustment > headroom:
+        gain_adjustment = headroom
+
+    audio_signal = audio_signal.apply_gain(gain_adjustment)
+    return audio_signal
