@@ -2,6 +2,7 @@ include RELEASE.md
 include requirements.txt
 include openwillis/measures/audio/config/acoustic.json
 include openwillis/measures/video/config/facial.json
+include openwillis/measures/video/config/preprocess.json
 include openwillis/measures/audio/config/speech.json
 include openwillis/measures/text/config/text.json
 include openwillis/measures/video/config/eye.json
