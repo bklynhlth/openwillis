@@ -3,6 +3,7 @@
 import logging
 import os
 
+import numpy as np
 from pydub import AudioSegment
 
 logging.basicConfig(level=logging.INFO)
@@ -101,7 +102,7 @@ def volume_normalization(audio_signal, target_dBFS):
     audio_signal = audio_signal.apply_gain(gain_adjustment)
     return audio_signal
 
-def audio_preprocess(audio_in, audio_out):
+def audio_preprocess(audio_in):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -111,24 +112,21 @@ def audio_preprocess(audio_in, audio_out):
     ...........
     audio_in : str
         path to the input audio file
-    audio_out: str
-        path to the output audio file
 
     Returns:
     ...........
-    None
+    signal_dict: dict
+        dictionary containing the preprocessed audio signal
 
     ------------------------------------------------------------------------------------------------------
     """
 
 
+    signal_dict = {}
+
     try:
         if not audio_in.endswith(".wav") and not audio_in.endswith(".mp3"):
             logger.error(f'Error in audio preprocessing- file: {audio_in} & Error: File format not supported')
-            return
-        
-        if not os.path.exists(audio_in):
-            logger.error(f'Error in audio preprocessing- file: {audio_in} & Error: File not found')
             return
 
         audio_signal = AudioSegment.from_file(audio_in, format="wav" if audio_in.endswith(".wav") else "mp3")
@@ -137,9 +135,9 @@ def audio_preprocess(audio_in, audio_out):
         audio_signal = dc_offset(audio_signal)
         audio_signal = volume_normalization(audio_signal, -20)
 
-        audio_signal.export(audio_out, format="wav" if audio_out.endswith(".wav") else "mp3")
+        signal_dict = {'clean': np.array(audio_signal.get_array_of_samples())}
 
     except Exception as e:
         logger.error(f'Error in audio preprocessing- file: {audio_in} & Error: {e}')
-
-
+    finally:
+        return signal_dict
