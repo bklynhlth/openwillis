@@ -288,25 +288,29 @@ def get_pause_feature(json_conf, df_list, text_list, turn_index, measures, time_
 
     ------------------------------------------------------------------------------------------------------
     """
-    if len(json_conf) <= 0:
+    try:
+        if len(json_conf) <= 0:
+            return df_list
+
+        word_df, turn_df, summ_df = df_list
+        word_list, turn_list, full_text = text_list
+        df_diff = pd.DataFrame(json_conf)
+
+        # Calculate the pause time between; each word and add the results to pause_list
+        if measures["pause"] not in df_diff.columns:
+            df_diff[measures["pause"]] = df_diff[time_index[0]].astype(float) - df_diff[time_index[1]].astype(float).shift(1)
+
+        # word-level analysis
+        word_df = get_pause_feature_word(word_df, df_diff, word_list, turn_index, measures)
+
+        # turn-level analysis
+        if len(turn_index) > 0:
+            turn_df = get_pause_feature_turn(turn_df, df_diff, turn_list, turn_index, time_index, measures, language)
+
+        # file-level analysis
+        summ_df = update_summ_df(df_diff, summ_df, full_text, time_index, word_df, turn_df, measures)
+        df_feature = [word_df, turn_df, summ_df]
+        return df_feature
+    except Exception as e:
+        logger.error(f"Error in pause feature calculation: {e}")
         return df_list
-
-    word_df, turn_df, summ_df = df_list
-    word_list, turn_list, full_text = text_list
-    df_diff = pd.DataFrame(json_conf)
-
-    # Calculate the pause time between; each word and add the results to pause_list
-    if measures["pause"] not in df_diff.columns:
-        df_diff[measures["pause"]] = df_diff[time_index[0]].astype(float) - df_diff[time_index[1]].astype(float).shift(1)
-
-    # word-level analysis
-    word_df = get_pause_feature_word(word_df, df_diff, word_list, turn_index, measures)
-
-    # turn-level analysis
-    if len(turn_index) > 0:
-        turn_df = get_pause_feature_turn(turn_df, df_diff, turn_list, turn_index, time_index, measures, language)
-
-    # file-level analysis
-    summ_df = update_summ_df(df_diff, summ_df, full_text, time_index, word_df, turn_df, measures)
-    df_feature = [word_df, turn_df, summ_df]
-    return df_feature

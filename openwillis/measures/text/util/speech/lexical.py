@@ -275,18 +275,22 @@ def get_pos_tag(df_list, text_list, measures):
 
     ------------------------------------------------------------------------------------------------------
     """
-    word_df, turn_df, summ_df = df_list
-    word_list, turn_list, full_text = text_list
+    try:
+        word_df, turn_df, summ_df = df_list
+        word_list, turn_list, full_text = text_list
 
-    word_df = get_tag(word_df, word_list, measures)
+        word_df = get_tag(word_df, word_list, measures)
 
-    if len(turn_list) > 0:
-        turn_df = get_first_person_turn(turn_df, turn_list, measures)
+        if len(turn_list) > 0:
+            turn_df = get_first_person_turn(turn_df, turn_list, measures)
 
-    summ_df = get_first_person_summ(summ_df, turn_df, full_text, measures)
+        summ_df = get_first_person_summ(summ_df, turn_df, full_text, measures)
 
-    df_list = [word_df, turn_df, summ_df]
-    return df_list
+        df_list = [word_df, turn_df, summ_df]
+    except Exception as e:
+        logger.error(f"Error in pos tag feature calculation: {e}")
+    finally:
+        return df_list
 
 def get_sentiment(df_list, text_list, measures):
     """
@@ -311,30 +315,34 @@ def get_sentiment(df_list, text_list, measures):
 
     ------------------------------------------------------------------------------------------------------
     """
-    word_df, turn_df, summ_df = df_list
-    _, turn_list, full_text = text_list
-    lemmatizer = spacy.load('en_core_web_sm')
+    try:
+        word_df, turn_df, summ_df = df_list
+        _, turn_list, full_text = text_list
+        lemmatizer = spacy.load('en_core_web_sm')
 
-    sentiment = SentimentIntensityAnalyzer()
-    cols = [measures["neg"], measures["neu"], measures["pos"], measures["compound"], measures["speech_mattr_5"], measures["speech_mattr_10"], measures["speech_mattr_25"], measures["speech_mattr_50"], measures["speech_mattr_100"]]
+        sentiment = SentimentIntensityAnalyzer()
+        cols = [measures["neg"], measures["neu"], measures["pos"], measures["compound"], measures["speech_mattr_5"], measures["speech_mattr_10"], measures["speech_mattr_25"], measures["speech_mattr_50"], measures["speech_mattr_100"]]
 
-    for idx, u in enumerate(turn_list):
-        try:
-            
-            sentiment_dict = sentiment.polarity_scores(u)
-            mattrs = [get_mattr(u, lemmatizer, window_size=ws) for ws in [5, 10, 25, 50, 100]]
-            turn_df.loc[idx, cols] = list(sentiment_dict.values()) + mattrs
-            
-        except Exception as e:
-            logger.error(f"Error in sentiment analysis: {e}")
-            continue
-            
-    sentiment_dict = sentiment.polarity_scores(full_text)
-    mattrs = [get_mattr(full_text, lemmatizer, window_size=ws) for ws in [5, 10, 25, 50, 100]]
+        for idx, u in enumerate(turn_list):
+            try:
+                
+                sentiment_dict = sentiment.polarity_scores(u)
+                mattrs = [get_mattr(u, lemmatizer, window_size=ws) for ws in [5, 10, 25, 50, 100]]
+                turn_df.loc[idx, cols] = list(sentiment_dict.values()) + mattrs
+                
+            except Exception as e:
+                logger.error(f"Error in sentiment analysis: {e}")
+                continue
+                
+        sentiment_dict = sentiment.polarity_scores(full_text)
+        mattrs = [get_mattr(full_text, lemmatizer, window_size=ws) for ws in [5, 10, 25, 50, 100]]
 
-    summ_df.loc[0, cols] = list(sentiment_dict.values()) + mattrs
-    df_list = [word_df, turn_df, summ_df]
-    return df_list
+        summ_df.loc[0, cols] = list(sentiment_dict.values()) + mattrs
+        df_list = [word_df, turn_df, summ_df]
+    except Exception as e:
+        logger.error(f"Error in sentiment feature calculation: {e}")
+    finally:
+        return df_list
 
 def calculate_repetitions(words_texts, phrases_texts):
     """
@@ -421,32 +429,36 @@ def get_repetitions(df_list, utterances_speaker, utterances_speaker_filtered, la
 
     """
     
-    word_df, turn_df, summ_df = df_list
+    try:
+        word_df, turn_df, summ_df = df_list
 
-    # turn-level
-    if len(turn_df) > 0:
-        for i in range(len(utterances_speaker_filtered)):
-            row = utterances_speaker_filtered.iloc[i]
-            words_texts = row[measures['words_texts']]
-            phrases_texts = row[measures['phrases_texts']]
+        # turn-level
+        if len(turn_df) > 0:
+            for i in range(len(utterances_speaker_filtered)):
+                row = utterances_speaker_filtered.iloc[i]
+                words_texts = row[measures['words_texts']]
+                phrases_texts = row[measures['phrases_texts']]
+
+                word_reps_perc, phrase_reps_perc = calculate_repetitions(words_texts, phrases_texts)
+
+                turn_df.loc[i, measures['word_repeat_percentage']] = word_reps_perc
+                turn_df.loc[i, measures['phrase_repeat_percentage']] = phrase_reps_perc
+
+        # summary-level
+        if len(turn_df) > 0:
+            summ_df[measures['word_repeat_percentage']] = turn_df[measures['word_repeat_percentage']].mean(skipna=True)
+            summ_df[measures['phrase_repeat_percentage']] = turn_df[measures['phrase_repeat_percentage']].mean(skipna=True)
+        else:
+            words_texts = [word for words in utterances_speaker[measures['words_texts']] for word in words]
+            phrases_texts = [phrase for phrases in utterances_speaker[measures['phrases_texts']] for phrase in phrases]
 
             word_reps_perc, phrase_reps_perc = calculate_repetitions(words_texts, phrases_texts)
 
-            turn_df.loc[i, measures['word_repeat_percentage']] = word_reps_perc
-            turn_df.loc[i, measures['phrase_repeat_percentage']] = phrase_reps_perc
+            summ_df[measures['word_repeat_percentage']] = word_reps_perc
+            summ_df[measures['phrase_repeat_percentage']] = phrase_reps_perc
 
-    # summary-level
-    if len(turn_df) > 0:
-        summ_df[measures['word_repeat_percentage']] = turn_df[measures['word_repeat_percentage']].mean(skipna=True)
-        summ_df[measures['phrase_repeat_percentage']] = turn_df[measures['phrase_repeat_percentage']].mean(skipna=True)
-    else:
-        words_texts = [word for words in utterances_speaker[measures['words_texts']] for word in words]
-        phrases_texts = [phrase for phrases in utterances_speaker[measures['phrases_texts']] for phrase in phrases]
-
-        word_reps_perc, phrase_reps_perc = calculate_repetitions(words_texts, phrases_texts)
-
-        summ_df[measures['word_repeat_percentage']] = word_reps_perc
-        summ_df[measures['phrase_repeat_percentage']] = phrase_reps_perc
-
-    df_list = [word_df, turn_df, summ_df]
-    return df_list
+        df_list = [word_df, turn_df, summ_df]
+    except Exception as e:
+        logger.error(f"Error in calculating repetitions: {e}")
+    finally:
+        return df_list
