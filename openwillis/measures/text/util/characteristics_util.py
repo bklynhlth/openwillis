@@ -104,7 +104,6 @@ def create_index_column(item_data, measures):
     """
     index = 0
     for item in item_data:
-        
         for word in item.get("words", []):
             word[measures["old_index"]] = index
             index += 1
@@ -490,7 +489,89 @@ def create_text_list(utterances_speaker, speaker_label, min_turn_length, measure
 
     text_list = [word_list, turn_list, text]
 
+    if speaker_label is not None and len(turn_indices) <= 0:
+        raise ValueError(f"No utterances found for speaker {speaker_label} with minimum length {min_turn_length}")
+
     return text_list, turn_indices
+
+def filter_speaker(utterances, json_conf, speaker_label, measures):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    This function filters the utterances based on the speaker label.
+
+    Parameters:
+    ...........
+    utterances: pandas dataframe
+        A dataframe containing the turns extracted from the JSON object.
+    json_conf: list
+        JSON response object.
+    speaker_label: str
+        Speaker label
+    measures: dict
+        A dictionary containing the names of the columns in the output dataframes.
+
+    Returns:
+    ...........
+    utterances_speaker: pandas dataframe
+        A dataframe containing the turns extracted from the JSON object for the specified speaker.
+    json_conf_speaker: list
+        JSON response object for the specified speaker.
+
+    ------------------------------------------------------------------------------------------------------
+    """
+    utterances_speaker = utterances.copy()
+    json_conf_speaker = json_conf.copy()
+    if speaker_label is not None:
+        utterances_speaker = utterances[utterances[measures['speaker_label']] == speaker_label]
+        json_conf_speaker = [item for item in json_conf if item.get("speaker_label", "") == speaker_label or item.get("speaker", "") == speaker_label]
+
+        if len(utterances_speaker) <= 0:
+            raise ValueError(f"No utterances found for speaker {speaker_label}")
+
+    return utterances_speaker, json_conf_speaker
+
+def filter_length(utterances, utterances_speaker, speaker_label, min_turn_length, measures):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    This function filters the utterances based on the minimum turn length.
+
+    Parameters:
+    ...........
+    utterances: pandas dataframe
+        A dataframe containing the turns extracted from the JSON object.
+    utterances_speaker: pandas dataframe
+        A dataframe containing the turns extracted from the JSON object for the specified speaker.
+    speaker_label: str
+        Speaker label
+    min_turn_length: int
+        minimum words required in each turn
+    measures: dict
+        A dictionary containing the names of the columns in the output dataframes.
+
+    Returns:
+    ...........
+    utterances_filtered: pandas dataframe
+        A dataframe containing the turns extracted from the JSON object after filtering based on the minimum turn length.
+    utterances_speaker_filtered: pandas dataframe
+        A dataframe containing the turns extracted from the JSON object for the specified speaker after filtering based on the minimum turn length.
+
+    ------------------------------------------------------------------------------------------------------
+    """
+    # filter utterances with minimum length
+    utterances_speaker_filtered = utterances_speaker[utterances_speaker[measures['words_texts']].apply(lambda x: len(x) >= min_turn_length)].reset_index(drop=True)
+    # filter utterances with minimum length for speaker
+    utterances_filtered = utterances.copy()
+    if speaker_label is not None:
+        utterances_filtered = utterances_filtered.iloc[0:0]
+        for i in range(len(utterances)):
+            if utterances.iloc[i][measures['speaker_label']] != speaker_label or len(utterances.iloc[i][measures['words_texts']]) >= min_turn_length:
+                utterances_filtered = pd.concat([utterances_filtered, utterances.iloc[i:i+1]])
+
+        utterances_filtered = utterances_filtered.reset_index(drop=True)
+
+    return utterances_filtered, utterances_speaker_filtered
 
 def process_language_feature(df_list, transcribe_info, speaker_label, min_turn_length, min_coherence_turn_length, language, time_index, option, measures):
     """
@@ -528,37 +609,13 @@ def process_language_feature(df_list, transcribe_info, speaker_label, min_turn_l
     ------------------------------------------------------------------------------------------------------
     """
     json_conf, utterances = transcribe_info
-    if speaker_label is not None:
-        utterances_speaker = utterances[utterances[measures['speaker_label']] == speaker_label]
-        json_conf_speaker = [item for item in json_conf if item.get("speaker_label", "") == speaker_label or item.get("speaker", "") == speaker_label]
 
-        if len(utterances_speaker) <= 0:
-            logger.error(f"No utterances found for speaker {speaker_label}")
-            return df_list
-    else:
-        utterances_speaker = utterances.copy()
-        json_conf_speaker = json_conf.copy()
-
+    # filter speaker in json_conf and utterances
+    utterances_speaker, json_conf_speaker = filter_speaker(utterances, json_conf, speaker_label, measures)
+    # create text list and turn indices
     text_list, turn_indices = create_text_list(utterances_speaker, speaker_label, min_turn_length, measures)
-    if speaker_label is not None and len(turn_indices) <= 0:
-        logger.error(f"No utterances found for speaker {speaker_label} with minimum length {min_turn_length}")
-        return df_list
-    
     # filter utterances with minimum length
-    utterances_speaker_filtered = utterances_speaker[utterances_speaker[measures['words_texts']].apply(lambda x: len(x) >= min_turn_length)].reset_index(drop=True)
-    # filter utterances with minimum length for speaker
-    if speaker_label is not None:
-        utterances_filtered = utterances.copy().iloc[0:0]
-        for i in range(len(utterances)):
-            if utterances.iloc[i][measures['speaker_label']] != speaker_label:
-                utterances_filtered = pd.concat([utterances_filtered, utterances.iloc[i:i+1]])
-            else:
-                if len(utterances.iloc[i][measures['words_texts']]) >= min_turn_length:
-                    utterances_filtered = pd.concat([utterances_filtered, utterances.iloc[i:i+1]])
-
-        utterances_filtered = utterances_filtered.reset_index(drop=True)
-    else:
-        utterances_filtered = utterances.copy()
+    utterances_filtered, utterances_speaker_filtered = filter_length(utterances, utterances_speaker, speaker_label, min_turn_length, measures)
 
     df_list = get_pause_feature(json_conf_speaker, df_list, text_list, turn_indices, measures, time_index, language)
     df_list = get_repetitions(df_list, utterances_speaker, utterances_speaker_filtered, measures)
