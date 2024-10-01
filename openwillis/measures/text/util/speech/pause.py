@@ -7,6 +7,7 @@ import numpy as np
 import logging
 
 import nltk
+import string
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger()
@@ -31,14 +32,13 @@ def get_num_of_syllables(text):
     """
 
     syllable_tokenizer = nltk.tokenize.SyllableTokenizer()
-    punctuation = "!\"#$%&()*+,-./:;<=>?@[\]^_`{|}~" # remove punctuation
+    text = text.translate(str.maketrans('', '', string.punctuation))  # Remove punctuation
+    tokens = nltk.word_tokenize(text.lower())  # Tokenize the text and convert to lowercase
+    syllables = [syllable_tokenizer.tokenize(token) for token in tokens]
     
-    syllables = [syllable_tokenizer.tokenize(token) for token in nltk.word_tokenize(text) if token not in punctuation]
-    syllable_count = sum([len(token) for token in syllables])
+    return sum(len(token) for token in syllables)
 
-    return syllable_count
-
-def get_pause_feature_word(word_df, df_diff, word_list, turn_index, measures):
+def calculate_pause_features_for_word(word_df, df_diff, word_list, turn_index, measures):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -69,10 +69,10 @@ def get_pause_feature_word(word_df, df_diff, word_list, turn_index, measures):
     turn_starts = [pindex[0] for pindex in turn_index]
     word_df[measures["word_pause"]] = df_diff[measures["pause"]].where(~df_diff[measures["old_index"]].isin(turn_starts), np.nan)
     
-    word_df[measures["num_syllables"]] = [get_num_of_syllables(word) for word in word_list]
+    word_df[measures["num_syllables"]] = pd.Series(word_list).apply(get_num_of_syllables)
     return word_df
 
-def process_pause_feature(df_diff, df, text_level, index_list, time_index, level_name, measures, language):
+def calculate_pause_features_for_turn(df_diff, df, text_level, index_list, time_index, measures, language):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -93,8 +93,6 @@ def process_pause_feature(df_diff, df, text_level, index_list, time_index, level
     time_index: list
         A list containing the names of the columns in json that contain
          the start and end times of each word.
-    level_name: str
-        The name of the level being analyzed turn.
     measures: dict
         A dictionary containing the names of the columns in the output dataframes.
 
@@ -106,43 +104,31 @@ def process_pause_feature(df_diff, df, text_level, index_list, time_index, level
     ------------------------------------------------------------------------------------------------------
     """
 
-    if level_name not in [measures["turn"]]:
-        logger.error(f"level_name must be turn")
-        return df
-
     for j, index in enumerate(index_list):
         try:
-            
             rng = range(index[0], index[1] + 1)
-            level_json = df_diff[df_diff[measures["old_index"]].isin(rng)]
-            
-            pauses = level_json[measures["pause"]].values[1:]
-            level_min_val = (float(level_json.iloc[-1][time_index[1]]) - float(level_json.iloc[0][time_index[0]])) / 60
-            
-            df.loc[j, measures[f"{level_name}_minutes"]] = level_min_val
-            df.loc[j, measures[f"{level_name}_words"]] = len(level_json)
+            turn_data = df_diff[df_diff[measures["old_index"]].isin(rng)]
 
-            if len(pauses) == 1:
-                df.loc[j, measures["pause_var"]] = 0
+            pauses = turn_data[measures["pause"]].values[1:]
+            turn_duration = (float(turn_data.iloc[-1][time_index[1]]) - float(turn_data.iloc[0][time_index[0]])) / 60
+
+            df.loc[j, measures[f"turn_minutes"]] = turn_duration
+            df.loc[j, measures[f"turn_words"]] = len(turn_data)
+
+            if len(pauses) > 0:
+                df.loc[j, measures["pause_var"]] = np.var(pauses) if len(pauses) > 1 else 0
                 df.loc[j, measures["pause_meandur"]] = np.mean(pauses)
 
-            elif len(pauses) > 1:
-                df.loc[j, measures["pause_var"]] = np.var(pauses)
-                df.loc[j, measures["pause_meandur"]] = np.mean(pauses)
-
-            if df.loc[j, measures[f"{level_name}_minutes"]] > 0:
-                speech_pct_val = 100 * (1 - np.sum(pauses) / (60 * df.loc[j, measures[f"{level_name}_minutes"]]))
-                df.loc[j, measures["speech_percentage"]] = speech_pct_val
+            if turn_duration > 0:
+                df.loc[j, measures["speech_percentage"]] = 100 * (1 - np.sum(pauses) / (60 * turn_duration))
 
                 if language in measures["english_langs"]:
-                    syllable_rate = (get_num_of_syllables(text_level[j]) / df.loc[j, measures[f"{level_name}_minutes"]])
+                    syllable_rate = (get_num_of_syllables(text_level[j]) / turn_duration)
                     df.loc[j, measures["syllable_rate"]] = syllable_rate
-                
-                word_rate_val = (df.loc[j, measures[f"{level_name}_words"]] / df.loc[j, measures[f"{level_name}_minutes"]])
-                df.loc[j, measures["word_rate"]] = word_rate_val
-                
+
+                df.loc[j, measures["word_rate"]] = len(turn_data) / turn_duration
         except Exception as e:
-            logger.error(f"Error in pause feature calculation for {level_name} {j}: {e}")
+            logger.error(f"Error in pause feature calculation for turn {j}: {e}")
             continue
 
     return df
@@ -191,7 +177,7 @@ def get_pause_feature_turn(turn_df, df_diff, turn_list, turn_index, time_index, 
     turn_df.loc[negative_pause, measures["interrupt_flag"]] = True
     turn_df = turn_df.reset_index(drop=True)
 
-    turn_df = process_pause_feature(df_diff, turn_df, turn_list, turn_index, time_index, measures["turn"], measures, language)
+    turn_df = calculate_pause_features_for_turn(df_diff, turn_df, turn_list, turn_index, time_index, measures, language)
     return turn_df
 
 def update_summ_df(df_diff, summ_df, full_text, time_index, word_df, turn_df, measures):
@@ -236,22 +222,21 @@ def update_summ_df(df_diff, summ_df, full_text, time_index, word_df, turn_df, me
     summ_df[measures["speech_words"]] = [speech_words]
 
     if speech_minutes > 0:
-        
-        summ_df[measures["word_rate"]] = (summ_df[measures["speech_words"]] / summ_df[measures["speech_minutes"]])
-        summ_df[measures["syllable_rate"]] = (get_num_of_syllables(full_text) / summ_df[measures["speech_minutes"]])
-        summ_df[measures["speech_percentage"]] = 100 * (summ_df[measures["speech_minutes"]] / summ_df[measures["file_length"]])
+        summ_df[measures["word_rate"]] = speech_words / speech_minutes
+        summ_df[measures["syllable_rate"]] = get_num_of_syllables(full_text) / speech_minutes
+        summ_df[measures["speech_percentage"]] = 100 * (speech_minutes / summ_df[measures["file_length"]])
 
     if len(word_df[measures["word_pause"]]) > 1:
         summ_df[measures["word_pause_mean"]] = word_df[measures["word_pause"]].mean(skipna=True)
         summ_df[measures["word_pause_var"]] = word_df[measures["word_pause"]].var(skipna=True)
-    
+
     if len(turn_df) > 0:
         summ_df[measures["num_turns"]] = len(turn_df)
         summ_df[measures["turn_minutes_mean"]] = turn_df[measures["turn_minutes"]].mean(skipna=True)
-        
+
         summ_df[measures["turn_words_mean"]] = turn_df[measures["turn_words"]].mean(skipna=True)
         summ_df[measures["turn_pause_mean"]] = turn_df[measures["turn_pause"]].mean(skipna=True)
-        
+
         summ_df[measures["num_one_word_turns"]] = len(turn_df[turn_df[measures["turn_words"]] == 1])
         summ_df[measures["num_interrupts"]] = len(turn_df[turn_df[measures["interrupt_flag"]]==True])
 
@@ -301,7 +286,7 @@ def get_pause_feature(json_conf, df_list, text_list, turn_index, measures, time_
             df_diff[measures["pause"]] = df_diff[time_index[0]].astype(float) - df_diff[time_index[1]].astype(float).shift(1)
 
         # word-level analysis
-        word_df = get_pause_feature_word(word_df, df_diff, word_list, turn_index, measures)
+        word_df = calculate_pause_features_for_word(word_df, df_diff, word_list, turn_index, measures)
 
         # turn-level analysis
         if len(turn_index) > 0:
