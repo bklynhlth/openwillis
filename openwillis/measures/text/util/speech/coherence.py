@@ -262,7 +262,7 @@ def calculate_perplexity(text, model, tokenizer):
 
     ------------------------------------------------------------------------------------------------------
     """
-    # Tokenize input text
+    # Clean and tokenize the input text
     clean_text = text.translate(str.maketrans('', '', string.punctuation))
     clean_text = re.sub(r'\s+', ' ', clean_text).strip()
     if len(clean_text) == 0 or len(clean_text.split()) < 2:
@@ -272,102 +272,40 @@ def calculate_perplexity(text, model, tokenizer):
     input_ids = tokens.input_ids
     masked_input_ids = input_ids.clone()
 
-    log_probs = []
-    log_probs_5 = []
-    log_probs_11 = []
-    log_probs_15 = []
-    # Iterate over each token in the input
-    for i in range(input_ids.size(1)):
-        # filter so that all input_ids include the masked location +- 256 tokens
-        if i < 256:
-            start = 0
-        else:
-            start = i - 256
-        if i > input_ids.size(1) - 256:
-            end = input_ids.size(1)
-        else:
-            end = i + 256
+    log_probs_dict = {2: [], 5: [], 7: [], 256: []}
 
-        masked_input_ids[0, i] = tokenizer.mask_token_id
-
-        input_ids_filtered = input_ids[:, start:(end+1)]
-        masked_input_ids_filtered = masked_input_ids[:, start:(end+1)]
-        # get new i from that
-        idx = i - start
-
-        # use only 2 words before and after the masked token
-        if i < 2:
-            start_5 = 0
-        else:
-            start_5 = i - 2
-        if i > input_ids.size(1) - 2:
-            end_5 = input_ids.size(1)
-        else:
-            end_5 = i + 2
-
-        input_ids_filtered_5 = input_ids[:, start_5:(end_5+1)]
-        masked_input_ids_filtered_5 = masked_input_ids[:, start_5:(end_5+1)]
-        idx_5 = i - start_5
-
-        # use only 5 words before and after the masked token
-        if i < 5:
-            start_11 = 0
-        else:
-            start_11 = i - 5
-        if i > input_ids.size(1) - 5:
-            end_11 = input_ids.size(1)
-        else:
-            end_11 = i + 5
-
-        input_ids_filtered_11 = input_ids[:, start_11:(end_11+1)]
-        masked_input_ids_filtered_11 = masked_input_ids[:, start_11:(end_11+1)]
-        idx_11 = i - start_11
-
-        # use only 7 words before and after the masked token
-        if i < 7:
-            start_15 = 0
-        else:
-            start_15 = i - 7
-        if i > input_ids.size(1) - 7:
-            end_15 = input_ids.size(1)
-        else:
-            end_15 = i + 7
-
-        input_ids_filtered_15 = input_ids[:, start_15:(end_15+1)]
-        masked_input_ids_filtered_15 = masked_input_ids[:, start_15:(end_15+1)]
-        idx_15 = i - start_15
+    def calculate_log_probs(start_offset, end_offset, idx):
+        """Helper function to calculate log probabilities for a given window size."""
+        input_ids_filtered = input_ids[:, start_offset:end_offset+1]
+        masked_input_ids_filtered = masked_input_ids[:, start_offset:end_offset+1]
+        idx_adjusted = idx - start_offset
 
         with torch.no_grad():
             outputs = model(input_ids=masked_input_ids_filtered, labels=input_ids_filtered)
-            outputs_5 = model(input_ids=masked_input_ids_filtered_5, labels=input_ids_filtered_5)
-            outputs_11 = model(input_ids=masked_input_ids_filtered_11, labels=input_ids_filtered_11)
-            outputs_15 = model(input_ids=masked_input_ids_filtered_15, labels=input_ids_filtered_15)
+        logits = outputs.logits[0, idx_adjusted].softmax(dim=0)
+        true_log_prob = logits[input_ids[0, idx]].log().item()
+        
+        return true_log_prob
 
-        # Calculate log probability of the original token
-        logit_prob = outputs.logits[0, idx].softmax(dim=0)
-        true_log_prob = logit_prob[input_ids[0, i]].log().item()
-        log_probs.append(true_log_prob)
+    # Iterate over each token in the input text
+    for i in range(input_ids.size(1)):
+        masked_input_ids[0, i] = tokenizer.mask_token_id
 
-        logit_prob_5 = outputs_5.logits[0, idx_5].softmax(dim=0)
-        true_log_prob_5 = logit_prob_5[input_ids[0, i]].log().item()
-        log_probs_5.append(true_log_prob_5)
-
-        logit_prob_11 = outputs_11.logits[0, idx_11].softmax(dim=0)
-        true_log_prob_11 = logit_prob_11[input_ids[0, i]].log().item()
-        log_probs_11.append(true_log_prob_11)
-
-        logit_prob_15 = outputs_15.logits[0, idx_15].softmax(dim=0)
-        true_log_prob_15 = logit_prob_15[input_ids[0, i]].log().item()
-        log_probs_15.append(true_log_prob_15)
+        # Calculate log probabilities for different window sizes
+        for window_size in [256, 2, 5, 7]:
+            start = max(0, i - window_size)
+            end = min(input_ids.size(1), i + window_size)
+            log_probs_dict[window_size].append(calculate_log_probs(start, end, i))
 
         # Unmask the token for the next iteration
         masked_input_ids[0, i] = input_ids[0, i]
 
-    # Calculate perplexity
-    perplexity = np.exp(-np.mean(log_probs))
-    perplexity_5 = np.exp(-np.mean(log_probs_5))
-    perplexity_11 = np.exp(-np.mean(log_probs_11))
-    perplexity_15 = np.exp(-np.mean(log_probs_15))
+    # Calculate perplexity for each window size
+    perplexity = np.exp(-np.mean(log_probs_dict[256]))
+    perplexity_5 = np.exp(-np.mean(log_probs_dict[2]))
+    perplexity_11 = np.exp(-np.mean(log_probs_dict[5]))
+    perplexity_15 = np.exp(-np.mean(log_probs_dict[7]))
+
     return perplexity, perplexity_5, perplexity_11, perplexity_15
 
 def calculate_phrase_tangeniality(phrases_texts, utterance_text, sentence_encoder, bert, tokenizer):
