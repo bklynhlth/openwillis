@@ -2,6 +2,7 @@
 # website:   http://www.bklynhlth.com
 
 # import the required packages
+import pandas as pd
 import numpy as np
 import string
 import logging
@@ -19,6 +20,8 @@ TAG_DICT = {"PRP": "Pronoun", "PRP$": "Pronoun", "VB": "Verb", "VBD": "Verb", "V
             "VBZ": "Verb", "JJ": "Adjective", "JJR": "Adjective", "JJS": "Adjective", "NN": "Noun", "NNP": "Noun", "NNS": "Noun",
             "RB": "Adverb", "RBR": "Adverb", "RBS": "Adverb", "DT": "Determiner"}
 FIRST_PERSON_PRONOUNS = ["I", "me", "my", "mine", "myself"]
+PRESENT = ["VBP", "VBZ"]
+PAST = ["VBD", "VBN"]
 
 def get_mattr(text, lemmatizer, window_size=50):
     """
@@ -90,9 +93,7 @@ def get_tag(word_df, word_list, measures):
     # make non pronouns NaN
     word_df[measures["first_person"]] = word_df[measures["first_person"]].where(word_df[measures["part_of_speech"]] == "Pronoun", np.nan)
 
-    present_tense = ["VBP", "VBZ"]
-    past_tense = ["VBD", "VBN"]
-    tag_list_verb = ["Present" if tag[1] in present_tense else "Past" if tag[1] in past_tense else "Other" for tag in tag_list]
+    tag_list_verb = ["Present" if tag[1] in PRESENT else "Past" if tag[1] in PAST else "Other" for tag in tag_list]
     word_df[measures["verb_tense"]] = tag_list_verb
     # make non verbs NaN
     word_df[measures["verb_tense"]] = word_df[measures["verb_tense"]].where(word_df[measures["part_of_speech"]] == "Verb", np.nan)
@@ -325,15 +326,15 @@ def get_sentiment(df_list, text_list, measures):
 
         for idx, u in enumerate(turn_list):
             try:
-                
+
                 sentiment_dict = sentiment.polarity_scores(u)
                 mattrs = [get_mattr(u, lemmatizer, window_size=ws) for ws in [5, 10, 25, 50, 100]]
                 turn_df.loc[idx, cols] = list(sentiment_dict.values()) + mattrs
-                
+
             except Exception as e:
                 logger.error(f"Error in sentiment analysis: {e}")
                 continue
-                
+
         sentiment_dict = sentiment.polarity_scores(full_text)
         mattrs = [get_mattr(full_text, lemmatizer, window_size=ws) for ws in [5, 10, 25, 50, 100]]
 
@@ -366,45 +367,31 @@ def calculate_repetitions(words_texts, phrases_texts):
 
     ------------------------------------------------------------------------------------------------------
     """
-    # remove punctuation - lowercase
-    words_texts = [word.translate(str.maketrans('', '', string.punctuation)).lower() for word in words_texts]
-    phrases_texts = [phrase.translate(str.maketrans('', '', string.punctuation)).lower() for phrase in phrases_texts]
+    def calculate_percentage_repetitions(text_list, window_size):
+        """Helper function to calculate the percentage of repetitions in a sliding window."""
+        if len(text_list) <= window_size:
+            reps = len(text_list) - len(set(text_list))
+            return 100 * reps / len(text_list) if len(text_list) > 0 else 0
+        else:
+            reps_list = [
+                100 * (len(window) - len(set(window))) / len(window)
+                for i in range(len(text_list) - window_size + 1)
+                for window in [text_list[i:i + window_size]]
+            ]
+            return np.mean(reps_list)
 
-    # remove empty strings
-    words_texts = [word for word in words_texts if word != '']
-    phrases_texts = [phrase for phrase in phrases_texts if phrase != '']
+    # Clean words and phrases: remove punctuation, convert to lowercase, and filter out empty strings
+    words_texts = [word.translate(str.maketrans('', '', string.punctuation)).lower() for word in words_texts if word.strip()]
+    phrases_texts = [phrase.translate(str.maketrans('', '', string.punctuation)).lower() for phrase in phrases_texts if phrase.strip()]
 
-    # sliding window of 10 words for repetitions
-    if len(words_texts) <= 10:
-        word_reps = len(words_texts) - len(set(words_texts))
-        word_perc = 100*word_reps/len(words_texts)
-    else:
-        word_reps_list = []
-        for i in range(len(words_texts) - 9):
-            window = words_texts[i:i+10]
-            word_reps_list.append(100*(len(window) - len(set(window))) / len(window))
-        word_perc = np.mean(word_reps_list)
+    # Calculate repetition percentages for words (sliding window of 10 words) and phrases (sliding window of 3 phrases)
+    word_reps_perc = calculate_percentage_repetitions(words_texts, window_size=10)
+    phrase_reps_perc = calculate_percentage_repetitions(phrases_texts, window_size=3) if phrases_texts else np.nan
 
-    if len(phrases_texts) == 0:
-        return word_perc, np.nan
-    
-    # sliding window of 3 phrases for repetitions
-    if len(phrases_texts) <= 3:
-        phrase_reps = len(phrases_texts) - len(set(phrases_texts))
-        phrase_perc = 100*phrase_reps/len(phrases_texts)
-    else:
-        phrase_reps_list = []
-        for i in range(len(phrases_texts) - 3):
-            window = phrases_texts[i:i+3]
-            phrase_reps_list.append(100*(len(window) - len(set(window))) / len(window))
-        phrase_perc = np.mean(phrase_reps_list)
+    return word_reps_perc, phrase_reps_perc
 
-    return word_perc, phrase_perc
-
-
-def get_repetitions(df_list, utterances_speaker, utterances_speaker_filtered, language, measures):
+def get_repetitions(df_list, utterances_speaker, utterances_speaker_filtered, measures):
     """
-
     This function calculates the percentage of repeated words and phrases in the input text
     and adds them to the output dataframes.
 
@@ -417,8 +404,6 @@ def get_repetitions(df_list, utterances_speaker, utterances_speaker_filtered, la
     utterances_speaker_filtered: pandas dataframe
         A dataframe containing the turns extracted from the JSON object for the specified speaker
         after filtering out turns with less than min_turn_length words.
-    language: str
-        Language of the transcribed text.
     measures: dict
         A dictionary containing the names of the columns in the output dataframes.
 
@@ -426,14 +411,13 @@ def get_repetitions(df_list, utterances_speaker, utterances_speaker_filtered, la
     ...........
     df_list: list
         List of updated pandas dataframes.
-
     """
     
     try:
         word_df, turn_df, summ_df = df_list
 
         # turn-level
-        if len(turn_df) > 0:
+        if not turn_df.empty:
             for i in range(len(utterances_speaker_filtered)):
                 row = utterances_speaker_filtered.iloc[i]
                 words_texts = row[measures['words_texts']]
@@ -444,8 +428,7 @@ def get_repetitions(df_list, utterances_speaker, utterances_speaker_filtered, la
                 turn_df.loc[i, measures['word_repeat_percentage']] = word_reps_perc
                 turn_df.loc[i, measures['phrase_repeat_percentage']] = phrase_reps_perc
 
-        # summary-level
-        if len(turn_df) > 0:
+            # Calculate summary-level statistics
             summ_df[measures['word_repeat_percentage']] = turn_df[measures['word_repeat_percentage']].mean(skipna=True)
             summ_df[measures['phrase_repeat_percentage']] = turn_df[measures['phrase_repeat_percentage']].mean(skipna=True)
         else:
