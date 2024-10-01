@@ -371,7 +371,7 @@ def calculate_phrase_tangeniality(phrases_texts, utterance_text, sentence_encode
         if len(phrases_texts) > 2:
             sentence_tangeniality2 = np.mean([similarity_matrix[j-2, j] for j in range(2, len(phrases_texts))])
 
-    perplexity, perplexity_5, perplexity_11, perplexity_15 = np.nan, np.nan, np.nan
+    perplexity, perplexity_5, perplexity_11, perplexity_15 = np.nan, np.nan, np.nan, np.nan
     if tokenizer is not None and bert is not None:
         # calculate pseudo-perplexity of the turn and indicating how predictable the turn is
         perplexity, perplexity_5, perplexity_11, perplexity_15 = calculate_perplexity(utterance_text, bert, tokenizer)        
@@ -503,7 +503,9 @@ def get_phrase_coherence(df_list, utterances_filtered, min_coherence_turn_length
             for i, row in utterances_filtered.iterrows():
                 current_speaker = row[measures['speaker_label']]
 
-                if current_speaker != speaker_label or len(row[measures['words_texts']]) < min_coherence_turn_length:
+                if current_speaker != speaker_label:
+                    continue
+                elif len(row[measures['words_texts']]) < min_coherence_turn_length:
                     sentence_tangeniality1_list.append(np.nan)
                     sentence_tangeniality2_list.append(np.nan)
                     perplexity_list.append(np.nan)
@@ -541,13 +543,12 @@ def get_phrase_coherence(df_list, utterances_filtered, min_coherence_turn_length
             turn_df[measures['turn_to_turn_tangeniality']] = turn_to_turn_tangeniality_list
 
 
-        # summary-level
-        if len(turn_df) > 0:
             for measure in ['sentence_tangeniality1', 'sentence_tangeniality2', 'perplexity', 'perplexity_5', 'perplexity_11', 'perplexity_15', 'turn_to_turn_tangeniality']:
                 summ_df[measures[measure + '_mean']] = turn_df[measures[measure]].mean(skipna=True)
                 summ_df[measures[measure + '_var']] = turn_df[measures[measure]].var(skipna=True)
 
-            summ_df[measures['turn_to_turn_tangeniality_slope']] = calculate_slope(turn_df[measures['turn_to_turn_tangeniality']])
+            if not turn_df[measures['turn_to_turn_tangeniality']].isnull().all():
+                summ_df[measures['turn_to_turn_tangeniality_slope']] = calculate_slope(turn_df[measures['turn_to_turn_tangeniality']])
 
         df_list = [word_df, turn_df, summ_df]
     except Exception as e:
