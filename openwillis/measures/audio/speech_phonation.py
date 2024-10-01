@@ -187,16 +187,19 @@ def phonations_acoustics(audio_path, transcript_json, speaker_label=''):
         to_audio(audio_path, phonation_dict, temp_dir)
 
         for file in os.listdir(temp_dir):
-            # standardize volume level
-            audio_signal = AudioSegment.from_file(file = os.path.join(temp_dir, file), format = "wav")
-            audio_signal = sutil.volume_normalization(audio_signal, -20)
-            audio_signal.export(os.path.join(temp_dir, file), format="wav")
+            try:
+                # standardize volume level
+                audio_signal = AudioSegment.from_file(file = os.path.join(temp_dir, file), format = "wav")
+                audio_signal = sutil.volume_normalization(audio_signal, -20)
+                audio_signal.export(os.path.join(temp_dir, file), format="wav")
 
-            # compute advanced vocal acoustics measures
-            _, df = vocal_acoustics(os.path.join(temp_dir, file), option='advanced')
-            df = clean_acoustic_df(df, file, audio_signal.duration_seconds, measures)
+                # compute advanced vocal acoustics measures
+                _, df = vocal_acoustics(os.path.join(temp_dir, file), option='advanced')
+                df = clean_acoustic_df(df, file, audio_signal.duration_seconds, measures)
 
-            phonations_df = pd.concat([phonations_df, df])
+                phonations_df = pd.concat([phonations_df, df])
+            except Exception as e:
+                logger.error(f'Error in phonation acoustics calculation for single phonation: {file} & Error: {e}')
 
         # summarize the phonation acoustics into dfs
         summ_df = phonations_df.groupby(measures['phonation_type']).mean().reset_index()
