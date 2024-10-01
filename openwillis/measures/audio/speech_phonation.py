@@ -83,9 +83,6 @@ def phonation_extraction(filepath, transcript_json, speaker_label=''):
     phonation_dict = {}
 
     try:
-        if not os.path.exists(filepath):
-            return phonation_dict
-
         audio_signal = AudioSegment.from_file(file = filepath, format = "wav")
         if is_whisper_transcribe(transcript_json):
             speaker_df, _ = sutil.whisperx_to_dataframe(transcript_json)
@@ -180,9 +177,6 @@ def phonations_acoustics(audio_path, transcript_json, speaker_label=''):
     measures = json.load(file)
 
     try:
-        if not os.path.exists(audio_path) or not transcript_json:
-            raise Exception('Audio file or transcript json not found')
-
         # extract phonation segments
         phonation_dict = phonation_extraction(audio_path, transcript_json, speaker_label)
         if not phonation_dict:
