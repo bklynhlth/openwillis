@@ -26,7 +26,7 @@ def make_dir(dir_name):
     if not os.path.exists(dir_name):
         os.makedirs(dir_name)
 
-def to_audio(filepath, speaker_dict, output_dir):
+def to_audio(filepath, speaker_dict, output_dir, cleaned=False):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -40,6 +40,8 @@ def to_audio(filepath, speaker_dict, output_dir):
             A dictionary containing speaker labels as keys and corresponding segments (NumPy arrays) as values.
         output_dir : str
             The directory where the output audio files will be saved.
+        cleaned : bool
+            A flag indicating whether the audio signal has been cleaned.
 
     ------------------------------------------------------------------------------------------------------
     """
@@ -48,7 +50,7 @@ def to_audio(filepath, speaker_dict, output_dir):
         file_name, _ = os.path.splitext(os.path.basename(filepath))
 
         audio_signal = AudioSegment.from_file(file = filepath, format = "wav")
-        spk_signal = AudioSegment(value.tobytes(), frame_rate=audio_signal.frame_rate,
+        spk_signal = AudioSegment(value.tobytes(), frame_rate=44100 if cleaned else audio_signal.frame_rate,
                                   sample_width=audio_signal.sample_width, channels=audio_signal.channels)
 
         output_file = os.path.join(output_dir, file_name + '_' + key + '.wav')
