@@ -184,7 +184,7 @@ def get_word_coherence(df_list, utterances_speaker, min_coherence_turn_length, l
     try:
         word_df, turn_df, summ_df = df_list
 
-        # model init
+        # Initialize the appropriate model and tokenizer based on language
         if language in measures["english_langs"]:
             tokenizer = BertTokenizer.from_pretrained('bert-base-cased')
             model = BertModel.from_pretrained('bert-base-cased')
@@ -192,43 +192,55 @@ def get_word_coherence(df_list, utterances_speaker, min_coherence_turn_length, l
             tokenizer = BertTokenizer.from_pretrained('bert-base-multilingual-cased')
             model = BertModel.from_pretrained('bert-base-multilingual-cased')
         else:
-            logger.error(f"Language {language} not supported for word coherence analysis")
+            logger.error(f"Language {language} not supported for word coherence analysis.")
             return df_list
 
-
-        # word-level
-        word_coherence_list = []
-        word_coherence_5_list = []
-        word_coherence_10_list = []
-        word_coherence_variability = {
-            x: [] for x in range(2, 11)
+        # Initialize coherence lists
+        coherence_lists = {
+            'word_coherence': [],
+            'word_coherence_5': [],
+            'word_coherence_10': [],
+            'variability': {k: [] for k in range(2, 11)}
         }
-        for i in range(len(utterances_speaker)):
-            row = utterances_speaker.iloc[i]
 
-            if len(row[measures['words_texts']]) < min_coherence_turn_length:
-                word_coherence_list += [np.nan]*len(row[measures['words_texts']])
-                word_coherence_5_list += [np.nan]*len(row[measures['words_texts']])
-                word_coherence_10_list += [np.nan]*len(row[measures['words_texts']])
-                for k in range(2, 11):
-                    word_coherence_variability[k] += [np.nan]*len(row[measures['words_texts']])
-                continue
-
-            word_coherence, word_coherence_5, word_coherence_10, word_word_variability = get_word_coherence_utterance(row, tokenizer, model, measures)
-
-            word_coherence_list += word_coherence
-            word_coherence_5_list += word_coherence_5
-            word_coherence_10_list += word_coherence_10
+        # Helper function to handle missing values
+        def append_nan_values(row_len):
+            """Helper to append NaN values to the lists."""
+            coherence_lists['word_coherence'] += [np.nan] * row_len
+            coherence_lists['word_coherence_5'] += [np.nan] * row_len
+            coherence_lists['word_coherence_10'] += [np.nan] * row_len
             for k in range(2, 11):
-                word_coherence_variability[k] += word_word_variability[k]
-        
-        word_df[measures['word_coherence']] = word_coherence_list
-        word_df[measures['word_coherence_5']] = word_coherence_5_list
-        word_df[measures['word_coherence_10']] = word_coherence_10_list
-        for k in range(2, 11):
-            word_df[measures[f'word_coherence_variability_{k}']] = word_coherence_variability[k]
+                coherence_lists['variability'][k] += [np.nan] * row_len
 
-        # summary-level
+        # Process each utterance
+        for _, row in utterances_speaker.iterrows():
+            try:
+                if len(row[measures['words_texts']]) < min_coherence_turn_length:
+                    append_nan_values(len(row[measures['words_texts']]))
+                    continue
+
+                # Get word coherence for the utterance
+                coherence, coherence_5, coherence_10, variability = get_word_coherence_utterance(row, tokenizer, model, measures)
+
+                # Append results to lists
+                coherence_lists['word_coherence'] += coherence
+                coherence_lists['word_coherence_5'] += coherence_5
+                coherence_lists['word_coherence_10'] += coherence_10
+                for k in range(2, 11):
+                    coherence_lists['variability'][k] += variability[k]
+
+            except Exception as e:
+                logger.error(f"Error in word coherence analysis for row: {e}")
+                append_nan_values(len(row[measures['words_texts']]))
+
+        # Update word_df with calculated coherence values
+        word_df[measures['word_coherence']] = coherence_lists['word_coherence']
+        word_df[measures['word_coherence_5']] = coherence_lists['word_coherence_5']
+        word_df[measures['word_coherence_10']] = coherence_lists['word_coherence_10']
+        for k in range(2, 11):
+            word_df[measures[f'word_coherence_variability_{k}']] = coherence_lists['variability'][k]
+
+        # Update the summary-level dataframe
         summ_df = get_word_coherence_summary(word_df, summ_df, measures)
 
         df_list = [word_df, turn_df, summ_df]
