@@ -94,15 +94,13 @@ def phonation_extraction(filepath, transcript_json, speaker_label=''):
 
         if speaker_label:
             speaker_df = speaker_df[speaker_df['speaker_label']==speaker_label]
-            if len(speaker_df)==0:
-                raise Exception(f'Speaker label {speaker_label} not found in the transcript')
-        else:
-            if speaker_df['speaker_label'].unique().shape[0]>1:
-                raise Exception('Multiple speakers found in the transcript. Please provide a speaker label')
+            if speaker_df.empty:
+                raise ValueError(f"Speaker label {speaker_label} not found in the transcript.")
+        elif speaker_df['speaker_label'].nunique() > 1:
+            raise ValueError("Multiple speakers found in the transcript. Please provide a speaker label.")
 
         phonation_df = putil.extract_phonation(speaker_df)
-
-        if len(phonation_df)>0:
+        if not phonation_df.empty:
             phonation_dict = putil.segment_phonations(audio_signal, phonation_df)
 
     except Exception as e:
@@ -138,11 +136,9 @@ def clean_acoustic_df(df, file, duration, measures):
     df = df[[measures['phonation_type']] + [col for col in df.columns if col != measures['phonation_type']]]
     df[measures['duration']] = duration
 
-    # remove unused columns
-    ## pause related measures
-    for col in [measures['spir'], measures['pause_meddur'], measures['pause_maddur'], measures['silence_ratio']]:
-        if col in df.columns:
-            df = df.drop(col, axis=1)
+    # remove unused columns - pause related measures
+    cols_to_drop = [measures['spir'], measures['pause_meddur'], measures['pause_maddur'], measures['silence_ratio']]
+    df = df.drop(columns=[col for col in cols_to_drop if col in df.columns], errors='ignore')
 
     return df
 
@@ -178,6 +174,9 @@ def phonations_acoustics(audio_path, transcript_json, speaker_label=''):
     measures = json.load(file)
 
     try:
+        if audio_path.split('.')[-1] != 'wav':
+            raise Exception('Audio file format not supported. Please provide a .wav file.')
+
         # extract phonation segments
         phonation_dict = phonation_extraction(audio_path, transcript_json, speaker_label)
         if not phonation_dict:
