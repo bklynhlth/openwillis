@@ -50,8 +50,10 @@ def extract_phonation(speaker_df):
     for phonation in PHONATIONS:
         phonation_list = PHONATIONS[phonation]
         phonation_df_temp = speaker_df_clean[speaker_df_clean['content'].isin(phonation_list)]
-        phonation_df_temp['phonation'] = phonation
+        if phonation_df_temp.empty:
+            continue
 
+        phonation_df_temp['phonation'] = phonation
         phonation_df = pd.concat([phonation_df, phonation_df_temp])
 
     phonation_df = phonation_df[phonation_df['end_time'].astype(float) - phonation_df['start_time'].astype(float) > 0.7]
@@ -85,21 +87,24 @@ def segment_phonations(audio_signal, phonation_df):
     phonation_counts = {spk + ph: 0 for spk in phonation_df['speaker_label'].unique() for ph in phonation_df['phonation'].unique()}
 
     for _, row in phonation_df.iterrows():
-        start_time = row['start_time']
-        end_time = row['end_time']
+        try:
+            start_time = row['start_time']
+            end_time = row['end_time']
 
-        speaker_label = row['speaker_label']
+            speaker_label = row['speaker_label']
 
-        speaker_audio = audio_signal[start_time:end_time]
-        # strip silence more than 100ms in the beginning and end
-        speaker_audio = speaker_audio.strip_silence(silence_len=100, silence_thresh=-30)
+            speaker_audio = audio_signal[start_time:end_time]
+            # strip silence more than 100ms in the beginning and end
+            speaker_audio = speaker_audio.strip_silence(silence_len=100, silence_thresh=-30)
 
-        if len(speaker_audio) < 500:
-            continue
+            if len(speaker_audio) < 500:
+                continue
 
-        speaker_array = np.array(speaker_audio.get_array_of_samples())
+            speaker_array = np.array(speaker_audio.get_array_of_samples())
 
-        phonation_dict[f"{speaker_label}_{row['phonation']}{phonation_counts[speaker_label+row['phonation']]}"] = speaker_array
-        phonation_counts[speaker_label + row['phonation']] += 1
+            phonation_dict[f"{speaker_label}_{row['phonation']}{phonation_counts[speaker_label+row['phonation']]}"] = speaker_array
+            phonation_counts[speaker_label + row['phonation']] += 1
+        except Exception as e:
+            logger.error(f'Error segmenting phonation: {e}')
 
     return phonation_dict
