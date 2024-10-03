@@ -169,13 +169,13 @@ def create_turns_aws(item_data, measures):
             if current_utterance:
                 # split utterance into phrases
                 phrases = nltk.tokenize.sent_tokenize(' '.join(utterance_texts))
-                phrases_idxs = []
-
-                start_idx = current_utterance[0]
-                for phrase in phrases:
-                    end_idx = start_idx + len(phrase.split()) - 1
-                    phrases_idxs.append((start_idx, end_idx))
-                    start_idx = end_idx + 1
+                word_counts = np.array([len(phrase.split()) for phrase in phrases])
+                # Compute the start indices using cumulative sum and add the starting index of the first phrase
+                start_indices = np.cumsum(np.concatenate(([0], word_counts[:-1]))) + current_utterance[0]
+                # Compute the end indices by adding word counts to start indices and subtracting 1
+                end_indices = start_indices + word_counts - 1
+                # Zip start and end indices to create the phrase index tuples
+                phrases_idxs = np.column_stack((start_indices, end_indices))
 
                 utterances.append({
                     measures['utterance_ids']: (current_utterance[0], current_utterance[-1]),
@@ -203,13 +203,13 @@ def create_turns_aws(item_data, measures):
     # Don't forget to add the last utterance if the loop ends
     if current_utterance:
         phrases = nltk.tokenize.sent_tokenize(' '.join(utterance_texts))
-        phrases_idxs = []
-
-        start_idx = current_utterance[0]
-        for phrase in phrases:
-            end_idx = start_idx + len(phrase.split()) - 1
-            phrases_idxs.append((start_idx, end_idx))
-            start_idx = end_idx + 1
+        word_counts = np.array([len(phrase.split()) for phrase in phrases])
+        # Compute the start indices using cumulative sum and add the starting index of the first phrase
+        start_indices = np.cumsum(np.concatenate(([0], word_counts[:-1]))) + current_utterance[0]
+        # Compute the end indices by adding word counts to start indices and subtracting 1
+        end_indices = start_indices + word_counts - 1
+        # Zip start and end indices to create the phrase index tuples
+        phrases_idxs = np.column_stack((start_indices, end_indices))
 
         utterances.append({
             measures['utterance_ids']: (current_utterance[0], current_utterance[-1]),
