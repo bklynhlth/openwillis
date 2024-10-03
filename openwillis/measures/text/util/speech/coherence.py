@@ -155,6 +155,34 @@ def get_word_coherence_summary(word_df, summ_df, measures):
 
     return summ_df
 
+def append_nan_values(coherence_lists, row_len):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    Helper function for appending NaN values to the coherence lists.
+
+    Parameters:
+    ...........
+    coherence_lists: dict
+        A dictionary containing the coherence lists.
+    row_len: int
+        The length of the row.
+
+    Returns:
+    ...........
+    coherence_lists: dict
+        The updated coherence lists.
+
+    ------------------------------------------------------------------------------------------------------
+    """
+    coherence_lists['word_coherence'] += [np.nan] * row_len
+    coherence_lists['word_coherence_5'] += [np.nan] * row_len
+    coherence_lists['word_coherence_10'] += [np.nan] * row_len
+    for k in range(2, 11):
+        coherence_lists['variability'][k] += [np.nan] * row_len
+
+    return coherence_lists
+
 def get_word_coherence(df_list, utterances_speaker, min_coherence_turn_length, language, measures):
     """
     ------------------------------------------------------------------------------------------------------
@@ -203,20 +231,11 @@ def get_word_coherence(df_list, utterances_speaker, min_coherence_turn_length, l
             'variability': {k: [] for k in range(2, 11)}
         }
 
-        # Helper function to handle missing values
-        def append_nan_values(row_len):
-            """Helper to append NaN values to the lists."""
-            coherence_lists['word_coherence'] += [np.nan] * row_len
-            coherence_lists['word_coherence_5'] += [np.nan] * row_len
-            coherence_lists['word_coherence_10'] += [np.nan] * row_len
-            for k in range(2, 11):
-                coherence_lists['variability'][k] += [np.nan] * row_len
-
         # Process each utterance
         for _, row in utterances_speaker.iterrows():
             try:
                 if len(row[measures['words_texts']]) < min_coherence_turn_length:
-                    append_nan_values(len(row[measures['words_texts']]))
+                    coherence_lists = append_nan_values(coherence_lists, len(row[measures['words_texts']]))
                     continue
 
                 # Get word coherence for the utterance
@@ -231,7 +250,7 @@ def get_word_coherence(df_list, utterances_speaker, min_coherence_turn_length, l
 
             except Exception as e:
                 logger.error(f"Error in word coherence analysis for row: {e}")
-                append_nan_values(len(row[measures['words_texts']]))
+                coherence_lists = append_nan_values(coherence_lists, len(row[measures['words_texts']]))
 
         # Update word_df with calculated coherence values
         word_df[measures['word_coherence']] = coherence_lists['word_coherence']
@@ -248,6 +267,45 @@ def get_word_coherence(df_list, utterances_speaker, min_coherence_turn_length, l
         logger.error(f"Error in word coherence analysis: {e}")
     finally:
         return df_list
+
+def calculate_log_probs(input_ids, masked_input_ids, model, start_offset, end_offset, idx):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    Helper function to calculate log probabilities for a given window size
+
+    Parameters:
+    ...........
+    input_ids: torch.Tensor
+        The input tensor.
+    masked_input_ids: torch.Tensor
+        The masked input tensor.
+    model: BertForMaskedLM
+        A BERT model.
+    start_offset: int
+        The start offset.
+    end_offset: int
+        The end offset.
+    idx: int
+        The index.
+
+    Returns:
+    ...........
+    float
+        The calculated log probability.
+
+    ------------------------------------------------------------------------------------------------------
+    """
+    input_ids_filtered = input_ids[:, start_offset:end_offset+1]
+    masked_input_ids_filtered = masked_input_ids[:, start_offset:end_offset+1]
+    idx_adjusted = idx - start_offset
+
+    with torch.no_grad():
+        outputs = model(input_ids=masked_input_ids_filtered, labels=input_ids_filtered)
+    logits = outputs.logits[0, idx_adjusted].softmax(dim=0)
+    true_log_prob = logits[input_ids[0, idx]].log().item()
+    
+    return true_log_prob
 
 def calculate_perplexity(text, model, tokenizer):
     """
@@ -286,19 +344,6 @@ def calculate_perplexity(text, model, tokenizer):
 
     log_probs_dict = {2: [], 5: [], 7: [], 256: []}
 
-    def calculate_log_probs(start_offset, end_offset, idx):
-        """Helper function to calculate log probabilities for a given window size."""
-        input_ids_filtered = input_ids[:, start_offset:end_offset+1]
-        masked_input_ids_filtered = masked_input_ids[:, start_offset:end_offset+1]
-        idx_adjusted = idx - start_offset
-
-        with torch.no_grad():
-            outputs = model(input_ids=masked_input_ids_filtered, labels=input_ids_filtered)
-        logits = outputs.logits[0, idx_adjusted].softmax(dim=0)
-        true_log_prob = logits[input_ids[0, idx]].log().item()
-        
-        return true_log_prob
-
     # Iterate over each token in the input text
     for i in range(input_ids.size(1)):
         masked_input_ids[0, i] = tokenizer.mask_token_id
@@ -307,7 +352,7 @@ def calculate_perplexity(text, model, tokenizer):
         for window_size in [256, 2, 5, 7]:
             start = max(0, i - window_size)
             end = min(input_ids.size(1), i + window_size)
-            log_probs_dict[window_size].append(calculate_log_probs(start, end, i))
+            log_probs_dict[window_size].append(calculate_log_probs(input_ids, masked_input_ids, model, start, end, i))
 
         # Unmask the token for the next iteration
         masked_input_ids[0, i] = input_ids[0, i]
