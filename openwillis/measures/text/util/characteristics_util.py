@@ -486,25 +486,15 @@ def create_text_list(utterances_speaker, speaker_label, min_turn_length, measure
 
     """
 
-    word_list = []
-    turn_list = []
-    text = ""
-    turn_indices = []
-    for i in range(len(utterances_speaker)):
-        row = utterances_speaker.iloc[i]
+    full_text = " ".join(utterances_speaker[measures['utterance_text']].tolist())
+    
+    word_list = sum(utterances_speaker[measures['words_texts']].tolist(), [])
 
-        utterance_text = row[measures['utterance_text']]
-        words_texts = row[measures['words_texts']]
-        utterance_ids = row[measures['utterance_ids']]
+    valid_turns = utterances_speaker[utterances_speaker[measures['words_texts']].apply(len) >= min_turn_length]
+    turn_list = valid_turns[measures['utterance_text']].tolist()
+    turn_indices = valid_turns[measures['utterance_ids']].tolist()
 
-        text += " " + utterance_text
-        word_list += words_texts
-
-        if speaker_label is not None and len(words_texts) >= min_turn_length:
-            turn_list.append(utterance_text)
-            turn_indices.append(utterance_ids)
-
-    text_list = [word_list, turn_list, text]
+    text_list = [word_list, turn_list, full_text]
 
     if speaker_label is not None and len(turn_indices) <= 0:
         raise ValueError(f"No utterances found for speaker {speaker_label} with minimum length {min_turn_length}")
