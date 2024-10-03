@@ -129,6 +129,58 @@ def download_nltk_resources():
     except LookupError:
         nltk.download("averaged_perceptron_tagger")
         
+def process_utterance(utterances, current_utterance, utterance_texts, current_words, words_texts, current_speaker, measures):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    This function processes the utterance and splits it into phrases.
+
+    Parameters:
+    ...........
+    utterances: list
+        A list of utterances.
+    current_utterance: list
+        A list of current utterance indices.
+    utterance_texts: list
+        A list of utterance texts.
+    current_words: list
+        A list of current word indices.
+    words_texts: list
+        A list of word texts.
+    current_speaker: str
+        Speaker label
+    measures: dict
+        A dictionary containing the names of the columns in the output dataframes.
+
+    Returns:
+    ...........
+    utterances: list
+        A list of utterances.
+
+    ------------------------------------------------------------------------------------------------------
+    """
+    # split utterance into phrases
+    phrases = nltk.tokenize.sent_tokenize(' '.join(utterance_texts))
+    word_counts = np.array([len(phrase.split()) for phrase in phrases])
+    # Compute the start indices using cumulative sum and add the starting index of the first phrase
+    start_indices = np.cumsum(np.concatenate(([0], word_counts[:-1]))) + current_utterance[0]
+    # Compute the end indices by adding word counts to start indices and subtracting 1
+    end_indices = start_indices + word_counts - 1
+    # Zip start and end indices to create the phrase index tuples
+    phrases_idxs = np.column_stack((start_indices, end_indices))
+
+    utterances.append({
+        measures['utterance_ids']: (current_utterance[0], current_utterance[-1]),
+        measures['utterance_text']: ' '.join(utterance_texts),
+        measures['phrases_ids']: phrases_idxs,
+        measures['phrases_texts']: phrases.copy(),
+        measures['words_ids']: current_words.copy(),
+        measures['words_texts']: words_texts.copy(),
+        measures['speaker_label']: current_speaker,
+    })
+
+    return utterances
+
 def create_turns_aws(item_data, measures):
     """
     ------------------------------------------------------------------------------------------------------
@@ -167,25 +219,7 @@ def create_turns_aws(item_data, measures):
         else:
             # If not, save the current utterance (if any) and start a new one
             if current_utterance:
-                # split utterance into phrases
-                phrases = nltk.tokenize.sent_tokenize(' '.join(utterance_texts))
-                word_counts = np.array([len(phrase.split()) for phrase in phrases])
-                # Compute the start indices using cumulative sum and add the starting index of the first phrase
-                start_indices = np.cumsum(np.concatenate(([0], word_counts[:-1]))) + current_utterance[0]
-                # Compute the end indices by adding word counts to start indices and subtracting 1
-                end_indices = start_indices + word_counts - 1
-                # Zip start and end indices to create the phrase index tuples
-                phrases_idxs = np.column_stack((start_indices, end_indices))
-
-                utterances.append({
-                    measures['utterance_ids']: (current_utterance[0], current_utterance[-1]),
-                    measures['utterance_text']: ' '.join(utterance_texts),
-                    measures['phrases_ids']: phrases_idxs,
-                    measures['phrases_texts']: phrases.copy(),
-                    measures['words_ids']: current_words.copy(),
-                    measures['words_texts']: words_texts.copy(),
-                    measures['speaker_label']: current_speaker,
-                })
+                utterances = process_utterance(utterances, current_utterance, utterance_texts, current_words, words_texts, current_speaker, measures)
                 current_utterance.clear()
                 utterance_texts.clear()
                 current_words.clear()
@@ -202,24 +236,7 @@ def create_turns_aws(item_data, measures):
 
     # Don't forget to add the last utterance if the loop ends
     if current_utterance:
-        phrases = nltk.tokenize.sent_tokenize(' '.join(utterance_texts))
-        word_counts = np.array([len(phrase.split()) for phrase in phrases])
-        # Compute the start indices using cumulative sum and add the starting index of the first phrase
-        start_indices = np.cumsum(np.concatenate(([0], word_counts[:-1]))) + current_utterance[0]
-        # Compute the end indices by adding word counts to start indices and subtracting 1
-        end_indices = start_indices + word_counts - 1
-        # Zip start and end indices to create the phrase index tuples
-        phrases_idxs = np.column_stack((start_indices, end_indices))
-
-        utterances.append({
-            measures['utterance_ids']: (current_utterance[0], current_utterance[-1]),
-            measures['utterance_text']: ' '.join(utterance_texts),
-            measures['phrases_ids']: phrases_idxs,
-            measures['phrases_texts']: phrases.copy(),
-            measures['words_ids']: current_words.copy(),
-            measures['words_texts']: words_texts.copy(),
-            measures['speaker_label']: current_speaker,
-        })
+        utterances = process_utterance(utterances, current_utterance, utterance_texts, current_words, words_texts, current_speaker, measures)
 
     return pd.DataFrame(utterances)
 
