@@ -451,6 +451,92 @@ def init_model(language, measures):
 
     return sentence_encoder, tokenizer, bert
 
+def calculate_turn_coherence(utterances_filtered, turn_df, min_coherence_turn_length, speaker_label, sentence_encoder, bert, tokenizer, measures):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    This function calculates turn coherence measures for the specified speaker.
+
+    Parameters:
+    ...........
+    utterances_filtered: pandas dataframe
+        A dataframe containing the turns extracted from the JSON object
+        after filtering out turns with less than min_turn_length words of the specified speaker.
+    turn_df: pandas dataframe
+        A dataframe containing turn summary information.
+    min_coherence_turn_length: int
+        Minimum number of words in a turn for word coherence analysis.
+    speaker_label: str
+        Speaker label
+    sentence_encoder: SentenceTransformer
+        A SentenceTransformer model.
+    bert: BertForMaskedLM
+        A BERT model.
+    tokenizer: BertTokenizer
+        A BERT tokenizer.
+    measures: dict
+        A dictionary containing the names of the columns in the output dataframes.
+
+    Returns:
+    ...........
+    turn_df: pandas dataframe
+        The updated turn_df dataframe.
+
+    ------------------------------------------------------------------------------------------------------
+    """
+    # semantic similarity between each pair of utterances
+    utterances_texts = utterances_filtered[measures['utterance_text']].values.tolist()
+    utterances_embeddings = sentence_encoder.encode(utterances_texts) if sentence_encoder else None
+    similarity_matrix = cosine_similarity(utterances_embeddings) if sentence_encoder else None
+
+    # Initialize coherence lists
+    sentence_tangeniality1_list, sentence_tangeniality2_list = [], []
+    perplexity_list, perplexity_5_list, perplexity_11_list, perplexity_15_list = [], [], [], []
+    turn_to_turn_tangeniality_list = []
+    for i, row in utterances_filtered.iterrows():
+        current_speaker = row[measures['speaker_label']]
+
+        if current_speaker != speaker_label:
+            continue
+        elif len(row[measures['words_texts']]) < min_coherence_turn_length:
+            sentence_tangeniality1_list.append(np.nan)
+            sentence_tangeniality2_list.append(np.nan)
+            perplexity_list.append(np.nan)
+            perplexity_5_list.append(np.nan)
+            perplexity_11_list.append(np.nan)
+            perplexity_15_list.append(np.nan)
+            turn_to_turn_tangeniality_list.append(np.nan)
+            continue
+
+        phrases_texts = row[measures['phrases_texts']]
+        utterance_text = row[measures['utterance_text']]
+        
+        sentence_tangeniality1, sentence_tangeniality2, perplexity, perplexity_5, perplexity_11, perplexity_15 = calculate_phrase_tangeniality(
+            phrases_texts, utterance_text, sentence_encoder, bert, tokenizer
+        )
+        
+        sentence_tangeniality1_list.append(sentence_tangeniality1)
+        sentence_tangeniality2_list.append(sentence_tangeniality2)
+        perplexity_list.append(perplexity)
+        perplexity_5_list.append(perplexity_5)
+        perplexity_11_list.append(perplexity_11)
+        perplexity_15_list.append(perplexity_15)
+
+        if i == 0 or len(utterances_filtered.iloc[i - 1][measures['words_texts']]) < min_coherence_turn_length or not sentence_encoder:
+            turn_to_turn_tangeniality_list.append(np.nan)
+        else:
+            turn_to_turn_tangeniality_list.append(similarity_matrix[i, i - 1])
+
+    turn_df[measures['sentence_tangeniality1']] = sentence_tangeniality1_list
+    turn_df[measures['sentence_tangeniality2']] = sentence_tangeniality2_list
+    turn_df[measures['perplexity']] = perplexity_list
+    turn_df[measures['perplexity_5']] = perplexity_5_list
+    turn_df[measures['perplexity_11']] = perplexity_11_list
+    turn_df[measures['perplexity_15']] = perplexity_15_list
+    turn_df[measures['turn_to_turn_tangeniality']] = turn_to_turn_tangeniality_list
+
+    return turn_df
+
 def get_phrase_coherence(df_list, utterances_filtered, min_coherence_turn_length, speaker_label, language, measures):
     """
     ------------------------------------------------------------------------------------------------------
@@ -490,58 +576,7 @@ def get_phrase_coherence(df_list, utterances_filtered, min_coherence_turn_length
 
         # turn-level
         if len(turn_df) > 0:
-
-            ## semantic similarity of current turn to previous turn of the other speaker
-            utterances_texts = utterances_filtered[measures['utterance_text']].values.tolist()
-            utterances_embeddings = sentence_encoder.encode(utterances_texts) if sentence_encoder else None
-            similarity_matrix = cosine_similarity(utterances_embeddings) if sentence_encoder else None
-
-            # Initialize coherence lists
-            sentence_tangeniality1_list, sentence_tangeniality2_list = [], []
-            perplexity_list, perplexity_5_list, perplexity_11_list, perplexity_15_list = [], [], [], []
-            turn_to_turn_tangeniality_list = []
-            for i, row in utterances_filtered.iterrows():
-                current_speaker = row[measures['speaker_label']]
-
-                if current_speaker != speaker_label:
-                    continue
-                elif len(row[measures['words_texts']]) < min_coherence_turn_length:
-                    sentence_tangeniality1_list.append(np.nan)
-                    sentence_tangeniality2_list.append(np.nan)
-                    perplexity_list.append(np.nan)
-                    perplexity_5_list.append(np.nan)
-                    perplexity_11_list.append(np.nan)
-                    perplexity_15_list.append(np.nan)
-                    turn_to_turn_tangeniality_list.append(np.nan)
-                    continue
-
-                phrases_texts = row[measures['phrases_texts']]
-                utterance_text = row[measures['utterance_text']]
-                
-                sentence_tangeniality1, sentence_tangeniality2, perplexity, perplexity_5, perplexity_11, perplexity_15 = calculate_phrase_tangeniality(
-                    phrases_texts, utterance_text, sentence_encoder, bert, tokenizer
-                )
-                
-                sentence_tangeniality1_list.append(sentence_tangeniality1)
-                sentence_tangeniality2_list.append(sentence_tangeniality2)
-                perplexity_list.append(perplexity)
-                perplexity_5_list.append(perplexity_5)
-                perplexity_11_list.append(perplexity_11)
-                perplexity_15_list.append(perplexity_15)
-
-                if i == 0 or len(utterances_filtered.iloc[i - 1][measures['words_texts']]) < min_coherence_turn_length or not sentence_encoder:
-                    turn_to_turn_tangeniality_list.append(np.nan)
-                else:
-                    turn_to_turn_tangeniality_list.append(similarity_matrix[i, i - 1])
-
-            turn_df[measures['sentence_tangeniality1']] = sentence_tangeniality1_list
-            turn_df[measures['sentence_tangeniality2']] = sentence_tangeniality2_list
-            turn_df[measures['perplexity']] = perplexity_list
-            turn_df[measures['perplexity_5']] = perplexity_5_list
-            turn_df[measures['perplexity_11']] = perplexity_11_list
-            turn_df[measures['perplexity_15']] = perplexity_15_list
-            turn_df[measures['turn_to_turn_tangeniality']] = turn_to_turn_tangeniality_list
-
+            turn_df = calculate_turn_coherence(utterances_filtered, turn_df, min_coherence_turn_length, speaker_label, sentence_encoder, bert, tokenizer, measures)
 
             for measure in ['sentence_tangeniality1', 'sentence_tangeniality2', 'perplexity', 'perplexity_5', 'perplexity_11', 'perplexity_15', 'turn_to_turn_tangeniality']:
                 if turn_df[measures[measure]].isnull().all():
