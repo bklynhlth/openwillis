@@ -544,6 +544,8 @@ def get_phrase_coherence(df_list, utterances_filtered, min_coherence_turn_length
 
 
             for measure in ['sentence_tangeniality1', 'sentence_tangeniality2', 'perplexity', 'perplexity_5', 'perplexity_11', 'perplexity_15', 'turn_to_turn_tangeniality']:
+                if turn_df[measures[measure]].isnull().all():
+                    continue
                 summ_df[measures[measure + '_mean']] = turn_df[measures[measure]].mean(skipna=True)
                 summ_df[measures[measure + '_var']] = turn_df[measures[measure]].var(skipna=True)
 
