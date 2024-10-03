@@ -93,9 +93,10 @@ def read_kwargs(kwargs):
     
     input_param['transcript_json'] = kwargs.get('transcript_json', json.dumps({}))
     input_param['context'] = kwargs.get('context', '')
+
     return input_param
 
-def get_pyannote(input_param, file_name, filepath):
+def get_pyannote(input_param, filepath):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -105,8 +106,6 @@ def get_pyannote(input_param, file_name, filepath):
     ...........
     input_param : dict
         A dictionary containing input parameters
-    file_name :str
-        The name of the file.
     filepath : str
         The file path.
 
@@ -153,18 +152,17 @@ def speaker_separation_nolabels(filepath, **kwargs):
     signal_label = {}
     input_param = read_kwargs(kwargs)
 
-    file_name, _ = os.path.splitext(os.path.basename(filepath))
     measures = get_config()
 
     try:
         if not os.path.exists(filepath) or 'transcript_json' not in kwargs:
             return signal_label
 
-        speaker_df, speaker_count = get_pyannote(input_param, file_name, filepath)
+        speaker_df, speaker_count = get_pyannote(input_param, filepath)
         audio_signal = AudioSegment.from_file(file = filepath, format = "wav")
 
         if len(speaker_df)>0 and speaker_count>1:
-            signal_label = sutil.generate_audio_signal(speaker_df , audio_signal, input_param['context'], measures)
+            signal_label = sutil.generate_audio_signal(speaker_df, audio_signal, input_param['context'], measures)
 
     except Exception as e:
         logger.error(f'Error in diard processing: {e} & File: {filepath}')

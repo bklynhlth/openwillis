@@ -83,7 +83,6 @@ def speaker_separation_labels(filepath, transcript_json):
 
         audio_signal = AudioSegment.from_file(file = filepath, format = "wav")
         if not is_amazon_transcribe(transcript_json):
-
             speaker_df, speaker_count = sutil.whisperx_to_dataframe(transcript_json)
         else:
             speaker_df, speaker_count = sutil.transcribe_response_to_dataframe(transcript_json)

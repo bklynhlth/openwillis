@@ -82,5 +82,7 @@
   "mfcc13_var": "mfcc13_var",
   "mfcc14_var": "mfcc14_var",
   "cpp_mean": "cpp_mean",
-  "cpp_var": "cpp_var"
+  "cpp_var": "cpp_var",
+  "phonation_type": "phonation_type",
+  "duration": "duration"
 }
