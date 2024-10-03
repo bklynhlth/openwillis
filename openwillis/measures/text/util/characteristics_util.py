@@ -2,10 +2,11 @@
 # website:   http://www.bklynhlth.com
 
 # import the required packages
+import logging
+import itertools
+
 import pandas as pd
 import numpy as np
-import logging
-
 import nltk
 from openwillis.measures.text.util.speech.pause import get_pause_feature
 from openwillis.measures.text.util.speech.lexical import get_repetitions, get_sentiment, get_pos_tag
@@ -102,11 +103,10 @@ def create_index_column(item_data, measures):
     item_data: dict
         The updated JSON response object.
     """
-    index = 0
-    for item in item_data:
-        for word in item.get("words", []):
-            word[measures["old_index"]] = index
-            index += 1
+    all_words = list(itertools.chain.from_iterable([item.get("words", []) for item in item_data]))
+
+    for index, word in enumerate(all_words):
+        word[measures["old_index"]] = index
 
     return item_data
 
