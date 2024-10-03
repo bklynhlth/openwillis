@@ -7,6 +7,7 @@ import tempfile
 import pandas as pd
 import numpy as np
 import logging
+import shutil
 
 from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
@@ -496,9 +497,7 @@ def adjust_volume(audio_path, signal_label, volume_level):
     signal_label = from_audio(temp_dir)
 
     # clear the temp directory
-    for file in os.listdir(temp_dir):
-        os.remove(os.path.join(temp_dir, file))
-    os.rmdir(temp_dir)
+    shutil.rmtree(temp_dir)
 
     return signal_label
 
