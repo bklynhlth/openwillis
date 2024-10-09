@@ -142,7 +142,7 @@ def clean_acoustic_df(df, file, duration, measures):
 
     return df
 
-def phonations_acoustics(audio_path, transcript_json, speaker_label=''):
+def phonation_acoustics(audio_path, transcript_json, speaker_label=''):
     """
     ------------------------------------------------------------------------------------------------------
 
