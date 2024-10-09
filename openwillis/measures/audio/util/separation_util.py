@@ -489,10 +489,13 @@ def adjust_volume(audio_path, signal_label, volume_level):
     temp_dir = tempfile.mkdtemp()
     to_audio(audio_path, signal_label, temp_dir)
     for file in os.listdir(temp_dir):
-        # standardize volume level
-        audio_signal = AudioSegment.from_file(file = os.path.join(temp_dir, file), format = "wav")
-        audio_signal = volume_normalization(audio_signal, volume_level)
-        audio_signal.export(os.path.join(temp_dir, file), format="wav")
+        try:
+            # standardize volume level
+            audio_signal = AudioSegment.from_file(file = os.path.join(temp_dir, file), format = "wav")
+            audio_signal = volume_normalization(audio_signal, volume_level)
+            audio_signal.export(os.path.join(temp_dir, file), format="wav")
+        except Exception as e:
+            logger.error(f'Error in adjusting volume for file: {file}, error: {e}')
 
     signal_label = from_audio(temp_dir)
 

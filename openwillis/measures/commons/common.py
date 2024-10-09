@@ -6,6 +6,10 @@ import json
 import os
 from pydub import AudioSegment
 import numpy as np
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger=logging.getLogger()
 
 def make_dir(dir_name):
     """
@@ -79,18 +83,21 @@ def from_audio(audio_dir):
     # Iterate over the files in the directory
     for file_name in os.listdir(audio_dir):
         if file_name.endswith('.wav'):
-            # Extract speaker key from the file name (assuming the format 'filename_speaker.wav')
-            speaker_key = file_name.split('_')[-1].replace('.wav', '')
-            
-            # Load the audio file
-            audio_file_path = os.path.join(audio_dir, file_name)
-            audio = AudioSegment.from_file(audio_file_path, format="wav")
-            
-            # Convert audio to raw bytes and then to a numpy array
-            audio_array = np.array(audio.get_array_of_samples())
-            
-            # Store in the dictionary with speaker key
-            speaker_dict[speaker_key] = audio_array
+            try:
+                # Extract speaker key from the file name (assuming the format 'filename_speaker.wav')
+                speaker_key = file_name.split('_')[-1].replace('.wav', '')
+                
+                # Load the audio file
+                audio_file_path = os.path.join(audio_dir, file_name)
+                audio = AudioSegment.from_file(audio_file_path, format="wav")
+                
+                # Convert audio to raw bytes and then to a numpy array
+                audio_array = np.array(audio.get_array_of_samples())
+                
+                # Store in the dictionary with speaker key
+                speaker_dict[speaker_key] = audio_array
+            except Exception as e:
+                logger.error(f"Error while converting from audio to numpy array file: {file_name}, error: {e}")
     
     return speaker_dict
 
