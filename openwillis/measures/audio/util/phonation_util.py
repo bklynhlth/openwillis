@@ -53,7 +53,7 @@ def extract_phonation(speaker_df):
         if phonation_df_temp.empty:
             continue
 
-        phonation_df_temp['phonation'] = phonation
+        phonation_df_temp.loc[:, 'phonation'] = phonation
         phonation_df = pd.concat([phonation_df, phonation_df_temp])
 
     phonation_df = phonation_df[phonation_df['end_time'].astype(float) - phonation_df['start_time'].astype(float) > 0.7]
