@@ -2,13 +2,17 @@
 # website:   http://www.bklynhlth.com
 
 # import the required packages
-
+import os
+import tempfile
 import pandas as pd
 import numpy as np
 import logging
+import shutil
 
 from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
+from pydub import AudioSegment
+from openwillis.measures.commons.common import to_audio, from_audio
 
 logging.basicConfig(level=logging.INFO)
 logger=logging.getLogger()
@@ -459,3 +463,75 @@ def volume_normalization(audio_signal, target_dBFS):
 
     audio_signal = audio_signal.apply_gain(gain_adjustment)
     return audio_signal
+
+def adjust_volume(audio_path, signal_label, volume_level):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    This function adjusts the volume level of the audio signal.
+
+    Parameters:
+    ...........
+    audio_path : str
+        Path to the input audio file.
+    signal_label : pandas.DataFrame
+        A pandas dataframe containing the speaker diarization information.
+    volume_level : int
+        The volume normalization level.
+
+    Returns:
+    ...........
+    signal_label : pandas.DataFrame
+        A pandas dataframe containing the speaker diarization information.
+
+    ------------------------------------------------------------------------------------------------------
+    """
+    temp_dir = tempfile.mkdtemp()
+    to_audio(audio_path, signal_label, temp_dir)
+    for file in os.listdir(temp_dir):
+        try:
+            # standardize volume level
+            audio_signal = AudioSegment.from_file(file = os.path.join(temp_dir, file), format = "wav")
+            audio_signal = volume_normalization(audio_signal, volume_level)
+            audio_signal.export(os.path.join(temp_dir, file), format="wav")
+        except Exception as e:
+            logger.error(f'Error in adjusting volume for file: {file}, error: {e}')
+
+    signal_label = from_audio(temp_dir)
+
+    # clear the temp directory
+    shutil.rmtree(temp_dir)
+
+    return signal_label
+
+def combine_turns(df):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    Combines consecutive words of the same speaker into a single turn.
+
+    Parameters:
+    ...........
+    df : pandas.DataFrame
+        The dataframe containing the speaker diarization information.
+
+    Returns:
+    ...........
+    combined_df : pandas.DataFrame
+        The dataframe with combined turns.
+
+    ------------------------------------------------------------------------------------------------------
+    """
+    change_mask = df['speaker_label'] != df['speaker_label'].shift()
+    
+    groups = np.cumsum(change_mask)
+    
+    combined_df = df.groupby(groups).agg({
+        'start_time': 'first',
+        'end_time': 'last',
+        'confidence': 'mean',
+        'speaker_label': 'first',
+        'content': ' '.join
+    }).reset_index(drop=True)
+    
+    return combined_df
