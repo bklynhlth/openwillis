@@ -134,7 +134,7 @@ def clean_acoustic_df(df, file, duration, measures):
     """
     df[measures['phonation_type']] = file.split('_')[-1][0]
     df = df[[measures['phonation_type']] + [col for col in df.columns if col != measures['phonation_type']]]
-    df[measures['duration']] = duration
+    df.loc[:, measures['duration']] = duration
 
     # remove unused columns - pause related measures
     cols_to_drop = [measures['spir'], measures['pause_meddur'], measures['pause_maddur'], measures['silence_ratio']]
@@ -142,7 +142,7 @@ def clean_acoustic_df(df, file, duration, measures):
 
     return df
 
-def phonations_acoustics(audio_path, transcript_json, speaker_label=''):
+def phonation_acoustics(audio_path, transcript_json, speaker_label=''):
     """
     ------------------------------------------------------------------------------------------------------
 
