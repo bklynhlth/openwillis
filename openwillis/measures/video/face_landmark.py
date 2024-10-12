@@ -15,7 +15,7 @@ import mediapipe as mp
 from PIL import Image
 from protobuf_to_dict import protobuf_to_dict
 
-from openwillis.measures.video.util.crop_utils import crop_img
+from openwillis.measures.video.util.crop_utils import crop_with_padding_and_center
 
 logging.basicConfig(level=logging.INFO)
 logger=logging.getLogger()
@@ -198,7 +198,7 @@ def crop_and_process_face_mesh(img, face_mesh, df_common, bbox, frame):
         pandas.DataFrame: The processed face landmarks dataframe.
     """
     if bbox:
-        cropped_img = crop_img(img, bbox)
+        cropped_img = crop_with_padding_and_center(img, bbox)
         df_landmark = process_and_format_face_mesh(
             cropped_img,
             face_mesh,
@@ -240,6 +240,7 @@ def run_facemesh(path, bbox_list=[]):
         print(num_frames, len_bbox_list)
 
         if (len_bbox_list>0) & (num_frames != len_bbox_list):
+            print(num_frames, len_bbox_list)
             raise ValueError('Number of frames in video and number of bounding boxes do not match')
         
         face_mesh = init_facemesh()
@@ -704,14 +705,8 @@ def normalize_face_landmarks(
          (right_eye_z - left_eye_z)**2
     )
 
-    # ok so right now scaling factor is a based on an individuals
-    # average face which will vary from person to person and based on how far individuals
-    # are from the camera - I think we'll want to standardize more strongly
-    # the problem is that it makes it hard for faces with different geometries
-    # to be compared - so we'll need to think about how to handle that
-    # but it could be someting like you preserve width to height ratios
-    # then stanardize to one of them so you keep things somewhat consistent
-    scaling_factor = eye_distance / np.mean(eye_distance)
+    #scaling_factor = eye_distance / np.mean(eye_distance)
+    scaling_factor = 1/ eye_distance
 
 
     nose_x, nose_y, nose_z = get_vertices_for_col(df,nose_tip)
