@@ -667,9 +667,92 @@ def get_summary(df):
         df_summ = pd.concat([df_mean, df_std], axis =1).reset_index(drop=True)
     return df_summ
 
-def get_vertices_for_col(df,col_name):
+def apply_rotation_per_frame(norm_df, rotation_matrices):
     """
-    Retrieves the x, y, and z columns for a given column name from a DataFrame.
+    Applies the corresponding rotation matrix to each row (frame) of the DataFrame.
+
+    Parameters:
+    norm_df (DataFrame): The DataFrame containing the centered landmarks.
+    rotation_matrices (list of np.array): List of 3x3 rotation matrices for each frame.
+
+    Returns:
+    DataFrame: The rotated landmarks.
+    """
+    for idx, rotation_matrix in enumerate(rotation_matrices):
+        for i in range(1, 469):
+            x_col = f'lmk{str(i).zfill(3)}_x'
+            y_col = f'lmk{str(i).zfill(3)}_y'
+            z_col = f'lmk{str(i).zfill(3)}_z'
+
+            # Original centered coordinates
+            x = norm_df.loc[idx, x_col]
+            y = norm_df.loc[idx, y_col]
+            z = norm_df.loc[idx, z_col]
+
+            # Rotate using the rotation matrix for this frame
+            rotated_coords = np.dot(rotation_matrix, np.array([x, y, z]))
+            norm_df.loc[idx, x_col] = rotated_coords[0]
+            norm_df.loc[idx, y_col] = rotated_coords[1]
+            norm_df.loc[idx, z_col] = rotated_coords[2]
+
+    return norm_df
+
+# Step 3 function: Calculate the rotation matrix based on eye positions for each frame
+def calculate_rotation_matrix_for_all_frames(left_eye_x, left_eye_y, right_eye_x, right_eye_y):
+    """
+    Calculates the rotation matrix for each frame based on eye positions to align the eyes horizontally.
+
+    Parameters:
+    left_eye_x, left_eye_y, right_eye_x, right_eye_y (Series): The x and y coordinates of the eyes for all frames.
+
+    Returns:
+    list of np.array: List of 3x3 rotation matrices, one for each frame.
+    """
+    rotation_matrices = []
+    
+    for lx, ly, rx, ry in zip(left_eye_x, left_eye_y, right_eye_x, right_eye_y):
+        delta_eye_x = lx - rx
+        delta_eye_y = ly - ry
+
+        # Compute 2D angle between eyes (ignore z-axis for horizontal alignment)
+        theta = np.arctan2(delta_eye_y, delta_eye_x)
+
+        # Create the rotation matrix to rotate landmarks around the Z-axis
+        cos_theta = np.cos(-theta)  # Negate for clockwise rotation
+        sin_theta = np.sin(-theta)
+
+        rotation_matrix = np.array([
+            [cos_theta, -sin_theta, 0],
+            [sin_theta, cos_theta, 0],
+            [0, 0, 1]
+        ])
+
+        rotation_matrices.append(rotation_matrix)
+
+    return rotation_matrices
+
+def center_landmarks(df, nose_tip):
+    """
+    Centers the landmarks by moving the nose tip to the origin.
+
+    Parameters:
+    df (DataFrame): The DataFrame containing the landmarks.
+    nose_tip (str): The column name of the nose tip landmark.
+
+    Returns:
+    DataFrame: The centered landmarks.
+    """
+    norm_data = {}
+    for axis in ['x', 'y', 'z']:
+        for i in range(1, 469):
+            col_name = f'lmk{str(i).zfill(3)}_{axis}'
+            norm_data[col_name] = df[col_name] - df[f'{nose_tip}_{axis}']
+    
+    return pd.DataFrame(norm_data)
+
+def get_vertices_for_col(df, col_name):
+    """
+    Extracts the x, y, and z coordinates for a given column.
 
     Parameters:
     df (DataFrame): The DataFrame containing the columns.
@@ -686,54 +769,56 @@ def get_vertices_for_col(df,col_name):
 
     return x_col, y_col, z_col
 
-
-# Adjusted function with performance improvement
+# Main function with the refactored parts included
 def normalize_face_landmarks(
     df, 
-    nose_tip = 'lmk001',
-    left_eye = 'lmk144',
-    right_eye = 'lmk373'
+    align=True,
+    nose_tip='lmk001',
+    left_eye='lmk144',
+    right_eye='lmk373'
 ):
     # Extract the x, y, z coordinates of the key points
-    
-    left_eye_x, left_eye_y, left_eye_z = get_vertices_for_col(df,left_eye)
-    right_eye_x, right_eye_y, right_eye_z = get_vertices_for_col(df,right_eye)
-    # Scale based on the distance between the eye
+    left_eye_x, left_eye_y, left_eye_z = get_vertices_for_col(df, left_eye)
+    right_eye_x, right_eye_y, right_eye_z = get_vertices_for_col(df, right_eye)
+    nose_x, nose_y, nose_z = get_vertices_for_col(df, nose_tip)
+
+    # Step 1: Compute the eye distance (for scaling)
     eye_distance = np.sqrt(
         (right_eye_x - left_eye_x)**2 +
-         (right_eye_y - left_eye_y)**2 +
-         (right_eye_z - left_eye_z)**2
+        (right_eye_y - left_eye_y)**2 +
+        (right_eye_z - left_eye_z)**2
     )
+    scaling_factor =  eye_distance / np.mean(eye_distance) # scale to one
 
-    #scaling_factor = eye_distance / np.mean(eye_distance)
-    scaling_factor = 1/ eye_distance
+    # Step 2: Center the face landmarks by moving the nose to the origin
+    norm_df = center_landmarks(df, nose_tip)
+    if align:
+        # Step 3: Calculate the rotation matrix for each frame based on eye positions
+        rotation_matrices = calculate_rotation_matrix_for_all_frames(left_eye_x, left_eye_y, right_eye_x, right_eye_y)
 
-
-    nose_x, nose_y, nose_z = get_vertices_for_col(df,nose_tip)
-    # Center the landmarks by translating them so the nose is at the origin
-    norm_data = {}
-    for axis in ['x', 'y', 'z']:
-        for i in range(1, 469):
-            col_name = f'lmk{str(i).zfill(3)}_{axis}'
-            norm_data[col_name] = df[col_name] - df[f'{nose_tip}_{axis}']
+        # Step 5: Apply rotation to the landmarks for each frame
+        norm_df = apply_rotation_per_frame(norm_df, rotation_matrices)
     
-    # right now the orientation is sort of the opposite of what you'd expect
-    # negative is up and positive is down on the y axis
-    norm_df = pd.DataFrame(norm_data)
-    
-    # Normalize relative to the average face size
-    norm_df = norm_df.divide(scaling_factor, axis=0)
+     # Scale the landmarks to normalize the face size
+    landmark_cols = [f'lmk{str(i).zfill(3)}_{axis}' for i in range(1, 469) for axis in ['x', 'y', 'z']]
+    norm_df[landmark_cols] = norm_df[landmark_cols].div(scaling_factor.values, axis=0)
 
-    norm_df['frame']=df['frame']
+    # Add back the frame identifier
+    norm_df['frame'] = df['frame']
 
     return norm_df
+
+
+
+
 
 def facial_expressivity(
     filepath,
     baseline_filepath='',
     bbox_list=[],
     base_bbox_list=[],
-    normalize=True
+    normalize=True,
+    align=True
 ):
     """
     ---------------------------------------------------------------------------------------------------
@@ -779,7 +864,7 @@ def facial_expressivity(
     try:
         df_landmark = get_landmarks(filepath, 'input',bbox_list=bbox_list)
         if normalize:
-            df_landmark = normalize_face_landmarks(df_landmark)
+            df_landmark = normalize_face_landmarks(df_landmark, align=align)
         df_disp = get_displacement(df_landmark, baseline_filepath, config,base_bbox_list=base_bbox_list)
 
         # use mouth height to calculate mouth openness

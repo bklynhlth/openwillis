@@ -646,6 +646,8 @@ def create_single_face_output(
                 'right_eye_x',
                 'right_eye_y',
                 ]].astype(int)
+    #actually need to merge with full df to have the empty dicts
+    # so pass total frames in and merge on frame index
     bb_dict = int_df.to_dict(orient='records')
 
     return bb_dict
