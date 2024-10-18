@@ -105,6 +105,6 @@ def segment_phonations(audio_signal, phonation_df):
             phonation_dict[f"{speaker_label}_{row['phonation']}{phonation_counts[speaker_label+row['phonation']]}"] = speaker_array
             phonation_counts[speaker_label + row['phonation']] += 1
         except Exception as e:
-            logger.error(f'Error segmenting phonation: {e}')
+            logger.info(f'Error segmenting phonation: {e}')
 
     return phonation_dict

@@ -104,7 +104,7 @@ def phonation_extraction(filepath, transcript_json, speaker_label=''):
             phonation_dict = putil.segment_phonations(audio_signal, phonation_df)
 
     except Exception as e:
-        logger.error(f'Error phonation extraction: {e} & File: {filepath}')
+        logger.info(f'Error phonation extraction: {e} & File: {filepath}')
 
     return phonation_dict
 
@@ -199,13 +199,13 @@ def phonation_acoustics(audio_path, transcript_json, speaker_label=''):
 
                 phonations_df = pd.concat([phonations_df, df])
             except Exception as e:
-                logger.error(f'Error in phonation acoustics calculation for single phonation: {file} & Error: {e}')
+                logger.info(f'Error in phonation acoustics calculation for single phonation: {file} & Error: {e}')
 
         # summarize the phonation acoustics into dfs
         summ_df = phonations_df.groupby(measures['phonation_type']).mean().reset_index()
     
     except Exception as e:
-        logger.error(f'Error in phonation acoustic calculation- file: {audio_path} & Error: {e}')
+        logger.info(f'Error in phonation acoustic calculation- file: {audio_path} & Error: {e}')
     finally:
         # clear the temp directory
         if os.path.exists(temp_dir):
