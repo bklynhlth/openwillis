@@ -172,6 +172,7 @@ def phonation_acoustics(audio_path, transcript_json, speaker_label=''):
     measure_path = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), './config/acoustic.json'))
     file = open(measure_path)
     measures = json.load(file)
+    temp_dir = tempfile.mkdtemp()
 
     try:
         if audio_path.split('.')[-1] != 'wav':
@@ -183,7 +184,6 @@ def phonation_acoustics(audio_path, transcript_json, speaker_label=''):
             return phonations_df, summ_df
 
         # save phonation segments
-        temp_dir = tempfile.mkdtemp()
         to_audio(audio_path, phonation_dict, temp_dir)
 
         for file in os.listdir(temp_dir):
