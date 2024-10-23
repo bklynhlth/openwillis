@@ -220,7 +220,7 @@ def get_word_coherence(df_list, utterances_speaker, min_coherence_turn_length, l
             tokenizer = BertTokenizer.from_pretrained('bert-base-multilingual-cased')
             model = BertModel.from_pretrained('bert-base-multilingual-cased')
         else:
-            logger.error(f"Language {language} not supported for word coherence analysis.")
+            logger.info(f"Language {language} not supported for word coherence analysis.")
             return df_list
 
         # Initialize coherence lists
@@ -249,7 +249,7 @@ def get_word_coherence(df_list, utterances_speaker, min_coherence_turn_length, l
                     coherence_lists['variability'][k] += variability[k]
 
             except Exception as e:
-                logger.error(f"Error in word coherence analysis for row: {e}")
+                logger.info(f"Error in word coherence analysis for row: {e}")
                 coherence_lists = append_nan_values(coherence_lists, len(row[measures['words_texts']]))
 
         # Update word_df with calculated coherence values
@@ -264,7 +264,7 @@ def get_word_coherence(df_list, utterances_speaker, min_coherence_turn_length, l
 
         df_list = [word_df, turn_df, summ_df]
     except Exception as e:
-        logger.error(f"Error in word coherence analysis: {e}")
+        logger.info(f"Error in word coherence analysis: {e}")
     finally:
         return df_list
 
@@ -486,13 +486,13 @@ def init_model(language, measures):
         if language in measures["supported_langs_sentence_embeddings"]:
             sentence_encoder = SentenceTransformer('sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2')
         else:
-            logger.error(f"Language {language} not supported for phrase coherence analysis")
+            logger.info(f"Language {language} not supported for phrase coherence analysis")
 
         if language in measures["supported_langs_bert"]:
             tokenizer = BertTokenizer.from_pretrained('bert-base-multilingual-cased')
             bert = BertForMaskedLM.from_pretrained('bert-base-multilingual-cased')
         else:
-            logger.error(f"Language {language} not supported for perplexity analysis")
+            logger.info(f"Language {language} not supported for perplexity analysis")
 
     return sentence_encoder, tokenizer, bert
 
@@ -616,7 +616,7 @@ def get_phrase_coherence(df_list, utterances_filtered, min_coherence_turn_length
 
         sentence_encoder, tokenizer, bert = init_model(language, measures)
         if not sentence_encoder and not tokenizer and not bert:
-            logger.error(f"Language {language} not supported for phrase coherence nor perplexity analysis")
+            logger.info(f"Language {language} not supported for phrase coherence nor perplexity analysis")
             return df_list
 
         # turn-level
@@ -634,6 +634,6 @@ def get_phrase_coherence(df_list, utterances_filtered, min_coherence_turn_length
 
         df_list = [word_df, turn_df, summ_df]
     except Exception as e:
-        logger.error(f"Error in phrase coherence analysis: {e}")
+        logger.info(f"Error in phrase coherence analysis: {e}")
     finally:
         return df_list

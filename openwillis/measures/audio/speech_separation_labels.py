@@ -95,11 +95,11 @@ def speaker_separation_labels(filepath, transcript_json, volume_normalization=No
 
             if volume_normalization:
                 if type(volume_normalization) != int or volume_normalization < -60 or volume_normalization > 0:
-                    logger.error('Volume normalization value should be an integer between -60 and 0')
+                    logger.info('Volume normalization value should be an integer between -60 and 0')
                     return signal_label
                 signal_label = sutil.adjust_volume(filepath, signal_label, volume_normalization)
 
     except Exception as e:
-        logger.error(f'Error in diard processing: {e} & File: {filepath}')
+        logger.info(f'Error in diard processing: {e} & File: {filepath}')
 
     return signal_label

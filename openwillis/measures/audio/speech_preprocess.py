@@ -126,7 +126,7 @@ def audio_preprocess(audio_in):
 
     try:
         if not audio_in.endswith(".wav") and not audio_in.endswith(".mp3"):
-            logger.error(f'Error in audio preprocessing- file: {audio_in} & Error: File format not supported')
+            logger.info(f'Error in audio preprocessing- file: {audio_in} & Error: File format not supported')
             return
 
         audio_signal = AudioSegment.from_file(audio_in, format="wav" if audio_in.endswith(".wav") else "mp3")
@@ -138,6 +138,6 @@ def audio_preprocess(audio_in):
         signal_dict = {'clean': np.array(audio_signal.get_array_of_samples())}
 
     except Exception as e:
-        logger.error(f'Error in audio preprocessing- file: {audio_in} & Error: {e}')
+        logger.info(f'Error in audio preprocessing- file: {audio_in} & Error: {e}')
     finally:
         return signal_dict

@@ -407,7 +407,7 @@ def filter_json_transcribe(item_data, measures):
             
             item_data2 += words
         except Exception as e:
-            logger.error(f"Failed to filter word: {e}")
+            logger.info(f"Failed to filter word: {e}")
     
     filter_json = [item for item in item_data2 if "start" in item and "end" in item]
     filter_json = pause_calculation(filter_json, measures, ['start', 'end'])

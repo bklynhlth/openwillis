@@ -128,7 +128,7 @@ def calculate_pause_features_for_turn(df_diff, df, text_level, index_list, time_
 
                 df.loc[j, measures["word_rate"]] = len(turn_data) / turn_duration
         except Exception as e:
-            logger.error(f"Error in pause feature calculation for turn {j}: {e}")
+            logger.info(f"Error in pause feature calculation for turn {j}: {e}")
             continue
 
     return df
@@ -297,5 +297,5 @@ def get_pause_feature(json_conf, df_list, text_list, turn_index, measures, time_
         df_feature = [word_df, turn_df, summ_df]
         return df_feature
     except Exception as e:
-        logger.error(f"Error in pause feature calculation: {e}")
+        logger.info(f"Error in pause feature calculation: {e}")
         return df_list

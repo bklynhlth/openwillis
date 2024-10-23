@@ -99,7 +99,7 @@ def from_audio(audio_dir):
                 # Store in the dictionary with speaker key
                 speaker_dict[speaker_key] = audio_array
             except Exception as e:
-                logger.error(f"Error while converting from audio to numpy array file: {file_name}, error: {e}")
+                logger.info(f"Error while converting from audio to numpy array file: {file_name}, error: {e}")
     
     return speaker_dict
 
