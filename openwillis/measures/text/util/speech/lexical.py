@@ -289,7 +289,7 @@ def get_pos_tag(df_list, text_list, measures):
 
         df_list = [word_df, turn_df, summ_df]
     except Exception as e:
-        logger.error(f"Error in pos tag feature calculation: {e}")
+        logger.info(f"Error in pos tag feature calculation: {e}")
     finally:
         return df_list
 
@@ -332,7 +332,7 @@ def get_sentiment(df_list, text_list, measures):
                 turn_df.loc[idx, cols] = list(sentiment_dict.values()) + mattrs
 
             except Exception as e:
-                logger.error(f"Error in sentiment analysis: {e}")
+                logger.info(f"Error in sentiment analysis: {e}")
                 continue
 
         sentiment_dict = sentiment.polarity_scores(full_text)
@@ -341,7 +341,7 @@ def get_sentiment(df_list, text_list, measures):
         summ_df.loc[0, cols] = list(sentiment_dict.values()) + mattrs
         df_list = [word_df, turn_df, summ_df]
     except Exception as e:
-        logger.error(f"Error in sentiment feature calculation: {e}")
+        logger.info(f"Error in sentiment feature calculation: {e}")
     finally:
         return df_list
 
@@ -442,6 +442,6 @@ def get_repetitions(df_list, utterances_speaker, utterances_speaker_filtered, me
 
         df_list = [word_df, turn_df, summ_df]
     except Exception as e:
-        logger.error(f"Error in calculating repetitions: {e}")
+        logger.info(f"Error in calculating repetitions: {e}")
     finally:
         return df_list

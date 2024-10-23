@@ -221,7 +221,7 @@ def run_vosk(filepath, language, transcribe_interval = []):
 
     except Exception as e:
         ut.remove_dir(os.path.dirname(mono_filepath))#Clean temp directory
-        logger.error(f'Error in speech Transcription: {e} & File: {filepath}')
+        logger.info(f'Error in speech Transcription: {e} & File: {filepath}')
 
     finally:
         return json_response, transcript

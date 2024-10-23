@@ -171,11 +171,11 @@ def speaker_separation_nolabels(filepath, **kwargs):
 
             if input_param['volume_normalization']:
                 if type(input_param['volume_normalization']) != int or input_param['volume_normalization'] < -60 or input_param['volume_normalization'] > 0:
-                    logger.error('Volume normalization value should be an integer between -60 and 0')
+                    logger.info('Volume normalization value should be an integer between -60 and 0')
                     return signal_label
                 signal_label = sutil.adjust_volume(filepath, signal_label, input_param['volume_normalization'])
 
     except Exception as e:
-        logger.error(f'Error in diard processing: {e} & File: {filepath}')
+        logger.info(f'Error in diard processing: {e} & File: {filepath}')
 
     return signal_label

@@ -336,4 +336,4 @@ def vocal_acoustics(audio_path, voiced_segments = True, option='simple'):
         return framewise, df_summary2
 
     except Exception as e:
-        logger.error(f'Error in acoustic calculation- file: {audio_path} & Error: {e}')
+        logger.info(f'Error in acoustic calculation- file: {audio_path} & Error: {e}')

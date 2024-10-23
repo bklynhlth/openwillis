@@ -142,7 +142,7 @@ def get_diart_interval(diarization):
             speaker_list.append('speaker'+ str(speaker_id))
 
         except Exception as e:
-            logger.error(f'Error in pyannote filtering: {e}')
+            logger.info(f'Error in pyannote filtering: {e}')
 
     df = prepare_diart_interval(start_time, end_time, speaker_list)
     return df
@@ -495,7 +495,7 @@ def adjust_volume(audio_path, signal_label, volume_level):
             audio_signal = volume_normalization(audio_signal, volume_level)
             audio_signal.export(os.path.join(temp_dir, file), format="wav")
         except Exception as e:
-            logger.error(f'Error in adjusting volume for file: {file}, error: {e}')
+            logger.info(f'Error in adjusting volume for file: {file}, error: {e}')
 
     signal_label = from_audio(temp_dir)
 

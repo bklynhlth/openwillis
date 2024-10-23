@@ -252,7 +252,7 @@ def common_summary_feature(df_summ, json_data, model, speaker_label):
             df_summ['speaker_percentage'] = [spk_pct]# if speaker_label is not None else df_summ['speaker_percentage']
             
     except Exception as e:
-        logger.error("Error in file length calculation")
+        logger.info("Error in file length calculation")
     return df_summ
 
 def process_transcript(df_list, json_conf, measures, min_turn_length, min_coherence_turn_length, speaker_label, source, language, option):
@@ -386,7 +386,7 @@ def speech_characteristics(json_conf, language="en", speaker_label=None, min_tur
                 df_list = process_transcript(df_list, json_conf, measures, min_turn_length, min_coherence_turn_length, speaker_label, 'vosk', language, option)
 
     except Exception as e:
-        logger.error(f"Error in Speech Characteristics {e}")
+        logger.info(f"Error in Speech Characteristics {e}")
 
     finally:
         for df in df_list:
