@@ -181,8 +181,9 @@ def phonation_acoustics(audio_path, transcript_json, speaker_label=''):
         # extract phonation segments
         phonation_dict = phonation_extraction(audio_path, transcript_json, speaker_label)
         if not phonation_dict:
+            logger.info(f'No phonation segments found in the audio file: {audio_path}')
             return phonations_df, summ_df
-
+        logger.info(f'Found {len(phonation_dict)} phonation segments in the audio file: {audio_path}')
         # save phonation segments
         to_audio(audio_path, phonation_dict, temp_dir)
 
@@ -202,6 +203,7 @@ def phonation_acoustics(audio_path, transcript_json, speaker_label=''):
                 logger.info(f'Error in phonation acoustics calculation for single phonation: {file} & Error: {e}')
 
         # summarize the phonation acoustics into dfs
+        logger.info(f'Phonation acoustics calculation completed for the audio file: {audio_path}')
         summ_df = phonations_df.groupby(measures['phonation_type']).mean().reset_index()
     
     except Exception as e:
