@@ -477,7 +477,7 @@ def load_facedata_from_video(
         frame_index += 1
 
         if n_frames_capture >= n_frames:
-            num_frames = n_frames
+            num_frames = n_frames * n_skip
             break
 
     cap.release()
@@ -576,6 +576,7 @@ def create_single_face_output(
         min_frames_face_present: int,
         frames_per_row: int,
         fps: int,
+        bbox_cols: list,
         interpolate=True
     ):
     """
@@ -603,24 +604,12 @@ def create_single_face_output(
     for presence_idx, presence_df in cluster_df.groupby('cluster_presences'):
         n_frames_present = len(presence_df) * frames_per_row
         if n_frames_present > min_frames_face_present:
-            # so we'd need frame per second
-            # or we can take
-            #can split this into two separate functions
+
             max_frame = presence_df.frame_idx.max()
             min_frame = presence_df.frame_idx.min()
             frames_in_clusters = list(range(min_frame,max_frame))
             upsampled_df = pd.DataFrame(frames_in_clusters,columns=['frame_idx'])
-            bb_dict_df = presence_df[[
-                'bb_x',
-                'bb_y',
-                'bb_w',
-                'bb_h',
-                'right_eye_x',
-                'right_eye_y',
-                'left_eye_x',
-                'left_eye_y',
-                'frame_idx'
-            ]]
+            bb_dict_df = presence_df[bbox_cols]
 
             merged_bb_df = upsampled_df.merge(
                 bb_dict_df,
@@ -633,238 +622,11 @@ def create_single_face_output(
                 interpolated_df = merged_bb_df.ffill()
 
             interpolated_section_dfs.append(interpolated_df)
-            
-            
-    df_for_all_clusters = pd.concat(interpolated_section_dfs)
-    int_df = df_for_all_clusters[[
-                'bb_x',
-                'bb_y',
-                'bb_h',
-                'bb_w',
-                'left_eye_x',
-                'left_eye_y',
-                'right_eye_x',
-                'right_eye_y',
-                ]].astype(int)
-    #actually need to merge with full df to have the empty dicts
-    # so pass total frames in and merge on frame index
-    bb_dict = int_df.to_dict(orient='records')
+             
+    df_for_all_presences = pd.concat(interpolated_section_dfs)
 
-    return bb_dict
-        
-def get_frame_indices_below_threshold(
-        cluster_df: pd.DataFrame, 
-        min_frames_face_present: int,
-        frames_per_row: int
-    ):
-    """
-    ---------------------------------------------------------------------------------------------------
+    return df_for_all_presences
 
-    Identifies the frame indices in clusters where the number of frames is below a specified minimum threshold.
-
-    Parameters:
-    ............
-    cluster_df : pandas.DataFrame
-        DataFrame containing face cluster information with columns 'cluster_presences' and 'frame_idx'.
-    min_frames_face_present : int
-        Minimum number of frames required for a face to be considered present.
-
-    Returns:
-    ............
-    frame_idx_not_meeting_min : list
-        List of frame indices that do not meet the minimum threshold.
-    ---------------------------------------------------------------------------------------------------
-    """
-    frame_idx_not_meeting_min = []
-    
-    for presence_idx, presence_df in cluster_df.groupby('cluster_presences'):
-        n_frames_present = len(presence_df) * frames_per_row
-        if n_frames_present < min_frames_face_present:
-            # so we'd need frame per second
-            # or we can take
-            max_frame = presence_df.frame_idx.max()
-            min_frame = presence_df.frame_idx.min()
-            frames_in_clusters = list(range(min_frame,max_frame))
-            pd.DataFrame(frames_in_clusters,columns=['frame_idx'])
-            frame_idx_not_meeting_min.extend(presence_df.frame_idx.values)
-    return frame_idx_not_meeting_min
-
-def filter_cluster_segments(
-    cluster_df: pd.DataFrame,
-    min_frames_face_present: int,
-    frames_per_row: int,
-    fps: int
-):
-    """
-    ---------------------------------------------------------------------------------------------------
-    Filters cluster segments based on minimum frames present and displacement jumps.
-
-    Parameters:
-    ............
-    cluster_df : pandas.DataFrame
-        DataFrame containing cluster information and bounding box coordinates.
-    min_frames_face_present : int
-        Minimum number of frames required for a face to be considered present.
-    frames_per_row : int
-        Number of frames per row in the DataFrame.
-    fps : int
-        Frames per second of the video.
-    threshold : float
-        Threshold for considering segments to be in the same location based on mean `bb_x` and `bb_y`.
-
-    Returns:
-    ............
-    frames_to_keep : list
-        List of frame indices to keep after filtering.
-
-    ---------------------------------------------------------------------------------------------------
-
-    """
-    cluster_df['cluster_presences'] = np.cumsum(
-        cluster_df.sample_time.diff() > ((frames_per_row / fps)*1.5) # 1.5 is hacky but just gives rounding room for fps and frames per row
-    )
-
-    frame_idx_not_meeting_min = get_frame_indices_below_threshold(
-        cluster_df, min_frames_face_present, frames_per_row
-    )
-
-    frames_to_cut_bools = cluster_df.frame_idx.isin(frame_idx_not_meeting_min)
-    cluster_df = cluster_df.loc[~frames_to_cut_bools]
-    
-    return cluster_df
-
-def interpolate_bounding_boxes(start_row, end_row, start_frame, end_frame):
-    """
-    Linearly interpolates the bounding box coordinates between two frames.
-
-    Parameters:
-    ............
-        start_row (pd.Series): Row containing the bounding box coordinates at the start frame.
-        end_row (pd.Series): Row containing the bounding box coordinates at the end frame.
-        start_frame (int): Index of the starting frame.
-        end_frame (int): Index of the ending frame.
-
-    Returns:
-    ............
-        list: A list of dictionaries with interpolated bounding box values for each frame.
-    """
-    interpolated_bboxes = []
-    for i in range(start_frame, end_frame):
-        t = (i - start_frame) / (end_frame - start_frame)  # interpolation factor
-
-        # Interpolating bounding box coordinates
-        bb_x = start_row['bb_x'] * (1 - t) + end_row['bb_x'] * t
-        bb_y = start_row['bb_y'] * (1 - t) + end_row['bb_y'] * t
-        bb_h = start_row['bb_h'] * (1 - t) + end_row['bb_h'] * t
-        bb_w = start_row['bb_w'] * (1 - t) + end_row['bb_w'] * t
-
-        interpolated_bboxes.append({
-            'bb_x': bb_x,
-            'bb_y': bb_y,
-            'bb_h': bb_h,
-            'bb_w': bb_w
-        })
-    return interpolated_bboxes
-
-
-def convert_face_df_to_bbox_list(face_df, frames_per_row, num_frames_vid, fps):
-    """
-    ---------------------------------------------------------------------------------------------------
-    Prepares the face dataframe for output by interpolating missing frames and converting it to a list of dictionaries.
-
-    Parameters:
-    ............
-        face_df (pandas.DataFrame): The input face dataframe.
-        frames_per_row (int): The number of frames per row.
-        num_frames_vid (int): The total number of frames in the video.
-
-    Returns:
-    ............
-        list: A list of dictionaries representing the processed face dataframe.
-    ---------------------------------------------------------------------------------------------------
-    """
-    out_data_list = [{} for _ in range(num_frames_vid)]
-
-    for idx in range(len(face_df) - 1):
-        current_row = face_df.iloc[idx]
-        next_row = face_df.iloc[idx + 1]
-
-        current_frame = current_row['frame_idx']
-        next_frame = next_row['frame_idx']
-
-        # Interpolate if frames are close enough
-        if next_frame - current_frame <= frames_per_row:
-            interpolated_bboxes = interpolate_bounding_boxes(current_row, next_row, current_frame, next_frame)
-            for i, bbox in enumerate(interpolated_bboxes):
-                if current_frame + i < num_frames_vid:
-                    out_data_list[current_frame + i] = bbox
-        else:
-            # Directly assign bounding box values without interpolation
-            for i in range(current_frame, current_frame + frames_per_row):
-                if i < num_frames_vid:
-                    out_data_list[i] = {
-                        'bb_x': current_row['bb_x'],
-                        'bb_y': current_row['bb_y'],
-                        'bb_h': current_row['bb_h'],
-                        'bb_w': current_row['bb_w']
-                    }
-
-    # Handle last row (without interpolation since no next row)
-    last_row = face_df.iloc[-1]
-    last_frame = last_row['frame_idx']
-    for i in range(last_frame, last_frame + frames_per_row):
-        if i < num_frames_vid:
-            out_data_list[i] = {
-                'bb_x': last_row['bb_x'],
-                'bb_y': last_row['bb_y'],
-                'bb_h': last_row['bb_h'],
-                'bb_w': last_row['bb_w']
-            }
-
-    return out_data_list
-
-# def convert_face_df_to_bbox_list(
-    # face_df,
-    # frames_per_row, 
-    # num_frames_vid,
-    # fps
-# ):
-#     """
-#     ---------------------------------------------------------------------------------------------------
-
-#     Prepares the face dataframe for output by interpolating missing frames and converting it to a list of dictionaries.
-
-#     Parameters:
-#     ............
-#         face_df (pandas.DataFrame): The input face dataframe.
-#         frames_per_row (int): The number of frames per row.
-#         num_frames_vid (int): The total number of frames in the video.
-
-#     Returns:
-#     ............
-#         list: A list of dictionaries representing the processed face dataframe.
-#     ---------------------------------------------------------------------------------------------------
-
-#     """
-    #get max because
-    # out_data_list = [{} for _ in range(num_frames_vid)]
-    # for idx,row in face_df.iterrows():
-    #     # upsample frames
-    #     # if next row frame is greater than 1 frames per row away then we don't interpolate
-    #     # else we interpolate
-    #     for i in range(row.frame_idx, row.frame_idx + frames_per_row):
-
-    #         # only add if within max frame (i.e. video length or n_frames sampled)
-    #         # if the next row is greater then 1 frames per row away then we don't interpolate
-    #         if i < num_frames_vid:
-    #             out_data_list[i] = {
-    #                 'bb_x':row.bb_x,
-    #                 'bb_y':row.bb_y,
-    #                 'bb_h':row.bb_h,
-    #                 'bb_w':row.bb_w
-    #             }
-
-    # return out_data_list
 
 def prep_face_clusters_for_output(
     facedata_df, 
@@ -872,7 +634,9 @@ def prep_face_clusters_for_output(
     capture_n_frames_per_second,
     fps,
     num_frames_vid,
-    n_clusters
+    n_clusters,
+    bbox_cols,
+    interpolate=True
 ):
     """
     ---------------------------------------------------------------------------------------------------
@@ -900,34 +664,32 @@ def prep_face_clusters_for_output(
 
     face_list_dict = {}
     for cluster_idx in range(n_clusters):
-
+        out_df = pd.DataFrame(range(num_frames_vid),columns=['frame_idx'])
         cluster_df = facedata_df.loc[
             facedata_df.cluster==cluster_idx
         ]
         
         # these two can be replaced with a single one.
-        face_bbox_list = create_single_face_output(
+        face_bbox_df = create_single_face_output(
             cluster_df,
             min_frames_face_present,
             frames_per_row,
-            fps
+            fps,
+            bbox_cols,
+            interpolate=interpolate
             #add interpolate parameter 
         )
-        # # clean face data
-        # cluster_df = filter_cluster_segments(
-        #     cluster_df,
-        #     min_frames_face_present,
-        #     frames_per_row,
-        #     fps
-        # )
+        out_df = out_df.merge(
+            face_bbox_df,
+            how='outer',
+            on='frame_idx'
+        )
 
-        # # upsample to frames and convert to dict list
-        # face_bbox_list = convert_face_df_to_bbox_list(
-        #     cluster_df,
-        #     frames_per_row,
-        #     num_frames_vid,
-        #     fps
-        # )
+        bbox_df = out_df[bbox_cols].applymap(
+            lambda x:int(x) if not pd.isna(x) else x
+        )
+
+        face_bbox_list = bbox_df.to_dict(orient='records')
 
         face_list_dict[cluster_idx] = face_bbox_list
 
@@ -941,7 +703,8 @@ def preprocess_face_video(
     detector_backend='mtcnn', 
     face_threshold=.95, 
     min_sec_face_present=3, 
-    n_frames=np.inf
+    n_frames=np.inf,
+    interpolate=True
 ):
     """
     Preprocesses a face video by extracting face data, clustering the faces, and preparing the output.
@@ -965,6 +728,7 @@ def preprocess_face_video(
 
     bb_dict = {}
     facedata_df = pd.DataFrame()
+    bbox_cols=config["bbox_dict_cols"]
 
     try:
         face_data_across_frames, fps, num_frames_vid = load_facedata_from_video(
@@ -989,7 +753,9 @@ def preprocess_face_video(
             capture_n_frames_per_second,
             fps,
             num_frames_vid,
-            n_people
+            n_people,
+            bbox_cols=bbox_cols,
+            interpolate=interpolate
         )
 
     except Exception as e:
