@@ -32,10 +32,10 @@ def crop_img(img, bb_dict):
     ---------------------------------------------------------------------------------------------------
     """
 
-    x = bb_dict['bb_x']
-    y = bb_dict['bb_y']
-    w = bb_dict['bb_w']
-    h = bb_dict['bb_h']
+    x = int(bb_dict['bb_x'])
+    y = int(bb_dict['bb_y'])
+    w = int(bb_dict['bb_w'])
+    h = int(bb_dict['bb_h'])
     roi = img[y:y+h, x:x+w]
     return roi
 
@@ -56,10 +56,10 @@ def draw_bounding_boxes_sf(frame, bb_dict):
     ---------------------------------------------------------------------------------------------------
     
     """
-    x = bb_dict['bb_x']
-    y = bb_dict['bb_y']
-    w = bb_dict['bb_w']
-    h = bb_dict['bb_h']
+    x = int(bb_dict['bb_x'])
+    y = int(bb_dict['bb_y'])
+    w = int(bb_dict['bb_w'])
+    h = int(bb_dict['bb_h'])
     cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 255, 0), 2)
     return frame
 
@@ -84,10 +84,10 @@ def calculate_padding(bb_dict, padding_percent):
     dict
         A dictionary containing the new bounding box coordinates with padding.
     """
-    x = bb_dict['bb_x']
-    y = bb_dict['bb_y']
-    w = bb_dict['bb_w']
-    h = bb_dict['bb_h']
+    x = int(bb_dict['bb_x'])
+    y = int(bb_dict['bb_y'])
+    w = int(bb_dict['bb_w'])
+    h = int(bb_dict['bb_h'])
     
     padding_x = int(w * padding_percent)
     padding_y = int(h * padding_percent)
@@ -224,10 +224,10 @@ def blacken_outside_bounding_box(frame, bb_dict):
     ---------------------------------------------------------------------------------------------------
 
     """
-    x = bb_dict['bb_x']
-    y = bb_dict['bb_y']
-    w = bb_dict['bb_w']
-    h = bb_dict['bb_h']
+    x = int(bb_dict['bb_x'])
+    y = int(bb_dict['bb_y'])
+    w = int(bb_dict['bb_w'])
+    h = int(bb_dict['bb_h'])
 
     # Create a black image of the same size as the frame
     mask = np.zeros_like(frame)
@@ -304,7 +304,7 @@ def create_face_frame(
         numpy.ndarray: The cropped face frame.
     """
     
-    if len(frame_dict.keys()) != 0:
+    if (len(frame_dict.keys()) != 0) and not np.isnan(frame_dict['bb_x']):
 
         face_frame = create_cropped_frame(
             frame,
