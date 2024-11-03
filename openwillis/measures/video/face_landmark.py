@@ -7,14 +7,10 @@ import pandas as pd
 import cv2
 import json
 import os
-import math
 import logging
-
-import tensorflow as tf
 import mediapipe as mp
-from PIL import Image
 from protobuf_to_dict import protobuf_to_dict
-
+from sklearn.mixture import GaussianMixture
 from openwillis.measures.video.util.crop_utils import crop_with_padding_and_center
 
 logging.basicConfig(level=logging.INFO)
@@ -236,6 +232,7 @@ def run_facemesh(path, bbox_list=[]):
 
         cap = cv2.VideoCapture(path)
         num_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        fps = int(cap.get(cv2.CAP_PROP_FPS))
         len_bbox_list = len(bbox_list)
         print(num_frames, len_bbox_list)
 
@@ -251,7 +248,7 @@ def run_facemesh(path, bbox_list=[]):
                 ret_type, img = cap.read()
                 if ret_type is not True:
                     break
-                df_common = pd.DataFrame([[frame]], columns=['frame'])
+                df_common = pd.DataFrame([[frame, frame/fps]], columns=['frame','time'])
                 img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
                 if len_bbox_list==0:
@@ -274,7 +271,7 @@ def run_facemesh(path, bbox_list=[]):
 
             except Exception as e:
                 print(e,frame)
-                df_landmark = get_undected_markers(frame)
+                df_landmark = get_undected_markers(frame,fps)
 
             df_list.append(df_landmark)
             frame +=1
@@ -284,7 +281,7 @@ def run_facemesh(path, bbox_list=[]):
 
     return df_list
 
-def get_undected_markers(frame):
+def get_undected_markers(frame,fps):
     """
     ---------------------------------------------------------------------------------------------------
 
@@ -303,7 +300,7 @@ def get_undected_markers(frame):
 
     ---------------------------------------------------------------------------------------------------
     """
-    df_common = pd.DataFrame([[frame]], columns=['frame'])
+    df_common = pd.DataFrame([[frame, frame/fps]], columns=['frame','time'])
     df_coord = get_column()
 
     col_list = list(range(0, 468))
@@ -788,7 +785,7 @@ def normalize_face_landmarks(
         (right_eye_y - left_eye_y)**2 +
         (right_eye_z - left_eye_z)**2
     )
-    scaling_factor =  eye_distance / np.mean(eye_distance) # scale to one
+    scaling_factor =  eye_distance / 1 # scale to one
 
     # Step 2: Center the face landmarks by moving the nose to the origin
     norm_df = center_landmarks(df, nose_tip)
@@ -808,8 +805,52 @@ def normalize_face_landmarks(
 
     return norm_df
 
+def get_fps(df):
+    """
+    Calculate the frames per second (FPS) from a DataFrame.
 
+    This function computes the FPS by taking the reciprocal of the mode of the time differences between consecutive rows in the DataFrame.
 
+    Parameters:
+    df (pandas.DataFrame): A DataFrame containing a 'time' column with timestamps.
+
+    Returns:
+    int: The calculated frames per second (FPS).
+    """
+    return int(1/df.time.diff().mode())
+
+def get_speaking_probabilities(df, rolling_std_seconds):
+    """
+    Calculate the probability of speaking at each frame in a DataFrame.
+
+    This function calculates the probability of speaking at each frame in a DataFrame by fitting a Gaussian Mixture Model to the rolling standard deviation of the 'mouth_openness' column.
+
+    Parameters:
+    df (pandas.DataFrame): A DataFrame containing a 'time' column with timestamps and a 'mouth_openness' column with mouth openness values.
+    fps (int): The frames per second (FPS) of the video.
+    rolling_std_seconds (int): The number of seconds over which to calculate the rolling standard deviation.
+
+    Returns:
+    pandas.Series: A Series containing the probability of speaking at each frame.
+    """
+    fps = get_fps(df)
+    rolling_std_frames = int(rolling_std_seconds*fps)
+
+    df['rolling_mouth_open_std'] = df.mouth_openness.rolling(rolling_std_frames).std()
+
+    df_nona = df[['frame','time','rolling_mouth_open_std']].dropna()
+    gmm = GaussianMixture(n_components=2)
+    gmm.fit(df_nona.rolling_mouth_open_std.values.reshape(-1,1))
+    prob_preds = gmm.predict_proba(df_nona.rolling_mouth_open_std.values.reshape(-1,1))
+    mean_1, mean_2 = gmm.means_.flatten()
+    if mean_1 > mean_2:
+        df_nona['speaking'] = prob_preds[:,0]
+    else:
+        df_nona['speaking'] = prob_preds[:,1]
+    
+    
+    df = df.merge(df_nona, on='frame', how='left')
+    return df.speaking
 
 
 def facial_expressivity(
@@ -818,7 +859,9 @@ def facial_expressivity(
     bbox_list=[],
     base_bbox_list=[],
     normalize=True,
-    align=True
+    align=False,
+    rolling_std_seconds=3,
+    split_by_speaking=False,
 ):
     """
     ---------------------------------------------------------------------------------------------------
@@ -834,6 +877,22 @@ def facial_expressivity(
             optional path to baseline video. see openwillis research guidelines on github wiki to
             read case for baseline video use, particularly in clinical research contexts.
             (default is 0, meaning no baseline correction will be conducted).
+        bbox_list : list, optional
+            list of bounding boxes for each frame in the video. each bounding box is a dictionary
+            with keys 'x', 'y', 'width', and 'height', representing the bounding box coordinates.
+            (default is [], meaning no bounding boxes will be used).
+        base_bbox_list : list, optional
+            list of bounding boxes for each frame in the baseline video. each bounding box is a dictionary
+            with keys 'x', 'y', 'width', and 'height', representing the bounding box coordinates.
+            (default is [], meaning no bounding boxes will be used).
+        normalize : bool, optional
+            whether to normalize the facial landmarks to a common reference point (default is True).
+        align : bool, optional
+            whether to align the facial landmarks based on the position of the eyes (default is True).
+        rolling_std_seconds : int, optional
+            number of seconds over which to calculate the rolling standard deviation for speaking probability
+        split_by_speaking : bool, optional
+            whether to split the output by speaking probability (default is False).
 
     Returns:
         framewise_loc : pandas.DataFrame
@@ -863,12 +922,16 @@ def facial_expressivity(
 
     try:
         df_landmark = get_landmarks(filepath, 'input',bbox_list=bbox_list)
+        
         if normalize:
             df_landmark = normalize_face_landmarks(df_landmark, align=align)
         df_disp = get_displacement(df_landmark, baseline_filepath, config,base_bbox_list=base_bbox_list)
 
         # use mouth height to calculate mouth openness
         df_disp['mouth_openness'] = get_mouth_openness(df_landmark, config)
+
+        if split_by_speaking:
+            df_disp['speaking'] = get_speaking_probabilities(df_disp, rolling_std_seconds)
 
         df_summ = get_summary(df_disp)
 
