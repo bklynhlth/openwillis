@@ -542,7 +542,7 @@ def get_empty_dataframe():
 
     ---------------------------------------------------------------------------------------------------
     """
-    columns = ['frame'] + ['lmk' + str(col+1).zfill(3) for col in range(0, 468)] + ['overall']
+    columns = ['frame','time'] + ['lmk' + str(col+1).zfill(3) for col in range(0, 468)] + ['overall']
     empty_df = pd.DataFrame(columns=columns)
     return empty_df
 
@@ -574,7 +574,7 @@ def get_displacement(lmk_df, base_path, measures,base_bbox_list=[]):
     displacement_df = get_empty_dataframe()
 
     try:
-        df_meta = lmk_df[['frame']]
+        df_meta = lmk_df[['frame','time']]
 
         if len(lmk_df)>1:
             disp_actual_df = get_distance(lmk_df)
@@ -635,34 +635,6 @@ def calculate_areas_displacement(displacement_df, measures):
     displacement_df['eyebrows'] = displacement_df[eyebrow_cols].mean(axis=1)
 
     return displacement_df
-
-def get_summary(df):
-    """
-    ---------------------------------------------------------------------------------------------------
-
-    This function calculates the summary measurements from the framewise displacement data.
-
-    Parameters:
-    ............
-    df : pandas.DataFrame
-        framewise euclidean displacement dataframe
-
-    Returns:
-    ............
-    df_summ : pandas.DataFrame
-         stat summary dataframe
-
-    ---------------------------------------------------------------------------------------------------
-    """
-
-    df_summ = pd.DataFrame()
-    if len(df.columns)>0:
-        
-        df_mean = pd.DataFrame(df.mean()).T.iloc[:,469:].add_suffix('_mean')
-        df_std = pd.DataFrame(df.std()).T.iloc[:,469:].add_suffix('_std')
-
-        df_summ = pd.concat([df_mean, df_std], axis =1).reset_index(drop=True)
-    return df_summ
 
 def apply_rotation_per_frame(norm_df, rotation_matrices):
     """
@@ -801,7 +773,7 @@ def normalize_face_landmarks(
     norm_df[landmark_cols] = norm_df[landmark_cols].div(scaling_factor.values, axis=0)
 
     # Add back the frame identifier
-    norm_df['frame'] = df['frame']
+    norm_df[['frame','time']] = df[['frame','time']]
 
     return norm_df
 
@@ -835,7 +807,7 @@ def get_speaking_probabilities(df, rolling_std_seconds):
     """
     fps = get_fps(df)
     rolling_std_frames = int(rolling_std_seconds*fps)
-
+    df = df.copy(deep=True)
     df['rolling_mouth_open_std'] = df.mouth_openness.rolling(rolling_std_frames).std()
 
     df_nona = df[['frame','time','rolling_mouth_open_std']].dropna()
@@ -852,6 +824,65 @@ def get_speaking_probabilities(df, rolling_std_seconds):
     df = df.merge(df_nona, on='frame', how='left')
     return df.speaking
 
+def split_speaking_df(df_disp):
+    """
+    ---------------------------------------------------------------------------------------------------
+
+    This function splits the displacement dataframe into two dataframes based on speaking probability.
+
+    Parameters:
+    ............
+    df_disp : pandas.DataFrame
+        displacement dataframe
+
+    Returns:
+    ............
+    df_summ : pandas.DataFrame
+        stat summary dataframe
+    ---------------------------------------------------------------------------------------------------
+    """
+
+    speaking_df = df_disp[df_disp['speaking'] > 0.5]
+    not_speaking_df = df_disp[df_disp['speaking'] <= 0.5]
+    speaking_df = speaking_df.drop('speaking', axis=1)
+    not_speaking_df = not_speaking_df.drop('speaking', axis=1)
+
+    speaking_df_summ = get_summary(speaking_df)
+    not_speaking_df_summ = get_summary(not_speaking_df)
+    speaking_df_summ = speaking_df_summ.add_suffix('_speaking')
+    not_speaking_df_summ = not_speaking_df_summ.add_suffix('_not_speaking')
+    
+    df_summ = pd.concat([speaking_df_summ, not_speaking_df_summ], axis=1)
+    
+    return df_summ
+
+def get_summary(df):
+    """
+    ---------------------------------------------------------------------------------------------------
+
+    This function calculates the summary measurements from the framewise displacement data.
+
+    Parameters:
+    ............
+    df : pandas.DataFrame
+        framewise euclidean displacement dataframe
+
+    Returns:
+    ............
+    df_summ : pandas.DataFrame
+         stat summary dataframe
+
+    ---------------------------------------------------------------------------------------------------
+    """
+
+    df_summ = pd.DataFrame()
+    if len(df.columns)>0:
+        #@ TODO: get names of summary stats
+        df_mean = pd.DataFrame(df.mean()).T.iloc[:,470:].add_suffix('_mean')
+        df_std = pd.DataFrame(df.std()).T.iloc[:,470:].add_suffix('_std')
+
+        df_summ = pd.concat([df_mean, df_std], axis =1).reset_index(drop=True)
+    return df_summ
 
 def facial_expressivity(
     filepath,
@@ -922,18 +953,22 @@ def facial_expressivity(
 
     try:
         df_landmark = get_landmarks(filepath, 'input',bbox_list=bbox_list)
-        
+        print('got landmarks')
+        df_landmark['time']
+        print('got time')
         if normalize:
             df_landmark = normalize_face_landmarks(df_landmark, align=align)
         df_disp = get_displacement(df_landmark, baseline_filepath, config,base_bbox_list=base_bbox_list)
 
         # use mouth height to calculate mouth openness
         df_disp['mouth_openness'] = get_mouth_openness(df_landmark, config)
+       
+        df_disp['speaking'] = get_speaking_probabilities(df_disp, rolling_std_seconds)
 
         if split_by_speaking:
-            df_disp['speaking'] = get_speaking_probabilities(df_disp, rolling_std_seconds)
-
-        df_summ = get_summary(df_disp)
+            df_summ = split_speaking_df(df_disp)
+        else:
+            df_summ = get_summary(df_disp)
 
         return df_landmark, df_disp, df_summ
 
