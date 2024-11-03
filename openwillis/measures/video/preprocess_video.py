@@ -571,6 +571,46 @@ def cluster_facedata(
 
     return facedata_df
 
+def create_section_output(
+    presence_df: pd.DataFrame,
+    bbox_cols: list,
+    interpolate: bool
+):
+    """
+    ---------------------------------------------------------------------------------------------------
+
+    Create a DataFrame with interpolated or forward/backward filled bounding box data for each frame.
+
+    Parameters:
+    ............
+    presence_df (pd.DataFrame): DataFrame containing presence data with frame indices.
+    bbox_cols (list): List of column names corresponding to bounding box data.
+    interpolate (bool): If True, interpolate missing values. If False, use forward fill and backward fill to handle missing values. Default is True.
+
+    Returns:
+    ............
+    pd.DataFrame: DataFrame with bounding box data for each frame, with missing values handled by interpolation or filling.
+    ---------------------------------------------------------------------------------------------------
+
+    """
+
+    max_frame = presence_df.frame_idx.max()
+    min_frame = presence_df.frame_idx.min()
+    frames_in_clusters = list(range(min_frame,max_frame))
+    upsampled_df = pd.DataFrame(frames_in_clusters,columns=['frame_idx'])
+    bb_dict_df = presence_df[bbox_cols]
+
+    merged_bb_df = upsampled_df.merge(
+        bb_dict_df,
+        how='outer',
+        on='frame_idx'
+    )
+    if interpolate:
+        interpolated_df = merged_bb_df.interpolate()
+    else:
+        interpolated_df = merged_bb_df.ffill().bfill()
+    return interpolated_df
+
 def create_single_face_output(
         cluster_df: pd.DataFrame, 
         min_frames_face_present: int,
@@ -590,6 +630,14 @@ def create_single_face_output(
         DataFrame containing face cluster information with columns 'cluster_presences' and 'frame_idx'.
     min_frames_face_present : int
         Minimum number of frames required for a face to be considered present.
+    frames_per_row : int
+        Number of frames per row.
+    fps : int
+        Frames per second of the video.
+    bbox_cols : list
+        List of column names for bounding box values.
+    interpolate : bool
+        Whether to interpolate bounding box values in the output.
 
     Returns:
     ............
@@ -601,27 +649,17 @@ def create_single_face_output(
     cluster_df['cluster_presences'] = np.cumsum(
         cluster_df.sample_time.diff() > ((frames_per_row / fps)*1.5) # 1.5 is hacky but just gives rounding room for fps and frames per row
     )
-    for presence_idx, presence_df in cluster_df.groupby('cluster_presences'):
+    for _, presence_df in cluster_df.groupby('cluster_presences'):
         n_frames_present = len(presence_df) * frames_per_row
         if n_frames_present > min_frames_face_present:
 
-            max_frame = presence_df.frame_idx.max()
-            min_frame = presence_df.frame_idx.min()
-            frames_in_clusters = list(range(min_frame,max_frame))
-            upsampled_df = pd.DataFrame(frames_in_clusters,columns=['frame_idx'])
-            bb_dict_df = presence_df[bbox_cols]
-
-            merged_bb_df = upsampled_df.merge(
-                bb_dict_df,
-                how='outer',
-                on='frame_idx'
+            section_df = create_section_output(
+                presence_df,
+                bbox_cols,
+                interpolate
             )
-            if interpolate:
-                interpolated_df = merged_bb_df.interpolate()
-            else:
-                interpolated_df = merged_bb_df.ffill()
 
-            interpolated_section_dfs.append(interpolated_df)
+            interpolated_section_dfs.append(section_df)
              
     df_for_all_presences = pd.concat(interpolated_section_dfs)
 
@@ -633,7 +671,6 @@ def prep_face_clusters_for_output(
     min_frames_face_present, 
     capture_n_frames_per_second,
     fps,
-    num_frames_vid,
     n_clusters,
     bbox_cols,
     interpolate=True
@@ -649,8 +686,8 @@ def prep_face_clusters_for_output(
         min_frames_face_present (int): The minimum number of frames a face must be present in a cluster.
         frames_per_row (int): The number of frames per row.
         fps (int): The frames per second of the video.
-        num_frames_vid (int): The total number of frames in the video.
         n_clusters (int): The number of clusters.
+        interpolate (bool): Whether to interpolate bounding box values in the output.
 
     Returns:
     ............
@@ -664,12 +701,11 @@ def prep_face_clusters_for_output(
 
     face_list_dict = {}
     for cluster_idx in range(n_clusters):
-        out_df = pd.DataFrame(range(num_frames_vid),columns=['frame_idx'])
+
         cluster_df = facedata_df.loc[
             facedata_df.cluster==cluster_idx
         ]
         
-        # these two can be replaced with a single one.
         face_bbox_df = create_single_face_output(
             cluster_df,
             min_frames_face_present,
@@ -678,13 +714,8 @@ def prep_face_clusters_for_output(
             bbox_cols,
             interpolate=interpolate
         )
-        out_df = out_df.merge(
-            face_bbox_df,
-            how='outer',
-            on='frame_idx'
-        )
 
-        bbox_df = out_df[bbox_cols].applymap(
+        bbox_df = face_bbox_df[bbox_cols].applymap(
             lambda x:int(x) if not pd.isna(x) else x
         )
 
@@ -717,7 +748,7 @@ def preprocess_face_video(
     - face_threshold (float): Similarity threshold for clustering faces. Default is 0.95.
     - min_sec_face_present (int): Minimum number of seconds a face must be present after clustering to not be filtered out. Default is 3.
     - n_frames (int): Maximum number of frames to process. Default is np.inf (i.e. process all frames).
-   
+    - interpolate (bool): Whether to interpolate bounding box values in the output. Default is True.
     Returns:
     - bb_dict (dict): Dictionary containing the framewise bounding boxes for each face of n_people in video. keys are zero indexed n_people integers.
     - facedata_df (pandas.DataFrame): DataFrame containing the face data and cluster info.
@@ -751,7 +782,6 @@ def preprocess_face_video(
             min_frames_face_present, 
             capture_n_frames_per_second,
             fps,
-            num_frames_vid,
             n_people,
             bbox_cols=bbox_cols,
             interpolate=interpolate
