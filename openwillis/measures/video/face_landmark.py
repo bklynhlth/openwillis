@@ -11,7 +11,8 @@ import logging
 import mediapipe as mp
 from protobuf_to_dict import protobuf_to_dict
 from sklearn.mixture import GaussianMixture
-from openwillis.measures.video.util.crop_utils import crop_with_padding_and_center
+#from openwillis.measures.video.
+from util.crop_utils import crop_with_padding_and_center
 
 logging.basicConfig(level=logging.INFO)
 logger=logging.getLogger()
@@ -179,7 +180,14 @@ def process_and_format_face_mesh(img, face_mesh, df_common):
     df_landmark = pd.concat([df_common, df_coord], axis=1)
     return df_landmark
 
-def crop_and_process_face_mesh(img, face_mesh, df_common, bbox, frame):
+def crop_and_process_face_mesh(
+    img,
+    face_mesh,
+    df_common,
+    bbox,
+    frame,
+    fps
+):
     """
     Crop and process the face mesh on the given image.
 
@@ -193,7 +201,7 @@ def crop_and_process_face_mesh(img, face_mesh, df_common, bbox, frame):
     Returns:
         pandas.DataFrame: The processed face landmarks dataframe.
     """
-    if bbox:
+    if bbox and not np.isnan(bbox['bb_x']):
         cropped_img = crop_with_padding_and_center(img, bbox)
         df_landmark = process_and_format_face_mesh(
             cropped_img,
@@ -201,7 +209,7 @@ def crop_and_process_face_mesh(img, face_mesh, df_common, bbox, frame):
             df_common
         )
     else:
-        df_landmark = get_undected_markers(frame)
+        df_landmark = get_undected_markers(frame,fps)
     return df_landmark
 
 
@@ -266,7 +274,8 @@ def run_facemesh(path, bbox_list=[]):
                         face_mesh,
                         df_common,
                         bbox,
-                        frame
+                        frame,
+                        fps
                     )
 
             except Exception as e:
@@ -492,7 +501,7 @@ def get_mouth_openness(df, measures):
 
     return mouth_openness
 
-def baseline(base_path, bbox_list=[]):
+def baseline(base_path, bbox_list=[], normalize=True, align=False):
     """
     ---------------------------------------------------------------------------------------------------
 
@@ -513,6 +522,10 @@ def baseline(base_path, bbox_list=[]):
     """
 
     base_landmark = get_landmarks(base_path, 'baseline',bbox_list=bbox_list)
+
+    if normalize:
+        base_df = normalize_face_landmarks(base_landmark, align=align)
+        
     disp_base_df = get_distance(base_landmark)
 
     disp_base_df['overall'] = pd.DataFrame(disp_base_df.mean(axis=1))
@@ -546,7 +559,14 @@ def get_empty_dataframe():
     empty_df = pd.DataFrame(columns=columns)
     return empty_df
 
-def get_displacement(lmk_df, base_path, measures,base_bbox_list=[]):
+def get_displacement(
+        lmk_df,
+        base_path,
+        measures,
+        base_bbox_list=[],
+        normalize=True,
+        align=False
+    ):
     """
     ---------------------------------------------------------------------------------------------------
 
@@ -581,7 +601,13 @@ def get_displacement(lmk_df, base_path, measures,base_bbox_list=[]):
             disp_actual_df['overall'] = pd.DataFrame(disp_actual_df.mean(axis=1))
 
             if os.path.exists(base_path):
-                disp_base_df = baseline(base_path,bbox_list=base_bbox_list)
+                # add normalize flag
+                disp_base_df = baseline(
+                    base_path,
+                    bbox_list=base_bbox_list,
+                    normalize=normalize,
+                    align=align
+                )
                 check_na = disp_base_df.iloc[:,1:].isna().all().all()
 
                 if len(disp_base_df)> 0 and not check_na:
@@ -956,7 +982,14 @@ def facial_expressivity(
         
         if normalize:
             df_landmark = normalize_face_landmarks(df_landmark, align=align)
-        df_disp = get_displacement(df_landmark, baseline_filepath, config,base_bbox_list=base_bbox_list)
+        df_disp = get_displacement(
+            df_landmark,
+            baseline_filepath,
+            config,
+            base_bbox_list=base_bbox_list,
+            normalize=normalize,
+            align=align
+        )
 
         # use mouth height to calculate mouth openness
         df_disp['mouth_openness'] = get_mouth_openness(df_landmark, config)
