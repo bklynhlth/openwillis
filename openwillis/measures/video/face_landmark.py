@@ -11,7 +11,7 @@ import logging
 import mediapipe as mp
 from protobuf_to_dict import protobuf_to_dict
 from sklearn.mixture import GaussianMixture
-#from openwillis.measures.video.
+
 from util.crop_utils import crop_with_padding_and_center
 
 logging.basicConfig(level=logging.INFO)
@@ -189,17 +189,20 @@ def crop_and_process_face_mesh(
     fps
 ):
     """
+    ---------------------------------------------------------------------------------------------------
     Crop and process the face mesh on the given image.
-
+    .......
     Args:
         img (numpy.ndarray): The input image.
         face_mesh (object): The face mesh object.
         df_common (pd.Dataframe): The common dataframe.
         bbox (dict): The bounding box coordinates of the face.
         frame (int): The frame index
-
+        fps (int): The frames per second of the video
+    .......
     Returns:
         pandas.DataFrame: The processed face landmarks dataframe.
+    ---------------------------------------------------------------------------------------------------
     """
     if bbox and not np.isnan(bbox['bb_x']):
         cropped_img = crop_with_padding_and_center(img, bbox)
@@ -224,6 +227,8 @@ def run_facemesh(path, bbox_list=[]):
     ............
     path : str
         Path to image file
+    bbox_list : list
+        List of bounding boxes for each frame in the video
 
     Returns:
     ............
@@ -301,6 +306,8 @@ def get_undected_markers(frame,fps):
     ............
     frame : int
         Frame number
+    fps : int
+        Frames per second of the video
 
     Returns:
     ............
@@ -512,6 +519,12 @@ def baseline(base_path, bbox_list=[], normalize=True, align=False):
     ............
     base_path : str
         Path to baseline input file
+    bbox_list : list
+        List of bounding boxes for each frame in the video
+    normalize : bool, optional
+        Whether to normalize the facial landmarks to a common reference point (default is True)
+    align : bool, optional
+        Whether to align the facial landmarks based on the position of the eyes (default is False)
 
     Returns:
     ............
@@ -581,6 +594,12 @@ def get_displacement(
         baseline input file path
     measures : dict
         dictionary of landmark indices
+    base_bbox_list : list, optional
+        list of bounding boxes for each frame in the baseline video
+    normalize : bool, optional
+        whether to normalize the facial landmarks to a common reference point (default is True)
+    align : bool, optional
+        whether to align the facial landmarks based on the position of the eyes (default is False)
 
     Returns:
     ............
@@ -590,7 +609,6 @@ def get_displacement(
     ---------------------------------------------------------------------------------------------------
     """
 
-    disp_list = []
     displacement_df = get_empty_dataframe()
 
     try:
@@ -692,16 +710,25 @@ def apply_rotation_per_frame(norm_df, rotation_matrices):
 
     return norm_df
 
-# Step 3 function: Calculate the rotation matrix based on eye positions for each frame
+
 def calculate_rotation_matrix_for_all_frames(left_eye_x, left_eye_y, right_eye_x, right_eye_y):
     """
+    ---------------------------------------------------------------------------------------------------
     Calculates the rotation matrix for each frame based on eye positions to align the eyes horizontally.
-
+    .................................
     Parameters:
-    left_eye_x, left_eye_y, right_eye_x, right_eye_y (Series): The x and y coordinates of the eyes for all frames.
-
+    left_eye_x: int
+        The x coordinate of the left eye.
+    left_eye_y: int
+        The y coordinate of the left eye.
+    right_eye_x: int
+        The x coordinate of the right eye.
+    right_eye_y: int
+        The y coordinate of the right eye.
+    .................................
     Returns:
     list of np.array: List of 3x3 rotation matrices, one for each frame.
+    ---------------------------------------------------------------------------------------------------
     """
     rotation_matrices = []
     
@@ -713,7 +740,7 @@ def calculate_rotation_matrix_for_all_frames(left_eye_x, left_eye_y, right_eye_x
         theta = np.arctan2(delta_eye_y, delta_eye_x)
 
         # Create the rotation matrix to rotate landmarks around the Z-axis
-        cos_theta = np.cos(-theta)  # Negate for clockwise rotation
+        cos_theta = np.cos(-theta)  
         sin_theta = np.sin(-theta)
 
         rotation_matrix = np.array([
@@ -728,14 +755,18 @@ def calculate_rotation_matrix_for_all_frames(left_eye_x, left_eye_y, right_eye_x
 
 def center_landmarks(df, nose_tip):
     """
+    ---------------------------------------------------------------------------------------------------
     Centers the landmarks by moving the nose tip to the origin.
 
     Parameters:
-    df (DataFrame): The DataFrame containing the landmarks.
-    nose_tip (str): The column name of the nose tip landmark.
-
+    df (DataFrame):
+        The DataFrame containing the landmarks.
+    nose_tip (str): 
+        The column name of the nose tip landmark.
+    .................................
     Returns:
     DataFrame: The centered landmarks.
+    ---------------------------------------------------------------------------------------------------
     """
     norm_data = {}
     for axis in ['x', 'y', 'z']:
@@ -750,8 +781,10 @@ def get_vertices_for_col(df, col_name):
     Extracts the x, y, and z coordinates for a given column.
 
     Parameters:
-    df (DataFrame): The DataFrame containing the columns.
-    col_name (str): The name of the column.
+    df : DataFrame
+         The DataFrame containing the columns.
+    col_name : str
+      The name of the column.
 
     Returns:
     x_col (Series): The x column.
@@ -772,64 +805,88 @@ def normalize_face_landmarks(
     left_eye='lmk144',
     right_eye='lmk373'
 ):
-    # Extract the x, y, z coordinates of the key points
+    """
+    ---------------------------------------------------------------------------------------------------
+    Normalize the face landmarks by centering them around the nose tip and aligning the eyes horizontally.
+
+    Parameters:
+    -----------
+    df : DataFrame
+        The DataFrame containing the face landmarks.
+    align : bool, optional
+        Whether to align the landmarks based on the position of the eyes (default is True).
+    nose_tip : str, optional
+        The name of the nose tip landmark (default is 'lmk001'). Note landmarks are 1-indexed in openwillis and 0-indexed in mediapipe
+    left_eye : str, optional
+        The name of the left eye landmark (default is 'lmk144').
+    right_eye : str, optional
+        The name of the right eye landmark (default is 'lmk373').
+
+    Returns:
+    --------
+    DataFrame: The normalized face landmarks.
+    ---------------------------------------------------------------------------------------------------
+    """
     left_eye_x, left_eye_y, left_eye_z = get_vertices_for_col(df, left_eye)
     right_eye_x, right_eye_y, right_eye_z = get_vertices_for_col(df, right_eye)
-    nose_x, nose_y, nose_z = get_vertices_for_col(df, nose_tip)
 
-    # Step 1: Compute the eye distance (for scaling)
+    # compute the eye distance (for scaling)
     eye_distance = np.sqrt(
         (right_eye_x - left_eye_x)**2 +
         (right_eye_y - left_eye_y)**2 +
         (right_eye_z - left_eye_z)**2
     )
-    scaling_factor =  eye_distance / 1 # scale to one
+    scaling_factor =  eye_distance / 1 # scale to one so all faces have a common size
 
-    # Step 2: Center the face landmarks by moving the nose to the origin
     norm_df = center_landmarks(df, nose_tip)
+
     if align:
-        # Step 3: Calculate the rotation matrix for each frame based on eye positions
+
         rotation_matrices = calculate_rotation_matrix_for_all_frames(left_eye_x, left_eye_y, right_eye_x, right_eye_y)
 
-        # Step 5: Apply rotation to the landmarks for each frame
         norm_df = apply_rotation_per_frame(norm_df, rotation_matrices)
     
-     # Scale the landmarks to normalize the face size
+     # scale the landmarks
     landmark_cols = [f'lmk{str(i).zfill(3)}_{axis}' for i in range(1, 469) for axis in ['x', 'y', 'z']]
     norm_df[landmark_cols] = norm_df[landmark_cols].div(scaling_factor.values, axis=0)
 
-    # Add back the frame identifier
     norm_df[['frame','time']] = df[['frame','time']]
 
     return norm_df
 
 def get_fps(df):
     """
+    ---------------------------------------------------------------------------------------------------
     Calculate the frames per second (FPS) from a DataFrame.
 
     This function computes the FPS by taking the reciprocal of the mode of the time differences between consecutive rows in the DataFrame.
 
     Parameters:
-    df (pandas.DataFrame): A DataFrame containing a 'time' column with timestamps.
+    df : DataFrame
+        A DataFrame containing a 'time' column with timestamps.
 
     Returns:
     int: The calculated frames per second (FPS).
+    ---------------------------------------------------------------------------------------------------
     """
     return int(1/df.time.diff().mode())
 
 def get_speaking_probabilities(df, rolling_std_seconds):
     """
+    ---------------------------------------------------------------------------------------------------
     Calculate the probability of speaking at each frame in a DataFrame.
 
     This function calculates the probability of speaking at each frame in a DataFrame by fitting a Gaussian Mixture Model to the rolling standard deviation of the 'mouth_openness' column.
 
     Parameters:
-    df (pandas.DataFrame): A DataFrame containing a 'time' column with timestamps and a 'mouth_openness' column with mouth openness values.
-    fps (int): The frames per second (FPS) of the video.
-    rolling_std_seconds (int): The number of seconds over which to calculate the rolling standard deviation.
+    df : pd.DataFrame
+        A DataFrame containing a 'time' column with timestamps and a 'mouth_openness' column with mouth openness values.
+    rolling_std_seconds : int
+        The number of seconds over which to calculate the rolling standard deviation.
 
     Returns:
     pandas.Series: A Series containing the probability of speaking at each frame.
+    ---------------------------------------------------------------------------------------------------
     """
     fps = get_fps(df)
     rolling_std_frames = int(rolling_std_seconds*fps)
@@ -945,7 +1002,7 @@ def facial_expressivity(
         normalize : bool, optional
             whether to normalize the facial landmarks to a common reference point (default is True).
         align : bool, optional
-            whether to align the facial landmarks based on the position of the eyes (default is True).
+            whether to align the facial landmarks based on the position of the eyes (default is False).
         rolling_std_seconds : int, optional
             number of seconds over which to calculate the rolling standard deviation for speaking probability
         split_by_speaking : bool, optional
