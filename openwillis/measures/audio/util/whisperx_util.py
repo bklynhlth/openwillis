@@ -161,8 +161,9 @@ def get_whisperx_diariazation(filepath, input_param):
     try:
         if torch.cuda.is_available():
             device = 'cuda'
-            compute_type = "float16"
-    
+            if not compute_type.startswith('float'):
+                compute_type = "float16"
+
         transcribe_json, audio = transcribe_whisper(filepath, input_param['model'], device, compute_type, input_param['batch_size'], input_param['infra_model'], input_param['language'])
     
         # Align whisper output
