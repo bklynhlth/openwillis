@@ -179,7 +179,7 @@ def calculate_glottal(audio_path):
 
     return glottal_features
 
-def calculate_tremor(audio_path):
+def calculate_tremor(audio_path, duration_seconds):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -189,6 +189,8 @@ def calculate_tremor(audio_path):
     ...........
     audio_path : str
         path to the audio file
+    duration_seconds : float
+        duration of the audio file
 
     Returns:
     ...........
@@ -198,6 +200,9 @@ def calculate_tremor(audio_path):
 
     ------------------------------------------------------------------------------------------------------
     """
+    if duration_seconds < 3:
+        return [np.NaN] * 18
+
     tremor_dir = os.path.dirname(os.path.abspath(__file__))
     tremor_dir = os.path.join(tremor_dir, "util/praat_tremor")
 
@@ -219,7 +224,7 @@ def calculate_tremor(audio_path):
 
     return tremor_features2
 
-def get_advanced_summary(df_summary, audio_path, option, measures):
+def get_advanced_summary(df_summary, audio_path, option, duration_seconds, measures):
     """
     ------------------------------------------------------------------------------------------------------
     
@@ -233,6 +238,9 @@ def get_advanced_summary(df_summary, audio_path, option, measures):
         path to the audio file
     option : str
         whether to calculate the advanced vocal acoustic variables
+        can be either 'simple', 'advanced' or 'tremor'
+    duration_seconds : float
+        duration of the audio file
     measures : dict
         a dictionary containing the measures names for the calculated statistics.
 
@@ -262,11 +270,11 @@ def get_advanced_summary(df_summary, audio_path, option, measures):
         tremor_summ = pd.DataFrame([[np.NaN] * 18], columns=tremor_cols)
         glottal_summ = pd.DataFrame([[np.NaN] * 6], columns=glottal_cols)
     elif option == 'tremor':
-        tremor_features = calculate_tremor(audio_path)
+        tremor_features = calculate_tremor(audio_path, duration_seconds)
         tremor_summ = pd.DataFrame([tremor_features], columns=tremor_cols)
         glottal_summ = pd.DataFrame([[np.NaN] * 6], columns=glottal_cols)
     else:
-        tremor_features = calculate_tremor(audio_path)
+        tremor_features = calculate_tremor(audio_path, duration_seconds)
         tremor_summ = pd.DataFrame([tremor_features], columns=tremor_cols)
 
         glottal_features = calculate_glottal(audio_path)
@@ -307,6 +315,7 @@ def vocal_acoustics(audio_path, voiced_segments = True, option='simple'):
             raise ValueError("Option should be either 'simple', 'advanced' or 'tremor'")
 
         sound, measures = autil.read_audio(audio_path)
+        duration_seconds = sound.get_total_duration()
         df_pitch = autil.pitchfreq(sound, measures, 75, 500)
         df_loudness = autil.loudness(sound, measures)
 
@@ -323,8 +332,8 @@ def vocal_acoustics(audio_path, voiced_segments = True, option='simple'):
         sig_df = pd.concat([df_jitter, df_shimmer, df_gne, df_cepstral], axis=1)
 
         df_summary = get_summary(sound, framewise, sig_df, df_silence, voiced_segments, measures)
-        df_summary2 = get_advanced_summary(df_summary, audio_path, option, measures)
+        df_summary2 = get_advanced_summary(df_summary, audio_path, option, duration_seconds, measures)
         return framewise, df_summary2
 
     except Exception as e:
-        logger.error(f'Error in acoustic calculation- file: {audio_path} & Error: {e}')
+        logger.info(f'Error in acoustic calculation- file: {audio_path} & Error: {e}')
