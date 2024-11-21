@@ -120,6 +120,9 @@ def speech_transcription_aws(s3_uri, **kwargs):
 
     present_labels = [x['speaker_label'] for x in json_response['results']['items'] if 'speaker_label' in x]
     if len(set(present_labels)) != 2:
+        if input_param['speaker_labels'] == True and input_param['max_speakers'] == 1:
+            for item in json_response['results']['items']:
+                item['speaker_label'] = 'speaker_0'
         return json_response, transcript, willisdiarize_status
 
     if input_param['language'].lower()[:2] == 'en' and input_param['willisdiarize_endpoint'].lower() not in ['', 'none']:
