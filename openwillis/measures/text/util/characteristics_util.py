@@ -491,8 +491,8 @@ def create_text_list(utterances_speaker, speaker_label, min_turn_length, measure
     word_list = sum(utterances_speaker[measures['words_texts']].tolist(), [])
 
     valid_turns = utterances_speaker[utterances_speaker[measures['words_texts']].apply(len) >= min_turn_length]
-    turn_list = valid_turns[measures['utterance_text']].tolist()
-    turn_indices = valid_turns[measures['utterance_ids']].tolist()
+    turn_list = valid_turns[measures['utterance_text']].tolist() if speaker_label is not None else []
+    turn_indices = valid_turns[measures['utterance_ids']].tolist() if speaker_label is not None else []
 
     text_list = [word_list, turn_list, full_text]
 
