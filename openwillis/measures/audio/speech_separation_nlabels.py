@@ -2,19 +2,19 @@
 # website:   http://www.bklynhlth.com
 
 # import the required packages
+import os
+import json
 import logging
+
+from pyannote.audio import Pipeline
+from openwillis.measures.audio.util import separation_util as sutil
+from openwillis.measures.commons.common import to_audio, from_audio
+from pydub import AudioSegment
+import pandas as pd
 
 logging.basicConfig(level=logging.INFO)
 logger=logging.getLogger()
 logging.getLogger('torch.distributed.nn.jit.instantiator').setLevel(logging.WARNING)
-
-from pyannote.audio import Pipeline
-from openwillis.measures.audio.util import separation_util as sutil
-from pydub import AudioSegment
-
-import os
-import json
-import pandas as pd
 
 def get_config():
     """
@@ -93,9 +93,12 @@ def read_kwargs(kwargs):
     
     input_param['transcript_json'] = kwargs.get('transcript_json', json.dumps({}))
     input_param['context'] = kwargs.get('context', '')
+
+    input_param['volume_normalization'] = kwargs.get('volume_normalization', None)
+
     return input_param
 
-def get_pyannote(input_param, file_name, filepath):
+def get_pyannote(input_param, filepath):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -105,8 +108,6 @@ def get_pyannote(input_param, file_name, filepath):
     ...........
     input_param : dict
         A dictionary containing input parameters
-    file_name :str
-        The name of the file.
     filepath : str
         The file path.
 
@@ -142,6 +143,8 @@ def speaker_separation_nolabels(filepath, **kwargs):
         Access token for HuggingFace to access pre-trained models.
     context : str, optional
         scale to use for slicing the separated audio files, if any.
+    volume_normalization : int
+        The volume normalization level. Default is None.
 
     Returns:
     ...........
@@ -153,20 +156,26 @@ def speaker_separation_nolabels(filepath, **kwargs):
     signal_label = {}
     input_param = read_kwargs(kwargs)
 
-    file_name, _ = os.path.splitext(os.path.basename(filepath))
     measures = get_config()
 
     try:
         if not os.path.exists(filepath) or 'transcript_json' not in kwargs:
             return signal_label
 
-        speaker_df, speaker_count = get_pyannote(input_param, file_name, filepath)
+        speaker_df, speaker_count = get_pyannote(input_param, filepath)
         audio_signal = AudioSegment.from_file(file = filepath, format = "wav")
 
         if len(speaker_df)>0 and speaker_count>1:
-            signal_label = sutil.generate_audio_signal(speaker_df , audio_signal, input_param['context'], measures)
+            combined_df = sutil.combine_turns(speaker_df)
+            signal_label = sutil.generate_audio_signal(combined_df, audio_signal, input_param['context'], measures)
+
+            if input_param['volume_normalization']:
+                if type(input_param['volume_normalization']) != int or input_param['volume_normalization'] < -60 or input_param['volume_normalization'] > 0:
+                    logger.info('Volume normalization value should be an integer between -60 and 0')
+                    return signal_label
+                signal_label = sutil.adjust_volume(filepath, signal_label, input_param['volume_normalization'])
 
     except Exception as e:
-        logger.error(f'Error in diard processing: {e} & File: {filepath}')
+        logger.info(f'Error in diard processing: {e} & File: {filepath}')
 
     return signal_label

@@ -177,5 +177,5 @@ def get_whisperx_diariazation(filepath, input_param):
         transcript = get_transcribe_summary(json_response)
     
     except Exception as e:
-        logger.error(f'Error in speech Transcription: {e} & File: {filepath}')
+        logger.info(f'Error in speech Transcription: {e} & File: {filepath}')
     return json_response, transcript

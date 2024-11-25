@@ -151,6 +151,6 @@ def diarization_correction(transcript_json, model_name, **kwargs):
             )
 
     except Exception as e:
-        logger.error(f"Error in Speaker Diarization Correction {e}")
+        logger.info(f"Error in Speaker Diarization Correction {e}")
 
     return transcript_json_corrected

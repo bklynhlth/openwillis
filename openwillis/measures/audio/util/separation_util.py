@@ -2,17 +2,17 @@
 # website:   http://www.bklynhlth.com
 
 # import the required packages
-
 import os
-import shutil
-
+import tempfile
 import pandas as pd
 import numpy as np
 import logging
+import shutil
 
 from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
-from openwillis.measures.audio.util import util as ut
+from pydub import AudioSegment
+from openwillis.measures.commons.common import to_audio, from_audio
 
 logging.basicConfig(level=logging.INFO)
 logger=logging.getLogger()
@@ -142,7 +142,7 @@ def get_diart_interval(diarization):
             speaker_list.append('speaker'+ str(speaker_id))
 
         except Exception as e:
-            logger.error(f'Error in pyannote filtering: {e}')
+            logger.info(f'Error in pyannote filtering: {e}')
 
     df = prepare_diart_interval(start_time, end_time, speaker_list)
     return df
@@ -292,12 +292,11 @@ def get_speaker_identification(df1, df2):
                             (merged_df['end'] <= merged_df['end_time'])]
 
     # Groupby and aggregate word and conf
-    grouped_df = filtered_df.groupby(['start_time', 'end_time', 'speaker']).agg({'word': ' '.join, 'conf': 'mean'}).reset_index()
-    grouped_df = grouped_df.rename(columns={'conf': 'confidence', 'speaker': 'speaker_label', 'word': 'content'})
+    filtered_df = filtered_df.rename(columns={'conf': 'confidence', 'speaker': 'speaker_label', 'word': 'content', 'start': 'start_time', 'end': 'end_time'}).iloc[:, 2:]
 
-    grouped_df = grouped_df[["start_time", "end_time", "confidence", "speaker_label", "content"]]
-    speaker_count = grouped_df['speaker_label'].nunique()
-    return grouped_df, speaker_count
+    filtered_df = filtered_df[["start_time", "end_time", "confidence", "speaker_label", "content"]]
+    speaker_count = filtered_df['speaker_label'].nunique()
+    return filtered_df, speaker_count
 
 def transcribe_response_to_dataframe(response):
     """
@@ -359,19 +358,15 @@ def extract_data(segment_info):
 
     ------------------------------------------------------------------------------------------------------
     """
-    phrase = segment_info.get("text", "")
-    start = segment_info.get("start", np.nan)
-    
-    end = segment_info.get("end", np.nan)
     words = segment_info.get("words", None)
 
-    if words is not None and len(words) > 0:
-        score = words[0].get("score", 0)
-    else:
-        score = 0
+    starts = [word.get("start", np.nan) for word in words]
+    ends = [word.get("end", np.nan) for word in words]
+    phrases = [word.get("word", "") for word in words]
+    scores = [word.get("score", 0) for word in words]
+    speakers = [segment_info.get("speaker", "no_speaker") for _ in words]
 
-    speaker = segment_info.get("speaker", "no_speaker")
-    return pd.Series([start, end, phrase, score, speaker], index=["start", "end", "phrase", "score", "speaker"])
+    return pd.DataFrame({"start": starts, "end": ends, "phrase": phrases, "score": scores, "speaker": speakers})
 
 def whisperx_to_dataframe(json_response):
     """
@@ -398,6 +393,7 @@ def whisperx_to_dataframe(json_response):
         
         segment_infos = json_response["segments"]
         df = pd.DataFrame(segment_infos).apply(extract_data, axis=1)
+        df = pd.concat(df.tolist(), ignore_index=True)
 
         df = df[df["score"] > 0].reset_index(drop=True)
         df = df.dropna(subset=["start", "end"]).reset_index(drop=True)
@@ -407,3 +403,135 @@ def whisperx_to_dataframe(json_response):
 
     speakers = df['speaker_label'].nunique()
     return df, speakers
+
+def vosk_to_dataframe(json_response):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    Transcribes(local:vosk) a json response into a pandas DataFrame.
+
+    Parameters:
+    ----------
+    json_response : dict
+        The response object
+
+    Returns:
+    -------
+    df : pandas DataFrame
+        The transcribed data in a DataFrame.
+
+    ------------------------------------------------------------------------------------------------------
+    """
+    df = pd.DataFrame(columns=["start_time", "end_time", "content", "confidence", "speaker_label"])
+        
+    df = pd.DataFrame(json_response)
+
+    df = df[df["conf"] > 0].reset_index(drop=True)
+    df = df.dropna(subset=["start", "end"]).reset_index(drop=True)
+    
+    df = df.rename(columns={"start": "start_time", "end": "end_time", "conf": "confidence", "word": "content"})
+    df['speaker_label'] = 'speaker0'
+
+    return df
+
+def volume_normalization(audio_signal, target_dBFS):
+    """
+    ------------------------------------------------------------------------------------------------------
+    
+    Normalizes the volume of the audio signal to the target dBFS.
+    
+    Parameters:
+    ...........
+    audio_signal : pydub.AudioSegment
+        input audio signal
+    target_dBFS : float
+        target dBFS
+        
+    Returns:
+    ...........
+    pydub.AudioSegment
+        normalized audio signal
+
+    ------------------------------------------------------------------------------------------------------
+    """
+
+    headroom = -audio_signal.max_dBFS
+    gain_adjustment = target_dBFS - audio_signal.dBFS
+
+    if gain_adjustment > headroom:
+        gain_adjustment = headroom
+
+    audio_signal = audio_signal.apply_gain(gain_adjustment)
+    return audio_signal
+
+def adjust_volume(audio_path, signal_label, volume_level):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    This function adjusts the volume level of the audio signal.
+
+    Parameters:
+    ...........
+    audio_path : str
+        Path to the input audio file.
+    signal_label : pandas.DataFrame
+        A pandas dataframe containing the speaker diarization information.
+    volume_level : int
+        The volume normalization level.
+
+    Returns:
+    ...........
+    signal_label : pandas.DataFrame
+        A pandas dataframe containing the speaker diarization information.
+
+    ------------------------------------------------------------------------------------------------------
+    """
+    temp_dir = tempfile.mkdtemp()
+    to_audio(audio_path, signal_label, temp_dir)
+    for file in os.listdir(temp_dir):
+        try:
+            # standardize volume level
+            audio_signal = AudioSegment.from_file(file = os.path.join(temp_dir, file), format = "wav")
+            audio_signal = volume_normalization(audio_signal, volume_level)
+            audio_signal.export(os.path.join(temp_dir, file), format="wav")
+        except Exception as e:
+            logger.info(f'Error in adjusting volume for file: {file}, error: {e}')
+
+    signal_label = from_audio(temp_dir)
+
+    # clear the temp directory
+    shutil.rmtree(temp_dir)
+
+    return signal_label
+
+def combine_turns(df):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    Combines consecutive words of the same speaker into a single turn.
+
+    Parameters:
+    ...........
+    df : pandas.DataFrame
+        The dataframe containing the speaker diarization information.
+
+    Returns:
+    ...........
+    combined_df : pandas.DataFrame
+        The dataframe with combined turns.
+
+    ------------------------------------------------------------------------------------------------------
+    """
+    change_mask = df['speaker_label'] != df['speaker_label'].shift()
+    
+    groups = np.cumsum(change_mask)
+    
+    combined_df = df.groupby(groups).agg({
+        'start_time': 'first',
+        'end_time': 'last',
+        'confidence': 'mean',
+        'speaker_label': 'first',
+        'content': ' '.join
+    }).reset_index(drop=True)
+    
+    return combined_df

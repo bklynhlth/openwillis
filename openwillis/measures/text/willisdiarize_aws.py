@@ -156,6 +156,6 @@ def diarization_correction_aws(transcript_json, endpoint_name, **kwargs):
             willisdiarize_status = True
 
     except Exception as e:
-        logger.error(f"Error in Speaker Diarization Correction {e}")
+        logger.info(f"Error in Speaker Diarization Correction {e}")
 
     return transcript_json_corrected, willisdiarize_status

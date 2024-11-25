@@ -70,7 +70,7 @@ def run_deepface(path, measures):
                 frame +=1
 
     except Exception as e:
-        logger.error(f'Face not detected by deepface for- file:{path} & Error: {e}')
+        logger.info(f'Face not detected by deepface for- file:{path} & Error: {e}')
 
     finally:
         #Empty dataframe in case of insufficient datapoints
@@ -273,4 +273,4 @@ def emotional_expressivity(filepath, baseline_filepath=''):
         return df_norm_emo, df_summ
 
     except Exception as e:
-        logger.error(f'Error in facial emotion calculation- file: {filepath} & Error: {e}')
+        logger.info(f'Error in facial emotion calculation- file: {filepath} & Error: {e}')
