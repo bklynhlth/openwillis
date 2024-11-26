@@ -714,7 +714,8 @@ def prep_face_clusters_for_output(
             bbox_cols,
             interpolate=interpolate
         )
-
+        if face_bbox_df.empty:
+            continue
         bbox_df = face_bbox_df[bbox_cols].applymap(
             lambda x:int(x) if not pd.isna(x) else x
         )
