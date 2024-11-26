@@ -481,7 +481,7 @@ def load_facedata_from_video(
             break
 
     cap.release()
-    return facedata_list, fps, num_frames
+    return facedata_list, fps
 
 
 def facedata_list_to_df(facedata_list):
@@ -762,7 +762,7 @@ def preprocess_face_video(
     bbox_cols=config["bbox_dict_cols"]
 
     try:
-        face_data_across_frames, fps, num_frames_vid = load_facedata_from_video(
+        face_data_across_frames, fps = load_facedata_from_video(
             video_path,
             config['rgb_back_ends'],
             n_frames=n_frames,
