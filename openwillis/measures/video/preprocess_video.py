@@ -661,7 +661,7 @@ def create_single_face_output(
 
             interpolated_section_dfs.append(section_df)
              
-    df_for_all_presences = pd.concat(interpolated_section_dfs)
+    df_for_all_presences = pd.concat(interpolated_section_dfs) if interpolated_section_dfs else pd.DataFrame()
 
     return df_for_all_presences
 
