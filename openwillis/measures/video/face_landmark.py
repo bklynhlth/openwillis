@@ -10,9 +10,9 @@ import os
 import logging
 import mediapipe as mp
 from protobuf_to_dict import protobuf_to_dict
-from sklearn.mixture import GaussianMixture
 
-from util.crop_utils import crop_with_padding_and_center
+from openwillis.measures.video.util.crop_utils import crop_with_padding_and_center
+from openwillis.measures.video.util.speaking_utils import get_speaking_probabilities
 
 logging.basicConfig(level=logging.INFO)
 logger=logging.getLogger()
@@ -358,7 +358,8 @@ def get_landmarks(path, error_info,bbox_list=[]):
         df_landmark = pd.concat(landmark_list).reset_index(drop=True)
 
     else:
-        df_landmark = get_undected_markers(0)
+        standard_fps = 25
+        df_landmark = get_undected_markers(0,standard_fps)
         logger.info(f'Face not detected by mediapipe in file {path}')
 
     return df_landmark
@@ -853,59 +854,6 @@ def normalize_face_landmarks(
     norm_df[['frame','time']] = df[['frame','time']]
 
     return norm_df
-
-def get_fps(df):
-    """
-    ---------------------------------------------------------------------------------------------------
-    Calculate the frames per second (FPS) from a DataFrame.
-
-    This function computes the FPS by taking the reciprocal of the mode of the time differences between consecutive rows in the DataFrame.
-
-    Parameters:
-    df : DataFrame
-        A DataFrame containing a 'time' column with timestamps.
-
-    Returns:
-    int: The calculated frames per second (FPS).
-    ---------------------------------------------------------------------------------------------------
-    """
-    return int(1/df.time.diff().mode())
-
-def get_speaking_probabilities(df, rolling_std_seconds):
-    """
-    ---------------------------------------------------------------------------------------------------
-    Calculate the probability of speaking at each frame in a DataFrame.
-
-    This function calculates the probability of speaking at each frame in a DataFrame by fitting a Gaussian Mixture Model to the rolling standard deviation of the 'mouth_openness' column.
-
-    Parameters:
-    df : pd.DataFrame
-        A DataFrame containing a 'time' column with timestamps and a 'mouth_openness' column with mouth openness values.
-    rolling_std_seconds : int
-        The number of seconds over which to calculate the rolling standard deviation.
-
-    Returns:
-    pandas.Series: A Series containing the probability of speaking at each frame.
-    ---------------------------------------------------------------------------------------------------
-    """
-    fps = get_fps(df)
-    rolling_std_frames = int(rolling_std_seconds*fps)
-    df = df.copy(deep=True)
-    df['rolling_mouth_open_std'] = df.mouth_openness.rolling(rolling_std_frames).std()
-
-    df_nona = df[['frame','time','rolling_mouth_open_std']].dropna()
-    gmm = GaussianMixture(n_components=2)
-    gmm.fit(df_nona.rolling_mouth_open_std.values.reshape(-1,1))
-    prob_preds = gmm.predict_proba(df_nona.rolling_mouth_open_std.values.reshape(-1,1))
-    mean_1, mean_2 = gmm.means_.flatten()
-    if mean_1 > mean_2:
-        df_nona['speaking'] = prob_preds[:,0]
-    else:
-        df_nona['speaking'] = prob_preds[:,1]
-    
-    
-    df = df.merge(df_nona, on='frame', how='left')
-    return df.speaking
 
 def split_speaking_df(df_disp):
     """
