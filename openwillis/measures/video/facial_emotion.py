@@ -5,19 +5,188 @@
 import numpy as np
 import pandas as pd
 
-
-from deepface import DeepFace
 import cv2
+
+import feat
+from feat.utils import FEAT_EMOTION_COLUMNS
+from feat.pretrained import  AU_LANDMARK_MAP
 
 import os
 import json
 import logging
 
+from openwillis.measures.video.util.crop_utils import crop_img
+
 logging.basicConfig(level=logging.INFO)
 logger=logging.getLogger()
 
+def get_config(filepath, json_file):
+    """
+    ------------------------------------------------------------------------------------------------------
 
-def run_deepface(path, measures):
+    This function reads the configuration file containing the column names for the output dataframes,
+    and returns the contents of the file as a dictionary.
+
+    Parameters:
+    ...........
+    filepath : str
+        The path to the configuration file.
+    json_file : str
+        The name of the configuration file.
+
+    Returns:
+    ...........
+    measures: A dictionary containing the names of the columns in the output dataframes.
+
+    ------------------------------------------------------------------------------------------------------
+    """
+    dir_name = os.path.dirname(filepath)
+    measure_path = os.path.abspath(os.path.join(dir_name, f"config/{json_file}"))
+
+    file = open(measure_path)
+    measures = json.load(file)
+    return measures
+
+def bb_dict_to_bb_list(bb_dict):
+    '''
+    insert docstring 
+
+    '''
+    return [[[
+        bb_dict['bb_x'],
+        bb_dict['bb_y'],
+        bb_dict['bb_w'],
+        bb_dict['bb_y']
+        ]]]
+
+def get_faces(detector,frame,bb_dict,threshold=.95):
+    '''
+    detect faces in frame if bb_dict is empty else use bb_dict
+
+    arguments:
+    detector: pyfeat detector object
+    frame: frame to detect faces in
+    bb_dict: dictionary with bounding box coordinates
+    threshold: threshold for face detection
+
+    returns:
+    faces: list of faces detected in frame
+    '''
+    if len(bb_dict.keys()):
+        #may need to change this if its batch
+        faces = bb_dict_to_bb_list(bb_dict)
+    else:
+        faces = detector.detect_faces(
+                frame,
+                threshold=.95,
+            )
+    return faces
+
+def mouth_openness(
+    landmarks,
+    upper_lip_lmks=[61, 62, 63],
+    lower_lip_lmks=[65, 66, 67]
+):
+    '''
+    insert docstring
+    '''
+    upper_lip = landmarks[upper_lip_lmks]
+    lower_lip = landmarks[lower_lip_lmks]
+
+    lmk_dist = []
+    for (upper_lip_x, upper_lip_y), (lower_lip_x, lower_lip_y) in zip(upper_lip, lower_lip):
+        lmk_dist.append(np.sqrt((upper_lip_x - lower_lip_x)**2 + (upper_lip_y - lower_lip_y)**2))
+    return np.mean(lmk_dist)
+
+
+def detect_emotions(detector, frame, emo_cols, bb_dict={},threshold=.95):
+    # if faces empty else - skip this step
+    faces = get_faces(detector,frame,bb_dict,threshold=threshold)
+    # ok so landmarks are much less intense than 
+    if len(faces[0]):
+        landmarks = detector.detect_landmarks(
+            frame,
+            detected_faces=faces
+        )
+
+        aus = detector.detect_aus(frame, landmarks)
+
+        emotions = detector.detect_emotions(
+            frame, faces, landmarks
+        )
+
+        emotions = emotions[0][0] * 100 # convert from 0-1 to 0-100
+        aus = aus[0][0]
+        landmarks = landmarks[0][0]
+
+        
+        emos_aus = np.hstack([emotions,aus])
+        df_emo = pd.DataFrame([emos_aus],columns=emo_cols)
+        df_emo['mouth_openness'] = mouth_openness(landmarks)
+
+        return df_emo, landmarks
+
+def extract_emo_and_format(
+        img_rgb,
+        cols,
+        df_common,
+        detector_backend='opencv'
+    ):
+    """
+    Extracts facial emotions from an image and formats the results into a DataFrame.
+
+    Parameters:
+    img_rgb (str): The path to the image file in RGB format.
+    cols (list): A list of column names for the resulting DataFrame.
+    df_common (pd.DataFrame): A DataFrame containing common data.
+
+    Returns:
+    pd.DataFrame: A DataFrame containing the common data and the extracted facial emotions.
+    """
+    face_analysis = DeepFace.analyze(
+        img_path=img_rgb,
+        actions=['emotion'],
+        detector_backend=detector_backend
+    )
+    df_face = pd.DataFrame([face_analysis[0]['emotion'].values()], columns=cols) / 100
+    #print(face_analysis[0]['region'])
+    df_emotion = pd.concat([df_common, df_face], axis=1)
+    return df_emotion
+
+
+def crop_and_extract_emo(
+    img_rgb,
+    cols,
+    df_common,
+    bbox,
+    frame
+):
+    """
+    Crop and extract emotions from an image.
+
+    Args:
+        img_rgb (numpy.ndarray): The RGB image to process.
+        cols (list): The list of column names for the emotion data.
+        df_common (pandas.DataFrame): The common dataframe for emotion data.
+        bbox (tuple): The bounding box coordinates for cropping the image.
+
+    Returns:
+        pandas.DataFrame: The extracted emotion data.
+
+    """
+    if bbox:
+        img_rgb = crop_img(img_rgb, bbox)
+        df_emotion = extract_emo_and_format(
+            img_rgb, 
+            cols, 
+            df_common,
+            detector_backend="skip"
+        )
+    else:
+        df_emotion = get_undected_emotion(frame, cols)
+    return df_emotion
+
+def run_pyfeat(path, skip_frames=5, bbox_list=[]):
     """
     ------------------------------------------------------------------------------------------------------
     This function takes an image path and measures config object as input, and uses the DeepFace package to
@@ -39,35 +208,57 @@ def run_deepface(path, measures):
     ------------------------------------------------------------------------------------------------------
     """
 
-    df_list = []
-    frame = 0
-    cols = [measures['angry'], measures['disgust'], measures['fear'], measures['happy'], measures['sad'],
-            measures['surprise'], measures['neutral']]
+    
+    emo_cols = FEAT_EMOTION_COLUMNS + AU_LANDMARK_MAP['Feat']
+    detector = feat.Detector()
 
     try:
-        cap = cv2.VideoCapture(path)
 
+        cap = cv2.VideoCapture(path)
+        num_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        len_bbox_list = len(bbox_list)
+        fps = cap.get(cv2.CAP_PROP_FPS)
+        
+        df_list = []
+        frame = 0
+        skip_frames = 5
+        n_frames_skipped = skip_frames
+
+
+        if (len_bbox_list>0) & (num_frames != len_bbox_list):
+            raise ValueError('Number of frames in video and number of bounding boxes do not match')
+        
         while True:
+
             try:
 
                 ret_type, img = cap.read()
                 if ret_type is not True:
                     break
 
-                df_common = pd.DataFrame([[frame]], columns=['frame'])
-                img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-
-                face_analysis = DeepFace.analyze(img_path = img_rgb, actions = ['emotion'])
-                df_face = pd.DataFrame([face_analysis[0]['emotion'].values()], columns=cols)/100
-
-                frame +=1
-                df_emotion = pd.concat([df_common, df_face], axis=1)
-                df_list.append(df_emotion)
-
+                if n_frames_skipped < skip_frames:
+                    n_frames_skipped += 1
+                elif n_frames_skipped == skip_frames:
+                    
+                    n_frames_skipped = 0
+                    print('frame:',frame,'n_frames_skipped:',n_frames_skipped,'skip_frames',skip_frames)
+                    
+                    bbox = bbox_list[frame] if len_bbox_list>0 else {}
+                    df_common = pd.DataFrame([[frame,frame/fps]], columns=['frame','time'])
+                    df_emo, landmarks = detect_emotions(
+                        detector,
+                        img,
+                        emo_cols,
+                        bb_dict=bbox
+                    ) #pyfeat converts image from bgr - to rgb
+                    df_emotion = pd.concat([df_common, df_emo], axis=1)
+            
             except Exception as e:
-                df_emotion = get_undected_emotion(frame, cols)
-                df_list.append(df_emotion)
-                frame +=1
+                df_emotion = get_undected_emotion(frame, emo_cols)
+            
+            df_list.append(df_emotion)
+            
+            frame +=1
 
     except Exception as e:
         logger.error(f'Face not detected by deepface for- file:{path} & Error: {e}')
@@ -75,7 +266,7 @@ def run_deepface(path, measures):
     finally:
         #Empty dataframe in case of insufficient datapoints
         if len(df_list)==0:
-            df_emotion = pd.DataFrame(columns = cols)
+            df_emotion = pd.DataFrame(columns = emo_cols)
 
             df_list.append(df_emotion)
             logger.info(f'Face not detected by deepface in : {path}')
@@ -109,10 +300,10 @@ def get_undected_emotion(frame, cols):
     df_emotion = pd.concat([df_common, df], axis=1)
     return df_emotion
 
-def get_emotion(path, error_info, measures):
+def get_emotion(path, measures, bbox_list=[]):
     """
     ------------------------------------------------------------------------------------------------------
-    This function fetches facial emotion data for each frame of the input video. It calls the run_deepface()
+    This function fetches facial emotion data for each frame of the input video. It calls the run_pyfeat()
     function to get a list of dataframes containing facial emotion data for each frame and then concatenates
     these dataframes into a single dataframe.
 
@@ -132,14 +323,14 @@ def get_emotion(path, error_info, measures):
     ------------------------------------------------------------------------------------------------------
     """
 
-    emotion_list = run_deepface(path, measures)
+    emotion_list = run_pyfeat(path, measures, bbox_list=bbox_list)
 
     if len(emotion_list)>0:
         df_emo = pd.concat(emotion_list).reset_index(drop=True)
 
     return df_emo
 
-def baseline(df, base_path, measures):
+def baseline(df, base_path, measures, base_bbox_list=[]):
     """
     ------------------------------------------------------------------------------------------------------
     This function normalizes the facial emotion data in the input dataframe using the baseline video. If no
@@ -171,7 +362,7 @@ def baseline(df, base_path, measures):
     df_common = df_emo[['frame']]
     df_emo.drop(columns=['frame'], inplace=True)
 
-    base_emo = get_emotion(base_path, 'baseline', measures)
+    base_emo = get_emotion(base_path, 'baseline', measures, bbox_list=base_bbox_list)
     base_mean = base_emo.iloc[:,1:].mean() + 1 #Normalization
 
     base_df = pd.DataFrame(base_mean).T
@@ -212,7 +403,7 @@ def get_summary(df):
         df_summ = pd.concat([df_mean, df_std], axis =1).reset_index(drop=True)
     return df_summ
 
-def emotional_expressivity(filepath, baseline_filepath=''):
+def emotional_expressivity(filepath, baseline_filepath='',bbox_list=[],base_bbox_list=[]):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -250,17 +441,11 @@ def emotional_expressivity(filepath, baseline_filepath=''):
     try:
 
         #Loading json config
-        dir_name = os.path.dirname(os.path.abspath(__file__))
-        measure_path = os.path.abspath(os.path.join(dir_name, 'config/facial.json'))
-
-        file = open(measure_path)
-        measures = json.load(file)
-
-        df_emotion = get_emotion(filepath, 'input', measures)
+        measures = get_config(os.path.abspath(__file__), 'facial.json')
+        df_emotion = get_emotion(filepath, measures, bbox_list=bbox_list)
         df_norm_emo = baseline(df_emotion, baseline_filepath, measures)
 
-        cols = [measures['angry'], measures['disgust'], measures['fear'], measures['happy'], measures['sad'],
-                measures['surprise']]
+        cols = FEAT_EMOTION_COLUMNS
         comp_exp = df_norm_emo[cols].mean(axis=1)
 
         df_norm_emo[measures['comp_exp']] = comp_exp
