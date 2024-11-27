@@ -998,9 +998,9 @@ def facial_expressivity(
 
         # use mouth height to calculate mouth openness
         df_disp['mouth_openness'] = get_mouth_openness(df_landmark, config)
-
+        df_disp['speaking'] = get_speaking_probabilities(df_disp, rolling_std_seconds)
+        
         if split_by_speaking:
-            df_disp['speaking'] = get_speaking_probabilities(df_disp, rolling_std_seconds)
             df_summ = split_speaking_df(df_disp)
         else:
             df_summ = get_summary(df_disp)
