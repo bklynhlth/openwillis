@@ -48,15 +48,21 @@ def get_config(filepath, json_file):
     return measures
 
 def bb_dict_to_bb_list(bb_dict):
-    '''
-    insert docstring 
+    """
+    Convert a bounding box dictionary to a bounding box list.
+    Args:
+        bb_dict (dict): A dictionary containing bounding box coordinates with keys 'bb_x', 'bb_y', 'bb_w', and 'bb_h'.
+    Returns:
+        list: A nested list representing the bounding box in the format 
+              [[[bb_x, bb_y, bb_x + bb_w, bb_y + bb_h, 1]]], where 1 is the face confidence.
+    """
 
-    '''
     return [[[
         bb_dict['bb_x'],
         bb_dict['bb_y'],
-        bb_dict['bb_w'],
-        bb_dict['bb_y']
+        bb_dict['bb_x'] + bb_dict['bb_w'],
+        bb_dict['bb_y'] + bb_dict['bb_y'],
+        1# this is to formatt bb_list to be compatible with pyfeat (this is face confidence)
         ]]]
 
 def get_faces(detector,frame,bb_dict,threshold=.95):
@@ -80,6 +86,7 @@ def get_faces(detector,frame,bb_dict,threshold=.95):
                 frame,
                 threshold=.95,
             )
+    print(faces)
     return faces
 
 def mouth_openness(
@@ -104,6 +111,7 @@ def detect_emotions(detector, frame, emo_cols, bb_dict={},threshold=.95):
     faces = get_faces(detector,frame,bb_dict,threshold=threshold)
     # ok so landmarks are much less intense than 
     if len(faces[0]):
+        print(frame.shape)
         landmarks = detector.detect_landmarks(
             frame,
             detected_faces=faces
@@ -126,67 +134,7 @@ def detect_emotions(detector, frame, emo_cols, bb_dict={},threshold=.95):
 
         return df_emo, landmarks
 
-def extract_emo_and_format(
-        img_rgb,
-        cols,
-        df_common,
-        detector_backend='opencv'
-    ):
-    """
-    Extracts facial emotions from an image and formats the results into a DataFrame.
-
-    Parameters:
-    img_rgb (str): The path to the image file in RGB format.
-    cols (list): A list of column names for the resulting DataFrame.
-    df_common (pd.DataFrame): A DataFrame containing common data.
-
-    Returns:
-    pd.DataFrame: A DataFrame containing the common data and the extracted facial emotions.
-    """
-    face_analysis = DeepFace.analyze(
-        img_path=img_rgb,
-        actions=['emotion'],
-        detector_backend=detector_backend
-    )
-    df_face = pd.DataFrame([face_analysis[0]['emotion'].values()], columns=cols) / 100
-    #print(face_analysis[0]['region'])
-    df_emotion = pd.concat([df_common, df_face], axis=1)
-    return df_emotion
-
-
-def crop_and_extract_emo(
-    img_rgb,
-    cols,
-    df_common,
-    bbox,
-    frame
-):
-    """
-    Crop and extract emotions from an image.
-
-    Args:
-        img_rgb (numpy.ndarray): The RGB image to process.
-        cols (list): The list of column names for the emotion data.
-        df_common (pandas.DataFrame): The common dataframe for emotion data.
-        bbox (tuple): The bounding box coordinates for cropping the image.
-
-    Returns:
-        pandas.DataFrame: The extracted emotion data.
-
-    """
-    if bbox:
-        img_rgb = crop_img(img_rgb, bbox)
-        df_emotion = extract_emo_and_format(
-            img_rgb, 
-            cols, 
-            df_common,
-            detector_backend="skip"
-        )
-    else:
-        df_emotion = get_undected_emotion(frame, cols)
-    return df_emotion
-
-def run_pyfeat(path, skip_frames=5, bbox_list=[]):
+def run_pyfeat(path, skip_frames=100, bbox_list=[]):
     """
     ------------------------------------------------------------------------------------------------------
     This function takes an image path and measures config object as input, and uses the DeepFace package to
@@ -221,7 +169,6 @@ def run_pyfeat(path, skip_frames=5, bbox_list=[]):
         
         df_list = []
         frame = 0
-        skip_frames = 5
         n_frames_skipped = skip_frames
 
 
@@ -254,6 +201,7 @@ def run_pyfeat(path, skip_frames=5, bbox_list=[]):
                     df_emotion = pd.concat([df_common, df_emo], axis=1)
             
             except Exception as e:
+                print(e)
                 df_emotion = get_undected_emotion(frame, emo_cols)
             
             df_list.append(df_emotion)
@@ -323,7 +271,7 @@ def get_emotion(path, measures, bbox_list=[]):
     ------------------------------------------------------------------------------------------------------
     """
 
-    emotion_list = run_pyfeat(path, measures, bbox_list=bbox_list)
+    emotion_list = run_pyfeat(path, bbox_list=bbox_list)
 
     if len(emotion_list)>0:
         df_emo = pd.concat(emotion_list).reset_index(drop=True)
