@@ -41,7 +41,10 @@ def get_speaking_probabilities(df, rolling_std_seconds):
     fps = get_fps(df)
     rolling_std_frames = int(rolling_std_seconds*fps)
     df = df.copy(deep=True)
-    df['rolling_mouth_open_std'] = df.mouth_openness.rolling(rolling_std_frames).std()
+    df['rolling_mouth_open_std'] = df.mouth_openness.rolling(
+        rolling_std_frames,
+        min_periods=2
+    ).std()
 
     df_nona = df[['frame','time','rolling_mouth_open_std']].dropna()
     gmm = GaussianMixture(n_components=2)

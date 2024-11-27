@@ -184,9 +184,9 @@ def run_pyfeat(path, skip_frames=5, bbox_list=[]):
                     break
 
                 if n_frames_skipped < skip_frames:
-                    
+
                     n_frames_skipped += 1
-                    df_emotion = get_undected_emotion(frame, emo_cols)
+                    df_emotion = get_undected_emotion(frame, emo_cols,fps)
 
                 elif n_frames_skipped == skip_frames:
                     
@@ -205,7 +205,7 @@ def run_pyfeat(path, skip_frames=5, bbox_list=[]):
             
             except Exception as e:
                 print(e)
-                df_emotion = get_undected_emotion(frame, emo_cols)
+                df_emotion = get_undected_emotion(frame, emo_cols,fps)
             
             df_list.append(df_emotion)
             
@@ -224,7 +224,7 @@ def run_pyfeat(path, skip_frames=5, bbox_list=[]):
 
     return df_list
 
-def get_undected_emotion(frame, cols):
+def get_undected_emotion(frame, cols, fps):
     """
     ------------------------------------------------------------------------------------------------------
     This function returns a pandas dataframe with a single row of NaN values for the different facial emotion
@@ -244,7 +244,7 @@ def get_undected_emotion(frame, cols):
         A dataframe with a single row of NaN values for the different facial emotion measures.
     ------------------------------------------------------------------------------------------------------
     """
-    df_common = pd.DataFrame([[frame]], columns=['frame'])
+    df_common = pd.DataFrame([[frame, frame/fps,np.nan]], columns=['frame','time','mouth_openness'])
     value = [np.nan] * len(cols)
 
     df = pd.DataFrame([value], columns = cols)
@@ -459,6 +459,7 @@ def emotional_expressivity(
         )
 
         if split_by_speaking:
+            
             df_summ = split_speaking_df(df_norm_emo)
         else:
             df_summ = get_summary(df_norm_emo)
