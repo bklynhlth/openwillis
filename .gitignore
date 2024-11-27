@@ -4,6 +4,7 @@ openwillis/measures/video/__pycache__/face_landmark.cpython-310.pyc
 .DS_Store
 openwillis/measures/video/.DS_Store
 openwillis/measures/video/__pycache__/face_landmark.cpython-310.pyc
+openwillis.egg-info
 openwillis.egg-info/dependency_links.txt
 openwillis.egg-info/not-zip-safe
 openwillis.egg-info/PKG-INFO
@@ -13,4 +14,3 @@ openwillis.egg-info/top_level.txt
 .DS_Store
 .gitignore
 openwillis/measures/video/__pycache__/face_landmark.cpython-310.pyc
-.DS_Store
