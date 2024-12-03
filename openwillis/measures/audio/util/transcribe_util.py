@@ -267,7 +267,7 @@ def get_job_status(transcribe, input_param):
 
             time.sleep(sleep_time)
         except Exception as e:
-            logger.error(f"Get Transcription job failed with exception: {e}")
+            logger.info(f"Get Transcription job failed with exception: {e}")
 
     return status
 
@@ -350,7 +350,7 @@ def transcribe_audio(s3uri, input_param):
             response, transcript = filter_transcript_response(status, input_param)
 
     except Exception as e:
-        logger.error(f"AWS Transcription job failed with file: {s3uri} exception: {e}")
+        logger.info(f"AWS Transcription job failed with file: {s3uri} exception: {e}")
 
     finally:
         return response, transcript

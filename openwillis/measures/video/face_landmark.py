@@ -291,7 +291,7 @@ def run_facemesh(path, bbox_list=[]):
             frame +=1
 
     except Exception as e:
-        logger.error(f'Face not detected by mediapipe file: {path} & Error: {e}')
+        logger.info(f'Face not detected by mediapipe file: {path} & Error: {e}')
 
     return df_list
 
@@ -639,7 +639,7 @@ def get_displacement(
             displacement_df = pd.concat([df_meta, disp_actual_df], axis=1).reset_index(drop=True)
     except Exception as e:
 
-        logger.error(f'Error in displacement calculation is {e}')
+        logger.info(f'Error in displacement calculation is {e}')
     return displacement_df
 
 def calculate_areas_displacement(displacement_df, measures):
@@ -1008,4 +1008,4 @@ def facial_expressivity(
         return df_landmark, df_disp, df_summ
 
     except Exception as e:
-        logger.error(f'Error in facial landmark calculation file: {filepath} & Error: {e}')
+        logger.info(f'Error in facial landmark calculation file: {filepath} & Error: {e}')
