@@ -158,7 +158,7 @@ def run_pyfeat(path, skip_frames=5, bbox_list=[]):
 
     
     emo_cols = FEAT_EMOTION_COLUMNS + AU_LANDMARK_MAP['Feat']
-    detector = feat.Detector()
+    detector = feat.Detector(emotion_model='svm')
 
     try:
 
