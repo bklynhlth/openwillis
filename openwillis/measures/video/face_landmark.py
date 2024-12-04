@@ -837,7 +837,7 @@ def normalize_face_landmarks(
         (right_eye_y - left_eye_y)**2 +
         (right_eye_z - left_eye_z)**2
     )
-    scaling_factor =  eye_distance / 1 # scale to one so all faces have a common size
+    scaling_factor =  eye_distance
 
     norm_df = center_landmarks(df, nose_tip)
 
