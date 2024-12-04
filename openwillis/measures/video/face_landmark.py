@@ -354,7 +354,7 @@ def get_landmarks(path, bbox_list=[]):
     ---------------------------------------------------------------------------------------------------
     """
 
-    landmark_list = run_facemesh(path,bbox_list=bbox_list)
+    landmark_list = run_facemesh(path, bbox_list=bbox_list)
 
     if len(landmark_list)>0:
         df_landmark = pd.concat(landmark_list).reset_index(drop=True)
