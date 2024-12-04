@@ -590,6 +590,14 @@ def create_single_face_output(
         DataFrame containing face cluster information with columns 'cluster_presences' and 'frame_idx'.
     min_frames_face_present : int
         Minimum number of frames required for a face to be considered present.
+    frames_per_row : int
+        Number of frames per row.
+    fps : int
+        Frames per second of the video.
+    bbox_cols : list
+        List of column names for the bounding box data.
+    interpolate : bool
+        Whether to interpolate missing values in the bounding box data.
 
     Returns:
     ............
@@ -622,7 +630,10 @@ def create_single_face_output(
                 interpolated_df = merged_bb_df.ffill()
 
             interpolated_section_dfs.append(interpolated_df)
-             
+    
+    if len(interpolated_section_dfs) == 0:
+        return pd.DataFrame(columns=bbox_cols)
+    
     df_for_all_presences = pd.concat(interpolated_section_dfs)
 
     return df_for_all_presences
@@ -671,7 +682,6 @@ def prep_face_clusters_for_output(
             facedata_df.cluster==cluster_idx
         ]
         
-        # these two can be replaced with a single one.
         face_bbox_df = create_single_face_output(
             cluster_df,
             min_frames_face_present,
@@ -681,6 +691,7 @@ def prep_face_clusters_for_output(
             interpolate=interpolate
         )
         
+        #ensure all frames are included
         out_df = out_df.merge(
             face_bbox_df,
             how='outer',
