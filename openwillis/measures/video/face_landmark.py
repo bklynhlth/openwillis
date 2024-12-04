@@ -908,7 +908,6 @@ def get_summary(df):
 
     df_summ = pd.DataFrame()
     if len(df.columns)>0:
-        #@ TODO: get names of summary stats
         df_mean = pd.DataFrame(df.mean()).T.iloc[:,470:].add_suffix('_mean')
         df_std = pd.DataFrame(df.std()).T.iloc[:,470:].add_suffix('_std')
 
