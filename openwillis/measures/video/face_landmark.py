@@ -330,7 +330,7 @@ def get_undected_markers(frame,fps):
     df_landmark = pd.concat([df_common, df_coord], axis=1)
     return df_landmark
 
-def get_landmarks(path, error_info,bbox_list=[]):
+def get_landmarks(path, bbox_list=[]):
     """
     ---------------------------------------------------------------------------------------------------
 
@@ -343,6 +343,8 @@ def get_landmarks(path, error_info,bbox_list=[]):
         Path to image file
     error_info : str
         Error location string
+    bbox_list : list
+        List of bounding boxes for each frame in the video
 
     Returns:
     ............
@@ -535,7 +537,7 @@ def baseline(base_path, bbox_list=[], normalize=True, align=False):
     ---------------------------------------------------------------------------------------------------
     """
 
-    base_landmark = get_landmarks(base_path, 'baseline',bbox_list=bbox_list)
+    base_landmark = get_landmarks(base_path, bbox_list=bbox_list)
 
     if normalize:
         base_df = normalize_face_landmarks(base_landmark, align=align)
@@ -982,7 +984,7 @@ def facial_expressivity(
     config = get_config(os.path.abspath(__file__), "facial.json")
 
     try:
-        df_landmark = get_landmarks(filepath, 'input',bbox_list=bbox_list)
+        df_landmark = get_landmarks(filepath, bbox_list=bbox_list)
         
         if normalize:
             df_landmark = normalize_face_landmarks(df_landmark, align=align)
