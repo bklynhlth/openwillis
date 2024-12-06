@@ -7,12 +7,12 @@ import pandas as pd
 import cv2
 import json
 import os
-import math
-
-import mediapipe as mp
-from PIL import Image
-from protobuf_to_dict import protobuf_to_dict
 import logging
+import mediapipe as mp
+from protobuf_to_dict import protobuf_to_dict
+
+from openwillis.measures.video.util.crop_utils import crop_with_padding_and_center
+from openwillis.measures.video.util.speaking_utils import get_speaking_probabilities
 
 logging.basicConfig(level=logging.INFO)
 logger=logging.getLogger()
@@ -43,6 +43,7 @@ def get_config(filepath, json_file):
     file = open(measure_path)
     measures = json.load(file)
     return measures
+
 
 def init_facemesh():
     """
@@ -156,14 +157,66 @@ def filter_coord(result):
 
     if len(keypoints)>0:
         df_x = filter_landmarks('x', keypoints)
-
         df_y = filter_landmarks('y', keypoints)
         df_z = filter_landmarks('z', keypoints)
         df_coord = pd.concat([df_x, df_y, df_z], axis=1)
 
     return df_coord
 
-def run_facemesh(path):
+def process_and_format_face_mesh(img, face_mesh, df_common):
+    """
+    Process the given image using the face_mesh model and format the resulting face landmarks.
+
+    Args:
+        img (numpy.ndarray): The input image.
+        face_mesh: The face_mesh model.
+        df_common (pandas.DataFrame): The common dataframe.
+
+    Returns:
+        pandas.DataFrame: The formatted dataframe containing the face landmarks.
+    """
+    result = face_mesh.process(img)
+    df_coord = filter_coord(result)
+    df_landmark = pd.concat([df_common, df_coord], axis=1)
+    return df_landmark
+
+def crop_and_process_face_mesh(
+    img,
+    face_mesh,
+    df_common,
+    bbox,
+    frame,
+    fps
+):
+    """
+    ---------------------------------------------------------------------------------------------------
+    Crop and process the face mesh on the given image.
+    .......
+    Args:
+        img (numpy.ndarray): The input image.
+        face_mesh (object): The face mesh object.
+        df_common (pd.Dataframe): The common dataframe.
+        bbox (dict): The bounding box coordinates of the face.
+        frame (int): The frame index
+        fps (int): The frames per second of the video
+    .......
+    Returns:
+        pandas.DataFrame: The processed face landmarks dataframe.
+    ---------------------------------------------------------------------------------------------------
+    """
+    if bbox and not np.isnan(bbox['bb_x']):
+        cropped_img = crop_with_padding_and_center(img, bbox)
+        df_landmark = process_and_format_face_mesh(
+            cropped_img,
+            face_mesh,
+            df_common
+        )
+    else:
+        df_landmark = get_undected_markers(frame,fps)
+    return df_landmark
+
+
+def run_facemesh(path, bbox_list=[]):
     """
     ---------------------------------------------------------------------------------------------------
 
@@ -174,6 +227,8 @@ def run_facemesh(path):
     ............
     path : str
         Path to image file
+    bbox_list : list
+        List of bounding boxes for each frame in the video
 
     Returns:
     ............
@@ -189,6 +244,15 @@ def run_facemesh(path):
     try:
 
         cap = cv2.VideoCapture(path)
+        num_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        fps = int(cap.get(cv2.CAP_PROP_FPS))
+        len_bbox_list = len(bbox_list)
+        print(num_frames, len_bbox_list)
+
+        if (len_bbox_list>0) & (num_frames != len_bbox_list):
+            print(num_frames, len_bbox_list)
+            raise ValueError('Number of frames in video and number of bounding boxes do not match')
+        
         face_mesh = init_facemesh()
 
         while True:
@@ -197,28 +261,41 @@ def run_facemesh(path):
                 ret_type, img = cap.read()
                 if ret_type is not True:
                     break
-
-                df_common = pd.DataFrame([[frame]], columns=['frame'])
+                df_common = pd.DataFrame([[frame, frame/fps]], columns=['frame','time'])
                 img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
-                result = face_mesh.process(img_rgb)
-                df_coord = filter_coord(result)
+                if len_bbox_list==0:
 
-                frame +=1
-                df_landmark = pd.concat([df_common, df_coord], axis=1)
-                df_list.append(df_landmark)
+                    df_landmark = process_and_format_face_mesh(
+                        img_rgb,
+                        face_mesh,
+                        df_common
+                    )
+                else:
+                    
+                    bbox = bbox_list[frame]
+                    df_landmark = crop_and_process_face_mesh(
+                        img_rgb,
+                        face_mesh,
+                        df_common,
+                        bbox,
+                        frame,
+                        fps
+                    )
 
             except Exception as e:
-                df_landmark = get_undected_markers(frame)
-                df_list.append(df_landmark)
-                frame +=1
+                print(e,frame)
+                df_landmark = get_undected_markers(frame,fps)
+
+            df_list.append(df_landmark)
+            frame +=1
 
     except Exception as e:
         logger.info(f'Face not detected by mediapipe file: {path} & Error: {e}')
 
     return df_list
 
-def get_undected_markers(frame):
+def get_undected_markers(frame,fps):
     """
     ---------------------------------------------------------------------------------------------------
 
@@ -229,6 +306,8 @@ def get_undected_markers(frame):
     ............
     frame : int
         Frame number
+    fps : int
+        Frames per second of the video
 
     Returns:
     ............
@@ -237,7 +316,7 @@ def get_undected_markers(frame):
 
     ---------------------------------------------------------------------------------------------------
     """
-    df_common = pd.DataFrame([[frame]], columns=['frame'])
+    df_common = pd.DataFrame([[frame, frame/fps]], columns=['frame','time'])
     df_coord = get_column()
 
     col_list = list(range(0, 468))
@@ -251,7 +330,7 @@ def get_undected_markers(frame):
     df_landmark = pd.concat([df_common, df_coord], axis=1)
     return df_landmark
 
-def get_landmarks(path, error_info):
+def get_landmarks(path, bbox_list=[]):
     """
     ---------------------------------------------------------------------------------------------------
 
@@ -264,6 +343,8 @@ def get_landmarks(path, error_info):
         Path to image file
     error_info : str
         Error location string
+    bbox_list : list
+        List of bounding boxes for each frame in the video
 
     Returns:
     ............
@@ -273,13 +354,14 @@ def get_landmarks(path, error_info):
     ---------------------------------------------------------------------------------------------------
     """
 
-    landmark_list = run_facemesh(path)
+    landmark_list = run_facemesh(path, bbox_list=bbox_list)
 
     if len(landmark_list)>0:
         df_landmark = pd.concat(landmark_list).reset_index(drop=True)
 
     else:
-        df_landmark = get_undected_markers(0)
+        standard_fps = 25
+        df_landmark = get_undected_markers(0,standard_fps)
         logger.info(f'Face not detected by mediapipe in file {path}')
 
     return df_landmark
@@ -429,7 +511,7 @@ def get_mouth_openness(df, measures):
 
     return mouth_openness
 
-def baseline(base_path):
+def baseline(base_path, bbox_list=[], normalize=True, align=False):
     """
     ---------------------------------------------------------------------------------------------------
 
@@ -440,6 +522,12 @@ def baseline(base_path):
     ............
     base_path : str
         Path to baseline input file
+    bbox_list : list
+        List of bounding boxes for each frame in the video
+    normalize : bool, optional
+        Whether to normalize the facial landmarks to a common reference point (default is True)
+    align : bool, optional
+        Whether to align the facial landmarks based on the position of the eyes (default is False)
 
     Returns:
     ............
@@ -449,7 +537,11 @@ def baseline(base_path):
     ---------------------------------------------------------------------------------------------------
     """
 
-    base_landmark = get_landmarks(base_path, 'baseline')
+    base_landmark = get_landmarks(base_path, bbox_list=bbox_list)
+
+    if normalize:
+        base_df = normalize_face_landmarks(base_landmark, align=align)
+        
     disp_base_df = get_distance(base_landmark)
 
     disp_base_df['overall'] = pd.DataFrame(disp_base_df.mean(axis=1))
@@ -479,11 +571,18 @@ def get_empty_dataframe():
 
     ---------------------------------------------------------------------------------------------------
     """
-    columns = ['frame'] + ['lmk' + str(col+1).zfill(3) for col in range(0, 468)] + ['overall']
+    columns = ['frame','time'] + ['lmk' + str(col+1).zfill(3) for col in range(0, 468)] + ['overall']
     empty_df = pd.DataFrame(columns=columns)
     return empty_df
 
-def get_displacement(lmk_df, base_path, measures):
+def get_displacement(
+        lmk_df,
+        base_path,
+        measures,
+        base_bbox_list=[],
+        normalize=True,
+        align=False
+    ):
     """
     ---------------------------------------------------------------------------------------------------
 
@@ -498,6 +597,12 @@ def get_displacement(lmk_df, base_path, measures):
         baseline input file path
     measures : dict
         dictionary of landmark indices
+    base_bbox_list : list, optional
+        list of bounding boxes for each frame in the baseline video
+    normalize : bool, optional
+        whether to normalize the facial landmarks to a common reference point (default is True)
+    align : bool, optional
+        whether to align the facial landmarks based on the position of the eyes (default is False)
 
     Returns:
     ............
@@ -507,18 +612,23 @@ def get_displacement(lmk_df, base_path, measures):
     ---------------------------------------------------------------------------------------------------
     """
 
-    disp_list = []
     displacement_df = get_empty_dataframe()
 
     try:
-        df_meta = lmk_df[['frame']]
+        df_meta = lmk_df[['frame','time']]
 
         if len(lmk_df)>1:
             disp_actual_df = get_distance(lmk_df)
             disp_actual_df['overall'] = pd.DataFrame(disp_actual_df.mean(axis=1))
 
             if os.path.exists(base_path):
-                disp_base_df = baseline(base_path)
+                # add normalize flag
+                disp_base_df = baseline(
+                    base_path,
+                    bbox_list=base_bbox_list,
+                    normalize=normalize,
+                    align=align
+                )
                 check_na = disp_base_df.iloc[:,1:].isna().all().all()
 
                 if len(disp_base_df)> 0 and not check_na:
@@ -573,6 +683,218 @@ def calculate_areas_displacement(displacement_df, measures):
 
     return displacement_df
 
+def apply_rotation_per_frame(norm_df, rotation_matrices):
+    """
+    Applies the corresponding rotation matrix to each row (frame) of the DataFrame.
+
+    Parameters:
+    norm_df (DataFrame): The DataFrame containing the centered landmarks.
+    rotation_matrices (list of np.array): List of 3x3 rotation matrices for each frame.
+
+    Returns:
+    DataFrame: The rotated landmarks.
+    """
+    axes = ['x', 'y', 'z']
+    landmark_cols = {
+        axis: [col for col in norm_df.columns if col.endswith(f'_{axis}')]
+        for axis in axes
+    }
+
+    stacked_coords = np.stack([
+        norm_df[landmark_cols['x']].values,
+        norm_df[landmark_cols['y']].values,
+        norm_df[landmark_cols['z']].values
+    ], axis=-1)  # Shape: (num_frames, num_landmarks, 3)
+
+    rotated_coords = np.array([
+        np.dot(stacked_coords[i], rotation_matrices[i].T) for i in range(len(rotation_matrices))
+    ])
+
+    for i, axis in enumerate(axes):
+        norm_df[landmark_cols[axis]] = rotated_coords[..., i]
+    return norm_df
+
+
+def calculate_rotation_matrix_for_all_frames(left_eye_x, left_eye_y, right_eye_x, right_eye_y):
+    """
+    ---------------------------------------------------------------------------------------------------
+    Calculates the rotation matrix for each frame based on eye positions to align the eyes horizontally.
+    .................................
+    Parameters:
+    left_eye_x: int
+        The x coordinate of the left eye.
+    left_eye_y: int
+        The y coordinate of the left eye.
+    right_eye_x: int
+        The x coordinate of the right eye.
+    right_eye_y: int
+        The y coordinate of the right eye.
+    .................................
+    Returns:
+    list of np.array: List of 3x3 rotation matrices, one for each frame.
+    ---------------------------------------------------------------------------------------------------
+    """
+    rotation_matrices = []
+    
+    for lx, ly, rx, ry in zip(left_eye_x, left_eye_y, right_eye_x, right_eye_y):
+        delta_eye_x = lx - rx
+        delta_eye_y = ly - ry
+
+        # Compute 2D angle between eyes (ignore z-axis for horizontal alignment)
+        theta = np.arctan2(delta_eye_y, delta_eye_x)
+
+        # Create the rotation matrix to rotate landmarks around the Z-axis
+        cos_theta = np.cos(-theta)  
+        sin_theta = np.sin(-theta)
+
+        rotation_matrix = np.array([
+            [cos_theta, -sin_theta, 0],
+            [sin_theta, cos_theta, 0],
+            [0, 0, 1]
+        ])
+
+        rotation_matrices.append(rotation_matrix)
+
+    return rotation_matrices
+
+def center_landmarks(df, nose_tip):
+    """
+    ---------------------------------------------------------------------------------------------------
+    Centers the landmarks by moving the nose tip to the origin.
+
+    Parameters:
+    df (DataFrame):
+        The DataFrame containing the landmarks.
+    nose_tip (str): 
+        The column name of the nose tip landmark.
+    .................................
+    Returns:
+    DataFrame: The centered landmarks.
+    ---------------------------------------------------------------------------------------------------
+    """
+    axes = ['x', 'y', 'z']
+    nose_tip_coords = {axis: f'{nose_tip}_{axis}' for axis in axes}
+
+    norm_data = {
+        axis: df.filter(like=f'_{axis}') - df[nose_tip_coords[axis]].values[:, None]
+        for axis in axes
+    }
+
+    norm_df = pd.concat(norm_data.values(), axis=1)
+    return norm_df
+
+def get_vertices_for_col(df, col_name):
+    """
+    Extracts the x, y, and z coordinates for a given column.
+
+    Parameters:
+    df : DataFrame
+         The DataFrame containing the columns.
+    col_name : str
+      The name of the column.
+
+    Returns:
+    x_col (Series): The x column.
+    y_col (Series): The y column.
+    z_col (Series): The z column.
+    """
+    x_col = df[f'{col_name}_x']
+    y_col = df[f'{col_name}_y']
+    z_col = df[f'{col_name}_z']
+
+    return x_col, y_col, z_col
+
+# Main function with the refactored parts included
+def normalize_face_landmarks(
+    df, 
+    align=True,
+    nose_tip='lmk001',
+    left_eye='lmk144',
+    right_eye='lmk373'
+):
+    """
+    ---------------------------------------------------------------------------------------------------
+    Normalize the face landmarks by centering them around the nose tip and aligning the eyes horizontally.
+
+    Parameters:
+    -----------
+    df : DataFrame
+        The DataFrame containing the face landmarks.
+    align : bool, optional
+        Whether to align the landmarks based on the position of the eyes (default is True).
+    nose_tip : str, optional
+        The name of the nose tip landmark (default is 'lmk001'). Note landmarks are 1-indexed in openwillis and 0-indexed in mediapipe
+    left_eye : str, optional
+        The name of the left eye landmark (default is 'lmk144').
+    right_eye : str, optional
+        The name of the right eye landmark (default is 'lmk373').
+
+    Returns:
+    --------
+    DataFrame: The normalized face landmarks.
+    ---------------------------------------------------------------------------------------------------
+    """
+    left_eye_x, left_eye_y, left_eye_z = get_vertices_for_col(df, left_eye)
+    right_eye_x, right_eye_y, right_eye_z = get_vertices_for_col(df, right_eye)
+
+    # compute the eye distance (for scaling)
+    eye_distance = np.sqrt(
+        (right_eye_x - left_eye_x)**2 +
+        (right_eye_y - left_eye_y)**2 +
+        (right_eye_z - left_eye_z)**2
+    )
+    scaling_factor =  eye_distance
+
+    norm_df = center_landmarks(df, nose_tip)
+
+    if align:
+
+        rotation_matrices = calculate_rotation_matrix_for_all_frames(left_eye_x, left_eye_y, right_eye_x, right_eye_y)
+
+        norm_df = apply_rotation_per_frame(norm_df, rotation_matrices)
+    
+     # scale the landmarks
+    landmark_cols = [f'lmk{str(i).zfill(3)}_{axis}' for i in range(1, 469) for axis in ['x', 'y', 'z']]
+    norm_df[landmark_cols] = norm_df[landmark_cols].div(scaling_factor.values, axis=0)
+
+    norm_df[['frame','time']] = df[['frame','time']]
+
+    return norm_df
+
+def split_speaking_df(df_disp, speaking_col):
+    """
+    ---------------------------------------------------------------------------------------------------
+
+    This function splits the displacement dataframe into two dataframes based on speaking probability.
+
+    Parameters:
+    ............
+    df_disp : pandas.DataFrame
+        displacement dataframe
+    speaking_col : str
+        speaking probability column name
+
+    Returns:
+    ............
+    df_summ : pandas.DataFrame
+        stat summary dataframe
+    ---------------------------------------------------------------------------------------------------
+    """
+
+    speaking_df = df_disp[df_disp[speaking_col] > 0.5]
+    not_speaking_df = df_disp[df_disp[speaking_col] <= 0.5]
+    speaking_df = speaking_df.drop(speaking_col, axis=1)
+    not_speaking_df = not_speaking_df.drop(speaking_col, axis=1)
+
+    speaking_df_summ = get_summary(speaking_df)
+    not_speaking_df_summ = get_summary(not_speaking_df)
+    speaking_df_summ = speaking_df_summ.add_suffix('_speaking')
+    not_speaking_df_summ = not_speaking_df_summ.add_suffix('_not_speaking')
+    
+    df_summ = pd.concat([speaking_df_summ, not_speaking_df_summ], axis=1)
+    
+    return df_summ
+
 def get_summary(df):
     """
     ---------------------------------------------------------------------------------------------------
@@ -594,14 +916,22 @@ def get_summary(df):
 
     df_summ = pd.DataFrame()
     if len(df.columns)>0:
-        
-        df_mean = pd.DataFrame(df.mean()).T.iloc[:,469:].add_suffix('_mean')
-        df_std = pd.DataFrame(df.std()).T.iloc[:,469:].add_suffix('_std')
+        df_mean = pd.DataFrame(df.mean()).T.iloc[:,470:].add_suffix('_mean')
+        df_std = pd.DataFrame(df.std()).T.iloc[:,470:].add_suffix('_std')
 
         df_summ = pd.concat([df_mean, df_std], axis =1).reset_index(drop=True)
     return df_summ
 
-def facial_expressivity(filepath, baseline_filepath=''):
+def facial_expressivity(
+    filepath,
+    baseline_filepath='',
+    bbox_list=[],
+    base_bbox_list=[],
+    normalize=True,
+    align=False,
+    rolling_std_seconds=3,
+    split_by_speaking=False,
+):
     """
     ---------------------------------------------------------------------------------------------------
 
@@ -616,6 +946,22 @@ def facial_expressivity(filepath, baseline_filepath=''):
             optional path to baseline video. see openwillis research guidelines on github wiki to
             read case for baseline video use, particularly in clinical research contexts.
             (default is 0, meaning no baseline correction will be conducted).
+        bbox_list : list, optional
+            list of bounding boxes for each frame in the video. each bounding box is a dictionary
+            with keys 'x', 'y', 'width', and 'height', representing the bounding box coordinates.
+            (default is [], meaning no bounding boxes will be used).
+        base_bbox_list : list, optional
+            list of bounding boxes for each frame in the baseline video. each bounding box is a dictionary
+            with keys 'x', 'y', 'width', and 'height', representing the bounding box coordinates.
+            (default is [], meaning no bounding boxes will be used).
+        normalize : bool, optional
+            whether to normalize the facial landmarks to a common reference point (default is True).
+        align : bool, optional
+            whether to align the facial landmarks based on the position of the eyes (default is False).
+        rolling_std_seconds : int, optional
+            number of seconds over which to calculate the rolling standard deviation for speaking probability
+        split_by_speaking : bool, optional
+            whether to split the output by speaking probability (default is False).
 
     Returns:
         framewise_loc : pandas.DataFrame
@@ -644,13 +990,27 @@ def facial_expressivity(filepath, baseline_filepath=''):
     config = get_config(os.path.abspath(__file__), "facial.json")
 
     try:
-        df_landmark = get_landmarks(filepath, 'input')
-        df_disp = get_displacement(df_landmark, baseline_filepath, config)
+        df_landmark = get_landmarks(filepath, bbox_list=bbox_list)
+        
+        if normalize:
+            df_landmark = normalize_face_landmarks(df_landmark, align=align)
+        df_disp = get_displacement(
+            df_landmark,
+            baseline_filepath,
+            config,
+            base_bbox_list=base_bbox_list,
+            normalize=normalize,
+            align=align
+        )
 
         # use mouth height to calculate mouth openness
         df_disp['mouth_openness'] = get_mouth_openness(df_landmark, config)
 
-        df_summ = get_summary(df_disp)
+        if split_by_speaking:
+            df_disp['speaking_probability'] = get_speaking_probabilities(df_disp, rolling_std_seconds)
+            df_summ = split_speaking_df(df_disp, 'speaking_probability')
+        else:
+            df_summ = get_summary(df_disp)
 
         return df_landmark, df_disp, df_summ
 
