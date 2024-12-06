@@ -609,7 +609,7 @@ def create_single_face_output(
     cluster_df['cluster_presences'] = np.cumsum(
         cluster_df.sample_time.diff() > ((frames_per_row / fps)*1.5) # 1.5 is hacky but just gives rounding room for fps and frames per row
     )
-    for presence_idx, presence_df in cluster_df.groupby('cluster_presences'):
+    for _, presence_df in cluster_df.groupby('cluster_presences'):
         n_frames_present = len(presence_df) * frames_per_row
         if n_frames_present > min_frames_face_present:
 
