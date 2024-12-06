@@ -861,7 +861,7 @@ def normalize_face_landmarks(
 
     return norm_df
 
-def split_speaking_df(df_disp):
+def split_speaking_df(df_disp, speaking_col):
     """
     ---------------------------------------------------------------------------------------------------
 
@@ -879,10 +879,10 @@ def split_speaking_df(df_disp):
     ---------------------------------------------------------------------------------------------------
     """
 
-    speaking_df = df_disp[df_disp['speaking'] > 0.5]
-    not_speaking_df = df_disp[df_disp['speaking'] <= 0.5]
-    speaking_df = speaking_df.drop('speaking', axis=1)
-    not_speaking_df = not_speaking_df.drop('speaking', axis=1)
+    speaking_df = df_disp[df_disp[speaking_col] > 0.5]
+    not_speaking_df = df_disp[df_disp[speaking_col] <= 0.5]
+    speaking_df = speaking_df.drop(speaking_col, axis=1)
+    not_speaking_df = not_speaking_df.drop(speaking_col, axis=1)
 
     speaking_df_summ = get_summary(speaking_df)
     not_speaking_df_summ = get_summary(not_speaking_df)
@@ -1006,7 +1006,7 @@ def facial_expressivity(
 
         if split_by_speaking:
             df_disp['speaking_probability'] = get_speaking_probabilities(df_disp, rolling_std_seconds)
-            df_summ = split_speaking_df(df_disp)
+            df_summ = split_speaking_df(df_disp, 'speaking_probability')
         else:
             df_summ = get_summary(df_disp)
 
