@@ -871,6 +871,8 @@ def split_speaking_df(df_disp, speaking_col):
     ............
     df_disp : pandas.DataFrame
         displacement dataframe
+    speaking_col : str
+        speaking probability column name
 
     Returns:
     ............
