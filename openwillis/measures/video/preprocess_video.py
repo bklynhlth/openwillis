@@ -615,7 +615,7 @@ def create_single_face_output(
 
             max_frame = presence_df.frame_idx.max()
             min_frame = presence_df.frame_idx.min()
-            frames_in_clusters = list(range(min_frame,max_frame))
+            frames_in_clusters = list(range(min_frame, max_frame))
             upsampled_df = pd.DataFrame(frames_in_clusters,columns=['frame_idx'])
             bb_dict_df = presence_df[bbox_cols]
 
