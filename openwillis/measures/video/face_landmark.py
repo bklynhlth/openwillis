@@ -694,23 +694,24 @@ def apply_rotation_per_frame(norm_df, rotation_matrices):
     Returns:
     DataFrame: The rotated landmarks.
     """
-    for idx, rotation_matrix in enumerate(rotation_matrices):
-        for i in range(1, 469):
-            x_col = f'lmk{str(i).zfill(3)}_x'
-            y_col = f'lmk{str(i).zfill(3)}_y'
-            z_col = f'lmk{str(i).zfill(3)}_z'
+    axes = ['x', 'y', 'z']
+    landmark_cols = {
+        axis: [col for col in norm_df.columns if col.endswith(f'_{axis}')]
+        for axis in axes
+    }
 
-            # Original centered coordinates
-            x = norm_df.loc[idx, x_col]
-            y = norm_df.loc[idx, y_col]
-            z = norm_df.loc[idx, z_col]
+    stacked_coords = np.stack([
+        norm_df[landmark_cols['x']].values,
+        norm_df[landmark_cols['y']].values,
+        norm_df[landmark_cols['z']].values
+    ], axis=-1)  # Shape: (num_frames, num_landmarks, 3)
 
-            # Rotate using the rotation matrix for this frame
-            rotated_coords = np.dot(rotation_matrix, np.array([x, y, z]))
-            norm_df.loc[idx, x_col] = rotated_coords[0]
-            norm_df.loc[idx, y_col] = rotated_coords[1]
-            norm_df.loc[idx, z_col] = rotated_coords[2]
+    rotated_coords = np.array([
+        np.dot(stacked_coords[i], rotation_matrices[i].T) for i in range(len(rotation_matrices))
+    ])
 
+    for i, axis in enumerate(axes):
+        norm_df[landmark_cols[axis]] = rotated_coords[..., i]
     return norm_df
 
 
@@ -771,13 +772,16 @@ def center_landmarks(df, nose_tip):
     DataFrame: The centered landmarks.
     ---------------------------------------------------------------------------------------------------
     """
-    norm_data = {}
-    for axis in ['x', 'y', 'z']:
-        for i in range(1, 469):
-            col_name = f'lmk{str(i).zfill(3)}_{axis}'
-            norm_data[col_name] = df[col_name] - df[f'{nose_tip}_{axis}']
-    
-    return pd.DataFrame(norm_data)
+    axes = ['x', 'y', 'z']
+    nose_tip_coords = {axis: f'{nose_tip}_{axis}' for axis in axes}
+
+    norm_data = {
+        axis: df.filter(like=f'_{axis}') - df[nose_tip_coords[axis]].values[:, None]
+        for axis in axes
+    }
+
+    norm_df = pd.concat(norm_data.values(), axis=1)
+    return norm_df
 
 def get_vertices_for_col(df, col_name):
     """
