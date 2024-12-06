@@ -79,7 +79,6 @@ def get_faces(detector,frame,bb_dict,threshold=.95):
     faces: list of faces detected in frame
     '''
     if len(bb_dict.keys()):
-        #may need to change this if its batch
         faces = bb_dict_to_bb_list(bb_dict)
     else:
         faces = detector.detect_faces(
@@ -93,9 +92,27 @@ def mouth_openness(
     upper_lip_lmks=[61, 62, 63],
     lower_lip_lmks=[65, 66, 67]
 ):
-    '''
-    insert docstring
-    '''
+    """
+    ------------------------------------------------------------------------------------------------------
+    This function calculates the average distance between the upper and lower lip landmarks to measure the
+    openness of the mouth.
+
+    Parameters:
+    ..........
+    landmarks: numpy array
+        An array containing the facial landmarks detected by the facial landmark detector.
+    upper_lip_lmks: list
+        A list containing the indices of the landmarks that make up the upper lip.
+    lower_lip_lmks: list
+        A list containing the indices of the landmarks that make up the lower lip.
+    
+    Returns:
+    ..........
+    lmk_dist: float
+        The average distance between the upper and lower lip landmarks.
+    ------------------------------------------------------------------------------------------------------
+    """
+
     upper_lip = landmarks[upper_lip_lmks]
     lower_lip = landmarks[lower_lip_lmks]
 
@@ -251,7 +268,7 @@ def get_undected_emotion(frame, cols, fps):
     df_emotion = pd.concat([df_common, df], axis=1)
     return df_emotion
 
-def get_emotion(path, measures,skip_frames=5, bbox_list=[],):
+def get_emotion(path, skip_frames=5, bbox_list=[],):
     """
     ------------------------------------------------------------------------------------------------------
     This function fetches facial emotion data for each frame of the input video. It calls the run_pyfeat()
@@ -394,6 +411,7 @@ def emotional_expressivity(
     baseline_filepath='',
     bbox_list=[],
     base_bbox_list=[],
+    skip_frames=5,
     split_by_speaking=False,
     rolling_std_seconds=3
 ):
@@ -438,8 +456,8 @@ def emotional_expressivity(
         
         df_emotion = get_emotion(
             filepath,
-            measures,
-            bbox_list=bbox_list
+            bbox_list=bbox_list,
+            skip_frames=skip_frames
         )
         
         df_norm_emo = baseline(
