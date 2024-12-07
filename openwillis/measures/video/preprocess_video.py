@@ -410,7 +410,7 @@ def extract_embed_faces_from_frame(
         face_data_list = prep_face_data_for_embed(face_data_list, frame)
         face_data_list = embed_faces(face_data_list, model_name=model_name)
     except Exception as e:
-        logger.error(f"Error extracting and embedding faces: {e}, frame_idx: {frame_idx}")
+        logger.info(f"Error extracting and embedding faces: {e}, frame_idx: {frame_idx}")
         face_data_list = [FaceData()]
     return face_data_list
 
@@ -759,7 +759,7 @@ def preprocess_face_video(
         )
 
     except Exception as e:
-        logger.error(f"Error preprocessing video: file: {video_path} & Error: {e}'")
+        logger.info(f"Error preprocessing video: file: {video_path} & Error: {e}'")
         
     return  bb_dict, facedata_df
 

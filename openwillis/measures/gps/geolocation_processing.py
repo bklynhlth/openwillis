@@ -201,7 +201,7 @@ def gps_analysis(filepath, timezone):
         df_list = gutil.trajectory_statistics(traj, df_list, timezone)
 
     except Exception as e:
-        logger.error(f"Error in gps summary calculation- file: {filepath} & Error: {e}")
+        logger.info(f"Error in gps summary calculation- file: {filepath} & Error: {e}")
 
     finally:
         hourly, daily, summary = df_list

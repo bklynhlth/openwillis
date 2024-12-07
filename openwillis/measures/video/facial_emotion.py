@@ -236,6 +236,7 @@ def run_pyfeat(path, skip_frames=5, bbox_list=[]):
     except Exception as e:
         logger.info(f'Face error process file in pyfeat for file:{path} & Error: {e}')
 
+
     finally:
         #Empty dataframe in case of insufficient datapoints
         if len(df_list)==0:
@@ -482,7 +483,6 @@ def emotional_expressivity(
             skip_frames=skip_frames
         )
 
-        print(df_norm_emo.head(1))
         if split_by_speaking:
             df_norm_emo['speaking_probability'] = get_speaking_probabilities(
                 df_norm_emo,

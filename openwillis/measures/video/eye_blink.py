@@ -327,7 +327,7 @@ def calculate_framewise(ear_df, vs, face_mesh, config):
             rightEAR = eye_aspect_ratio(rightEye)
             ear = (leftEAR + rightEAR) / 2.0
         except Exception as e:
-            logger.error(e)
+            logger.info(e)
 
         framewise.append([frame_n, ear])
 
@@ -396,7 +396,7 @@ def eye_blink_rate(video):
         summary.loc[0] = summary_list
 
     except Exception as e:
-        logger.error(f'Error in eye blink rate calculation- file: {video} & Error: {e}')
+        logger.info(f'Error in eye blink rate calculation- file: {video} & Error: {e}')
 
     finally:
         if 'vs' in locals():
