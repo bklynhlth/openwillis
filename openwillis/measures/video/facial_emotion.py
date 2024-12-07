@@ -123,9 +123,14 @@ def mouth_openness(
 
 
 def detect_emotions(detector, frame, emo_cols, bb_dict={},threshold=.95):
-    # if faces empty else - skip this step
-    faces = get_faces(detector,frame,bb_dict,threshold=threshold)
-    # ok so landmarks are much less intense than 
+
+    faces = get_faces(
+        detector,
+        frame,
+        bb_dict,
+        threshold=threshold
+    )
+
     if len(faces[0])<1:
         raise ValueError('No faces detected in frame')
     
@@ -137,14 +142,15 @@ def detect_emotions(detector, frame, emo_cols, bb_dict={},threshold=.95):
     aus = detector.detect_aus(frame, landmarks)
 
     emotions = detector.detect_emotions(
-        frame, faces, landmarks
+        frame,
+        faces,
+        landmarks
     )
 
     emotions = emotions[0][0] * 100 # convert from 0-1 to 0-100
     aus = aus[0][0]
     landmarks = landmarks[0][0]
 
-    
     emos_aus = np.hstack([emotions,aus])
     df_emo = pd.DataFrame([emos_aus],columns=emo_cols)
     df_emo['mouth_openness'] = mouth_openness(landmarks)
@@ -173,11 +179,10 @@ def run_pyfeat(path, skip_frames=5, bbox_list=[]):
     ------------------------------------------------------------------------------------------------------
     """
 
-    
-    emo_cols = FEAT_EMOTION_COLUMNS + AU_LANDMARK_MAP['Feat']
-    detector = feat.Detector(emotion_model='svm')
-
     try:
+        #init pyfeat
+        emo_cols = FEAT_EMOTION_COLUMNS + AU_LANDMARK_MAP['Feat']
+        detector = feat.Detector()
 
         cap = cv2.VideoCapture(path)
         num_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
@@ -188,8 +193,7 @@ def run_pyfeat(path, skip_frames=5, bbox_list=[]):
         frame = 0
         n_frames_skipped = skip_frames
 
-
-        if (len_bbox_list>0) & (num_frames != len_bbox_list):
+        if (len_bbox_list > 0) & (num_frames != len_bbox_list):
             raise ValueError('Number of frames in video and number of bounding boxes do not match')
         
         while True:
@@ -208,20 +212,21 @@ def run_pyfeat(path, skip_frames=5, bbox_list=[]):
                 elif n_frames_skipped == skip_frames:
                     
                     n_frames_skipped = 0
-                    print('frame:',frame,'n_frames_skipped:',n_frames_skipped,'skip_frames',skip_frames)
                     
                     bbox = bbox_list[frame] if len_bbox_list>0 else {}
+
                     df_common = pd.DataFrame([[frame,frame/fps]], columns=['frame','time'])
                     df_emo = detect_emotions(
                         detector,
                         img,
                         emo_cols,
                         bb_dict=bbox
-                    ) #pyfeat converts image from bgr - to rgb
+                    ) 
+
                     df_emotion = pd.concat([df_common, df_emo], axis=1)
             
             except Exception as e:
-                print(e)
+                logger.info(f'error processing frame:{frame} in file:{path} & Error: {e}')
                 df_emotion = get_undected_emotion(frame, emo_cols,fps)
             
             df_list.append(df_emotion)
@@ -229,15 +234,15 @@ def run_pyfeat(path, skip_frames=5, bbox_list=[]):
             frame +=1
 
     except Exception as e:
-        logger.error(f'Face not detected by deepface for- file:{path} & Error: {e}')
+        logger.info(f'Face error process file in pyfeat for file:{path} & Error: {e}')
 
     finally:
         #Empty dataframe in case of insufficient datapoints
         if len(df_list)==0:
-            df_emotion = pd.DataFrame(columns = emo_cols)
+            df_emotion = pd.DataFrame(columns= emo_cols)
 
             df_list.append(df_emotion)
-            logger.info(f'Face not detected by deepface in : {path}')
+            logger.info(f'Face not detected by pyfeat in : {path}')
 
     return df_list
 
@@ -261,14 +266,14 @@ def get_undected_emotion(frame, cols, fps):
         A dataframe with a single row of NaN values for the different facial emotion measures.
     ------------------------------------------------------------------------------------------------------
     """
-    df_common = pd.DataFrame([[frame, frame/fps,np.nan]], columns=['frame','time','mouth_openness'])
+    df_common = pd.DataFrame([[frame, frame/fps]], columns=['frame','time'])
     value = [np.nan] * len(cols)
 
     df = pd.DataFrame([value], columns = cols)
     df_emotion = pd.concat([df_common, df], axis=1)
     return df_emotion
 
-def get_emotion(path, skip_frames=5, bbox_list=[],):
+def get_emotion(path, skip_frames=5, bbox_list=[]):
     """
     ------------------------------------------------------------------------------------------------------
     This function fetches facial emotion data for each frame of the input video. It calls the run_pyfeat()
@@ -279,10 +284,10 @@ def get_emotion(path, skip_frames=5, bbox_list=[],):
     ..........
     path: str
         The path of the input video file
-    error_info: str
-        A string that specifies the type of error that occurred (e.g., 'input' or 'baseline')
-    measures: dict
-        A configuration object containing keys for different facial emotion measures.
+    skip_frames: int
+        number of frames to skip between samples
+    bbox_list: list of dicts
+        a list of dicts as long as the video that contain bounding box information
 
     Returns:
     ..........
@@ -291,14 +296,25 @@ def get_emotion(path, skip_frames=5, bbox_list=[],):
     ------------------------------------------------------------------------------------------------------
     """
 
-    emotion_list = run_pyfeat(path, bbox_list=bbox_list, skip_frames=skip_frames)
+    emotion_list = run_pyfeat(
+        path,
+        bbox_list=bbox_list,
+        skip_frames=skip_frames
+    )
 
     if len(emotion_list)>0:
         df_emo = pd.concat(emotion_list).reset_index(drop=True)
+    else:
+        df_emo = pd.DataFrame()
 
     return df_emo
 
-def baseline(df, base_path, measures, base_bbox_list=[]):
+def baseline(
+    df,
+    base_path,
+    base_bbox_list=[],
+    skip_frames=5
+):
     """
     ------------------------------------------------------------------------------------------------------
     This function normalizes the facial emotion data in the input dataframe using the baseline video. If no
@@ -314,6 +330,8 @@ def baseline(df, base_path, measures, base_bbox_list=[]):
         The path to the baseline video
     measures: dict
         A configuration object containing keys for different facial emotion measures.
+    skip_frames: int
+        number of frames to skip between frames processed
 
     Returns:
     ..........
@@ -327,14 +345,17 @@ def baseline(df, base_path, measures, base_bbox_list=[]):
     if not os.path.exists(base_path):
         return df_emo
 
-    df_common = df_emo[['frame']]
-    df_emo.drop(columns=['frame'], inplace=True)
+    df_common = df_emo[['frame','time','mouth_openness']]
+    df_emo.drop(columns=['frame','time','mouth_openness'], inplace=True)
 
-    base_emo = get_emotion(base_path,
-                           # 'baseline', look back and see why these matter
-                           # measures,
-                            bbox_list=base_bbox_list)
-    base_mean = base_emo.iloc[:,1:].mean() + 1 #Normalization
+    base_emo = get_emotion(
+        base_path, 
+        bbox_list=base_bbox_list,
+        skip_frames=skip_frames
+    )
+
+    base_mean = base_emo.drop(
+        columns=['frame','time','mouth_openness']).mean() + 1 #Normalization
 
     base_df = pd.DataFrame(base_mean).T
     base_df = base_df[~base_df.isin([np.nan, np.inf, -np.inf]).any(1)]
@@ -344,9 +365,10 @@ def baseline(df, base_path, measures, base_bbox_list=[]):
         df_emo = df_emo.div(base_df.iloc[0])
 
     df_emotion = pd.concat([df_common, df_emo], axis=1)
+
     return df_emotion
 
-def split_speaking_df(df_disp):
+def split_speaking_df(df):
     """
     ---------------------------------------------------------------------------------------------------
 
@@ -363,11 +385,10 @@ def split_speaking_df(df_disp):
         stat summary dataframe
     ---------------------------------------------------------------------------------------------------
     """
-
-    speaking_df = df_disp[df_disp['speaking'] > 0.5]
-    not_speaking_df = df_disp[df_disp['speaking'] <= 0.5]
-    speaking_df = speaking_df.drop('speaking', axis=1)
-    not_speaking_df = not_speaking_df.drop('speaking', axis=1)
+    speaking_df = df[df['speaking_probability'] > 0.5]
+    not_speaking_df = df[df['speaking_probability'] <= 0.5]
+    speaking_df = speaking_df.drop('speaking_probability', axis=1)
+    not_speaking_df = not_speaking_df.drop('speaking_probability', axis=1)
 
     speaking_df_summ = get_summary(speaking_df)
     not_speaking_df_summ = get_summary(not_speaking_df)
@@ -375,7 +396,6 @@ def split_speaking_df(df_disp):
     not_speaking_df_summ = not_speaking_df_summ.add_suffix('_not_speaking')
     
     df_summ = pd.concat([speaking_df_summ, not_speaking_df_summ], axis=1)
-    
     return df_summ
 
 def get_summary(df):
@@ -400,8 +420,8 @@ def get_summary(df):
     df_summ = pd.DataFrame()
     if len(df)>0:
         
-        df_mean = pd.DataFrame(df.mean()).T.iloc[:,1:].add_suffix('_mean')
-        df_std = pd.DataFrame(df.std()).T.iloc[:,1:].add_suffix('_std')
+        df_mean = pd.DataFrame(df.mean()).T.iloc[:,2:].add_suffix('_mean')
+        df_std = pd.DataFrame(df.std()).T.iloc[:,2:].add_suffix('_std')
 
         df_summ = pd.concat([df_mean, df_std], axis =1).reset_index(drop=True)
     return df_summ
@@ -420,7 +440,7 @@ def emotional_expressivity(
 
     Facial emotion detection and analysis
 
-    This function uses serengil/deepface to quantify the framewise expressivity of facial emotions,
+    This function uses pyfeat to quantify the framewise expressivity of facial emotions,
     specifically happiness, sadness, anger, fear, disgust, and surprise – in addition to measuring
     the absence of any emotion (neutral). The summary output provides overall measurements for the input.
 
@@ -437,9 +457,7 @@ def emotional_expressivity(
     ..........
     df_norm_emo : pandas dataframe
         Dataframe with framewise output of facial emotion expressivity. first column is the frame number,
-        second column is time in seconds, subsequent columns are emotional expressivity  measures, and
-        last column is overall emotional expressivity i.e. a mean of all individual emotions except
-        neutral. all values are between 0 and 1, as outputted by deepface.
+        second column is time in seconds, subsequent columns are emotional expressivity  measures,
 
     df_summ: pandas dataframe
         Dataframe with summary measurements. first column is name of statistic, subsequent columns are
@@ -450,9 +468,6 @@ def emotional_expressivity(
     ------------------------------------------------------------------------------------------------------
     """
     try:
-
-        #Loading json config
-        measures = get_config(os.path.abspath(__file__), 'facial.json')
         
         df_emotion = get_emotion(
             filepath,
@@ -463,31 +478,29 @@ def emotional_expressivity(
         df_norm_emo = baseline(
             df_emotion, 
             baseline_filepath,
-            measures,
-            base_bbox_list=base_bbox_list
+            base_bbox_list=base_bbox_list,
+            skip_frames=skip_frames
         )
 
-        comp_exp = df_norm_emo[FEAT_EMOTION_COLUMNS].mean(axis=1)
-
-        df_norm_emo[measures['comp_exp']] = comp_exp
-
-        df_norm_emo['speaking'] = get_speaking_probabilities(
-            df_norm_emo,
-            rolling_std_seconds
-        )
-
+        print(df_norm_emo.head(1))
         if split_by_speaking:
-            
+            df_norm_emo['speaking_probability'] = get_speaking_probabilities(
+                df_norm_emo,
+                rolling_std_seconds
+            )
             df_summ = split_speaking_df(df_norm_emo)
         else:
             df_summ = get_summary(df_norm_emo)
 
         if os.path.exists(baseline_filepath):
             df_norm_emo = df_norm_emo - 1
-            df_norm_emo['frame'] = df_norm_emo['frame'] + 1
+            df_norm_emo[['frame','time']] = df_norm_emo[['frame','time']] + 1
+            if split_by_speaking:
+                df_norm_emo['speaking_probability'] = df_norm_emo['speaking_probability'] + 1
 
-        df_summ = get_summary(df_norm_emo)
+        df_norm_emo.dropna(inplace=True)
+
         return df_norm_emo, df_summ
 
     except Exception as e:
-        logger.error(f'Error in facial emotion calculation- file: {filepath} & Error: {e}')
+        logger.info(f'Error in facial emotion calculation- file: {filepath} & Error: {e}')
