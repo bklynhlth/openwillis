@@ -1,4 +1,5 @@
-
+# author:    Kieran McVeigh
+# website:   http://www.bklynhlth.com
 from sklearn.mixture import GaussianMixture
 
 def get_fps(df):
@@ -53,7 +54,5 @@ def get_speaking_probabilities(df, rolling_std_seconds):
     else:
         df_nona['speaking'] = prob_preds[:,1]
     
-    
     df = df.merge(df_nona, on='frame', how='left')
     return df.speaking
-

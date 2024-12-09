@@ -776,6 +776,3 @@ def preprocess_face_video(
         logger.info(f"Error preprocessing video: file: {video_path} & Error: {e}'")
         
     return  bb_dict, facedata_df
-
-
-
