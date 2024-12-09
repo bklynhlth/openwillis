@@ -330,7 +330,8 @@ def get_undected_markers(frame,fps):
     df_landmark = pd.concat([df_common, df_coord], axis=1)
     return df_landmark
 
-def get_landmarks(path, error_info,bbox_list=[]):
+def get_landmarks(path, bbox_list=[]):
+
     """
     ---------------------------------------------------------------------------------------------------
 
@@ -343,6 +344,8 @@ def get_landmarks(path, error_info,bbox_list=[]):
         Path to image file
     error_info : str
         Error location string
+    bbox_list : list
+        List of bounding boxes for each frame in the video
 
     Returns:
     ............
@@ -352,7 +355,8 @@ def get_landmarks(path, error_info,bbox_list=[]):
     ---------------------------------------------------------------------------------------------------
     """
 
-    landmark_list = run_facemesh(path,bbox_list=bbox_list)
+    landmark_list = run_facemesh(path, bbox_list=bbox_list)
+
 
     if len(landmark_list)>0:
         df_landmark = pd.concat(landmark_list).reset_index(drop=True)
@@ -535,7 +539,8 @@ def baseline(base_path, bbox_list=[], normalize=True, align=False):
     ---------------------------------------------------------------------------------------------------
     """
 
-    base_landmark = get_landmarks(base_path, 'baseline',bbox_list=bbox_list)
+    base_landmark = get_landmarks(base_path, bbox_list=bbox_list)
+
 
     if normalize:
         base_df = normalize_face_landmarks(base_landmark, align=align)
@@ -692,22 +697,24 @@ def apply_rotation_per_frame(norm_df, rotation_matrices):
     Returns:
     DataFrame: The rotated landmarks.
     """
-    for idx, rotation_matrix in enumerate(rotation_matrices):
-        for i in range(1, 469):
-            x_col = f'lmk{str(i).zfill(3)}_x'
-            y_col = f'lmk{str(i).zfill(3)}_y'
-            z_col = f'lmk{str(i).zfill(3)}_z'
+    axes = ['x', 'y', 'z']
+    landmark_cols = {
+        axis: [col for col in norm_df.columns if col.endswith(f'_{axis}')]
+        for axis in axes
+    }
 
-            # Original centered coordinates
-            x = norm_df.loc[idx, x_col]
-            y = norm_df.loc[idx, y_col]
-            z = norm_df.loc[idx, z_col]
+    stacked_coords = np.stack([
+        norm_df[landmark_cols['x']].values,
+        norm_df[landmark_cols['y']].values,
+        norm_df[landmark_cols['z']].values
+    ], axis=-1)  # Shape: (num_frames, num_landmarks, 3)
 
-            # Rotate using the rotation matrix for this frame
-            rotated_coords = np.dot(rotation_matrix, np.array([x, y, z]))
-            norm_df.loc[idx, x_col] = rotated_coords[0]
-            norm_df.loc[idx, y_col] = rotated_coords[1]
-            norm_df.loc[idx, z_col] = rotated_coords[2]
+    rotated_coords = np.array([
+        np.dot(stacked_coords[i], rotation_matrices[i].T) for i in range(len(rotation_matrices))
+    ])
+
+    for i, axis in enumerate(axes):
+        norm_df[landmark_cols[axis]] = rotated_coords[..., i]
 
     return norm_df
 
@@ -769,13 +776,17 @@ def center_landmarks(df, nose_tip):
     DataFrame: The centered landmarks.
     ---------------------------------------------------------------------------------------------------
     """
-    norm_data = {}
-    for axis in ['x', 'y', 'z']:
-        for i in range(1, 469):
-            col_name = f'lmk{str(i).zfill(3)}_{axis}'
-            norm_data[col_name] = df[col_name] - df[f'{nose_tip}_{axis}']
-    
-    return pd.DataFrame(norm_data)
+
+    axes = ['x', 'y', 'z']
+    nose_tip_coords = {axis: f'{nose_tip}_{axis}' for axis in axes}
+
+    norm_data = {
+        axis: df.filter(like=f'_{axis}') - df[nose_tip_coords[axis]].values[:, None]
+        for axis in axes
+    }
+
+    norm_df = pd.concat(norm_data.values(), axis=1)
+    return norm_df
 
 def get_vertices_for_col(df, col_name):
     """
@@ -837,7 +848,8 @@ def normalize_face_landmarks(
         (right_eye_y - left_eye_y)**2 +
         (right_eye_z - left_eye_z)**2
     )
-    scaling_factor =  eye_distance / 1 # scale to one so all faces have a common size
+
+    scaling_factor =  eye_distance
 
     norm_df = center_landmarks(df, nose_tip)
 
@@ -855,7 +867,8 @@ def normalize_face_landmarks(
 
     return norm_df
 
-def split_speaking_df(df_disp):
+
+def split_speaking_df(df_disp, speaking_col):
     """
     ---------------------------------------------------------------------------------------------------
 
@@ -865,6 +878,9 @@ def split_speaking_df(df_disp):
     ............
     df_disp : pandas.DataFrame
         displacement dataframe
+    speaking_col : str
+        speaking probability column name
+
 
     Returns:
     ............
@@ -873,10 +889,11 @@ def split_speaking_df(df_disp):
     ---------------------------------------------------------------------------------------------------
     """
 
-    speaking_df = df_disp[df_disp['speaking'] > 0.5]
-    not_speaking_df = df_disp[df_disp['speaking'] <= 0.5]
-    speaking_df = speaking_df.drop('speaking', axis=1)
-    not_speaking_df = not_speaking_df.drop('speaking', axis=1)
+
+    speaking_df = df_disp[df_disp[speaking_col] > 0.5]
+    not_speaking_df = df_disp[df_disp[speaking_col] <= 0.5]
+    speaking_df = speaking_df.drop(speaking_col, axis=1)
+    not_speaking_df = not_speaking_df.drop(speaking_col, axis=1)
 
     speaking_df_summ = get_summary(speaking_df)
     not_speaking_df_summ = get_summary(not_speaking_df)
@@ -908,7 +925,6 @@ def get_summary(df):
 
     df_summ = pd.DataFrame()
     if len(df.columns)>0:
-        #@ TODO: get names of summary stats
         df_mean = pd.DataFrame(df.mean()).T.iloc[:,470:].add_suffix('_mean')
         df_std = pd.DataFrame(df.std()).T.iloc[:,470:].add_suffix('_std')
 
@@ -983,7 +999,8 @@ def facial_expressivity(
     config = get_config(os.path.abspath(__file__), "facial.json")
 
     try:
-        df_landmark = get_landmarks(filepath, 'input',bbox_list=bbox_list)
+
+        df_landmark = get_landmarks(filepath, bbox_list=bbox_list)
         
         if normalize:
             df_landmark = normalize_face_landmarks(df_landmark, align=align)
@@ -998,10 +1015,11 @@ def facial_expressivity(
 
         # use mouth height to calculate mouth openness
         df_disp['mouth_openness'] = get_mouth_openness(df_landmark, config)
-        df_disp['speaking'] = get_speaking_probabilities(df_disp, rolling_std_seconds)
-        
+
         if split_by_speaking:
-            df_summ = split_speaking_df(df_disp)
+            df_disp['speaking_probability'] = get_speaking_probabilities(df_disp, rolling_std_seconds)
+            df_summ = split_speaking_df(df_disp, 'speaking_probability')
+
         else:
             df_summ = get_summary(df_disp)
 
