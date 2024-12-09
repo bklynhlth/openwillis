@@ -1,5 +1,6 @@
 # author:    Kieran McVeigh
 # website:   http://www.bklynhlth.com
+
 from sklearn.mixture import GaussianMixture
 
 def get_fps(df):
@@ -42,7 +43,11 @@ def get_speaking_probabilities(df, rolling_std_seconds):
     fps = get_fps(df)
     rolling_std_frames = int(rolling_std_seconds*fps)
     df = df.copy(deep=True)
-    df['rolling_mouth_open_std'] = df.mouth_openness.rolling(rolling_std_frames).std()
+    df['rolling_mouth_open_std'] = df.mouth_openness.rolling(
+        rolling_std_frames,
+        min_periods=2
+    ).std()
+
 
     df_nona = df[['frame','time','rolling_mouth_open_std']].dropna()
     gmm = GaussianMixture(n_components=2)
@@ -53,6 +58,6 @@ def get_speaking_probabilities(df, rolling_std_seconds):
         df_nona['speaking'] = prob_preds[:,0]
     else:
         df_nona['speaking'] = prob_preds[:,1]
-    
+        
     df = df.merge(df_nona, on='frame', how='left')
     return df.speaking

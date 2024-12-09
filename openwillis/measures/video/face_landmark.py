@@ -331,6 +331,7 @@ def get_undected_markers(frame,fps):
     return df_landmark
 
 def get_landmarks(path, bbox_list=[]):
+
     """
     ---------------------------------------------------------------------------------------------------
 
@@ -355,6 +356,7 @@ def get_landmarks(path, bbox_list=[]):
     """
 
     landmark_list = run_facemesh(path, bbox_list=bbox_list)
+
 
     if len(landmark_list)>0:
         df_landmark = pd.concat(landmark_list).reset_index(drop=True)
@@ -539,6 +541,7 @@ def baseline(base_path, bbox_list=[], normalize=True, align=False):
 
     base_landmark = get_landmarks(base_path, bbox_list=bbox_list)
 
+
     if normalize:
         base_df = normalize_face_landmarks(base_landmark, align=align)
         
@@ -712,6 +715,7 @@ def apply_rotation_per_frame(norm_df, rotation_matrices):
 
     for i, axis in enumerate(axes):
         norm_df[landmark_cols[axis]] = rotated_coords[..., i]
+
     return norm_df
 
 
@@ -772,6 +776,7 @@ def center_landmarks(df, nose_tip):
     DataFrame: The centered landmarks.
     ---------------------------------------------------------------------------------------------------
     """
+
     axes = ['x', 'y', 'z']
     nose_tip_coords = {axis: f'{nose_tip}_{axis}' for axis in axes}
 
@@ -843,6 +848,7 @@ def normalize_face_landmarks(
         (right_eye_y - left_eye_y)**2 +
         (right_eye_z - left_eye_z)**2
     )
+
     scaling_factor =  eye_distance
 
     norm_df = center_landmarks(df, nose_tip)
@@ -861,6 +867,7 @@ def normalize_face_landmarks(
 
     return norm_df
 
+
 def split_speaking_df(df_disp, speaking_col):
     """
     ---------------------------------------------------------------------------------------------------
@@ -874,12 +881,14 @@ def split_speaking_df(df_disp, speaking_col):
     speaking_col : str
         speaking probability column name
 
+
     Returns:
     ............
     df_summ : pandas.DataFrame
         stat summary dataframe
     ---------------------------------------------------------------------------------------------------
     """
+
 
     speaking_df = df_disp[df_disp[speaking_col] > 0.5]
     not_speaking_df = df_disp[df_disp[speaking_col] <= 0.5]
@@ -990,6 +999,7 @@ def facial_expressivity(
     config = get_config(os.path.abspath(__file__), "facial.json")
 
     try:
+
         df_landmark = get_landmarks(filepath, bbox_list=bbox_list)
         
         if normalize:
@@ -1009,6 +1019,7 @@ def facial_expressivity(
         if split_by_speaking:
             df_disp['speaking_probability'] = get_speaking_probabilities(df_disp, rolling_std_seconds)
             df_summ = split_speaking_df(df_disp, 'speaking_probability')
+
         else:
             df_summ = get_summary(df_disp)
 
