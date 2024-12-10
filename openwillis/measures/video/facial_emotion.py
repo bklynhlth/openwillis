@@ -143,7 +143,7 @@ def detect_emotions(detector, frame, emo_cols, bb_dict={}, threshold=.95):
     #need to figure this out 
     # if frame == []:
     #     raise ValueError('No faces detected in frame')
-    if len(faces[0])<1:
+    if len(faces[0])<1 or np.isnan(faces[0][0][:4]).sum() == 4:
         raise ValueError('No faces detected in frame')
     
     landmarks = detector.detect_landmarks(
