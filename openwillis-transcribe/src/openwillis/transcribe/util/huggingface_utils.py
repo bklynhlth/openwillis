@@ -5,7 +5,7 @@
 from transformers import AutoTokenizer, AutoModelForCausalLM
 import torch
 
-from openwillis.measures.text.util.diarization_utils import (
+from .diarization_utils import (
     preprocess_str, apply_formatting
 )
 

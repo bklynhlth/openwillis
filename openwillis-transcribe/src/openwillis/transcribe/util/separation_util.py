@@ -12,7 +12,7 @@ import shutil
 from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
 from pydub import AudioSegment
-from openwillis.measures.commons.common import to_audio, from_audio
+from ..commons import to_audio, from_audio
 
 logging.basicConfig(level=logging.INFO)
 logger=logging.getLogger()

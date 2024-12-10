@@ -10,7 +10,7 @@ import random
 
 import json
 import logging
-from openwillis.measures.audio.util import separation_util as sutil
+from . import separation_util as sutil
 
 logging.basicConfig(level=logging.INFO)
 logger=logging.getLogger()
