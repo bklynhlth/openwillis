@@ -16,6 +16,7 @@ import json
 import logging
 
 from openwillis.measures.video.util.speaking_utils import get_speaking_probabilities
+from openwillis.measures.video.util.crop_utils import create_face_frame, create_cropped_frame, crop_img
 
 logging.basicConfig(level=logging.INFO)
 logger=logging.getLogger()
@@ -78,14 +79,23 @@ def get_faces(detector,frame,bb_dict,threshold=.95):
     returns:
     faces: list of faces detected in frame
     '''
+    #if a non-empty bb_dict is passed use it
+    #it may have null values though the next function handles that logic
     if len(bb_dict.keys()):
-        faces = bb_dict_to_bb_list(bb_dict)
-    else:
-        faces = detector.detect_faces(
-                frame,
-                threshold=.95,
-            )
-    return faces
+        frame = create_face_frame(
+            bb_dict,
+            frame,
+            crop=True,
+            trim=True,
+            debug=False
+        )
+    
+    faces = detector.detect_faces(
+        frame,
+        threshold=.95,
+    )
+
+    return (faces, frame)
 
 def mouth_openness(
     landmarks,
@@ -124,13 +134,16 @@ def mouth_openness(
 
 def detect_emotions(detector, frame, emo_cols, bb_dict={},threshold=.95):
 
-    faces = get_faces(
+    faces, frame = get_faces(
         detector,
         frame,
         bb_dict,
         threshold=threshold
     )
-
+    
+    #need to figure this out 
+    # if frame == []:
+    #     raise ValueError('No faces detected in frame')
     if len(faces[0])<1:
         raise ValueError('No faces detected in frame')
     
@@ -377,8 +390,8 @@ def split_speaking_df(df):
 
     Parameters:
     ............
-    df_disp : pandas.DataFrame
-        displacement dataframe
+    df: pandas.DataFrame
+        The input dataframe containing the normalized facial emotion data.
 
     Returns:
     ............
@@ -396,8 +409,8 @@ def split_speaking_df(df):
     speaking_df_summ = speaking_df_summ.add_suffix('_speaking')
     not_speaking_df_summ = not_speaking_df_summ.add_suffix('_not_speaking')
     
-    df_summ = pd.concat([speaking_df_summ, not_speaking_df_summ], axis=1)
-    return df_summ
+    df_sum = pd.concat([speaking_df_summ, not_speaking_df_summ], axis=1)
+    return df_sum
 
 def get_summary(df):
     """
@@ -453,6 +466,19 @@ def emotional_expressivity(
         optional path to baseline video. see openwillis research guidelines on github wiki to read case
         for baseline video use, particularly in clinical research contexts. (default is 0, meaning no
         baseline correction will be conducted).
+    bbox_list : list of dicts, optional
+        list of bounding box dictionaries for each frame in the video. (default is 0, meaning pyfeat will
+        be used to detect faces in each frame).
+    base_bbox_list : list of dicts, optional
+        list of bounding box dictionaries for each frame in the baseline video. (default is 0, meaning
+        pyfeat will be used to detect faces in each frame).
+    skip_frames : int, optional
+        number of frames to skip between samples (default is 5).
+    split_by_speaking : bool, optional
+        split the output by speaking probability (default is False).
+    rolling_std_seconds : int, optional
+        window size in seconds for calculating rolling standard deviation of speaking probability
+        (default is 3).
 
     Returns
     ..........
@@ -495,6 +521,7 @@ def emotional_expressivity(
         if os.path.exists(baseline_filepath):
             df_norm_emo = df_norm_emo - 1
             df_norm_emo[['frame','time']] = df_norm_emo[['frame','time']] + 1
+
             if split_by_speaking:
                 df_norm_emo['speaking_probability'] = df_norm_emo['speaking_probability'] + 1
 
