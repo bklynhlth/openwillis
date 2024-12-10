@@ -190,7 +190,7 @@ def crop_and_detect_emotions(
 def run_pyfeat(path, skip_frames=5, bbox_list=[]):
     """
     ------------------------------------------------------------------------------------------------------
-    This function takes an image path and measures config object as input, and uses the DeepFace package to
+    This function takes an image path and measures config object as input, and uses the py-feat package to
     fetch facial emotion for each frame of the video. It returns a list of dataframes, each containing facial
     emotion data for one frame.
 
@@ -243,7 +243,7 @@ def run_pyfeat(path, skip_frames=5, bbox_list=[]):
 
                 elif n_frames_skipped == skip_frames:
                     n_frames_skipped = 0
-                    df_common = pd.DataFrame([[frame,frame/fps]], columns=['frame','time'])
+                    df_common = pd.DataFrame([[frame, frame/fps]], columns=['frame', 'time'])
                     # if there is a bounding box list crop the frame (or return a black frame)
                     
                     if bbox_list_passed:
@@ -270,8 +270,8 @@ def run_pyfeat(path, skip_frames=5, bbox_list=[]):
                         df_emotion = pd.concat([df_common, df_emo], axis=1)
             
             except Exception as e:
-                logger.info(f'error processing frame:{frame} in file:{path} & Error: {e}')
-                df_emotion = get_undected_emotion(frame, emo_cols,fps)
+                logger.info(f'error processing frame: {frame} in file: {path} & Error: {e}')
+                df_emotion = get_undected_emotion(frame, emo_cols, fps)
             
             df_list.append(df_emotion)
             
@@ -287,7 +287,7 @@ def run_pyfeat(path, skip_frames=5, bbox_list=[]):
             df_emotion = pd.DataFrame(columns= emo_cols)
 
             df_list.append(df_emotion)
-            logger.info(f'Face not detected by pyfeat in : {path}')
+            logger.info(f'Face not detected by pyfeat in: {path}')
 
     return df_list
 
@@ -295,7 +295,7 @@ def get_undected_emotion(frame, cols, fps):
     """
     ------------------------------------------------------------------------------------------------------
     This function returns a pandas dataframe with a single row of NaN values for the different facial emotion
-    measures. It is used to fill in missing values in cases where DeepFace is unable to detect facial emotion
+    measures. It is used to fill in missing values in cases where py-feat is unable to detect facial emotion
     for a particular frame.
 
     Parameters:
@@ -311,7 +311,7 @@ def get_undected_emotion(frame, cols, fps):
         A dataframe with a single row of NaN values for the different facial emotion measures.
     ------------------------------------------------------------------------------------------------------
     """
-    df_common = pd.DataFrame([[frame, frame/fps]], columns=['frame','time'])
+    df_common = pd.DataFrame([[frame, frame/fps]], columns=['frame', 'time'])
     value = [np.nan] * len(cols)
 
     df = pd.DataFrame([value], columns = cols)
@@ -390,8 +390,8 @@ def baseline(
     if not os.path.exists(base_path):
         return df_emo
 
-    df_common = df_emo[['frame','time','mouth_openness']]
-    df_emo.drop(columns=['frame','time','mouth_openness'], inplace=True)
+    df_common = df_emo[['frame', 'time', 'mouth_openness']]
+    df_emo.drop(columns=['frame', 'time', 'mouth_openness'], inplace=True)
 
     base_emo = get_emotion(
         base_path, 
@@ -551,8 +551,8 @@ def emotional_expressivity(
             df_summ = get_summary(df_norm_emo)
 
         if os.path.exists(baseline_filepath):
-            df_norm_emo = df_norm_emo - 1
-            df_norm_emo[['frame','time']] = df_norm_emo[['frame','time']] + 1
+            df_norm_emo -= 1
+            df_norm_emo[['frame', 'time']] += 1
 
             if split_by_speaking:
                 df_norm_emo['speaking_probability'] += 1
