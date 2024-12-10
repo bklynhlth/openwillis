@@ -12,7 +12,7 @@ import mediapipe as mp
 from protobuf_to_dict import protobuf_to_dict
 
 from openwillis.measures.video.util.crop_utils import crop_with_padding_and_center
-from openwillis.measures.video.util.speaking_utils import get_speaking_probabilities
+from openwillis.measures.video.util.speaking_utils import get_speaking_probabilities, split_speaking_df, get_summary
 
 logging.basicConfig(level=logging.INFO)
 logger=logging.getLogger()
@@ -868,70 +868,6 @@ def normalize_face_landmarks(
 
     return norm_df
 
-
-def split_speaking_df(df_disp, speaking_col):
-    """
-    ---------------------------------------------------------------------------------------------------
-
-    This function splits the displacement dataframe into two dataframes based on speaking probability.
-
-    Parameters:
-    ............
-    df_disp : pandas.DataFrame
-        displacement dataframe
-    speaking_col : str
-        speaking probability column name
-
-
-    Returns:
-    ............
-    df_summ : pandas.DataFrame
-        stat summary dataframe
-    ---------------------------------------------------------------------------------------------------
-    """
-
-
-    speaking_df = df_disp[df_disp[speaking_col] > 0.5]
-    not_speaking_df = df_disp[df_disp[speaking_col] <= 0.5]
-    speaking_df = speaking_df.drop(speaking_col, axis=1)
-    not_speaking_df = not_speaking_df.drop(speaking_col, axis=1)
-
-    speaking_df_summ = get_summary(speaking_df)
-    not_speaking_df_summ = get_summary(not_speaking_df)
-    speaking_df_summ = speaking_df_summ.add_suffix('_speaking')
-    not_speaking_df_summ = not_speaking_df_summ.add_suffix('_not_speaking')
-    
-    df_summ = pd.concat([speaking_df_summ, not_speaking_df_summ], axis=1)
-    
-    return df_summ
-
-def get_summary(df):
-    """
-    ---------------------------------------------------------------------------------------------------
-
-    This function calculates the summary measurements from the framewise displacement data.
-
-    Parameters:
-    ............
-    df : pandas.DataFrame
-        framewise euclidean displacement dataframe
-
-    Returns:
-    ............
-    df_summ : pandas.DataFrame
-         stat summary dataframe
-
-    ---------------------------------------------------------------------------------------------------
-    """
-
-    df_summ = pd.DataFrame()
-    if len(df.columns)>0:
-        df_mean = pd.DataFrame(df.mean()).T.iloc[:,470:].add_suffix('_mean')
-        df_std = pd.DataFrame(df.std()).T.iloc[:,470:].add_suffix('_std')
-
-        df_summ = pd.concat([df_mean, df_std], axis =1).reset_index(drop=True)
-    return df_summ
-
 def facial_expressivity(
     filepath,
     baseline_filepath='',
@@ -1019,10 +955,10 @@ def facial_expressivity(
 
         if split_by_speaking:
             df_disp['speaking_probability'] = get_speaking_probabilities(df_disp, rolling_std_seconds)
-            df_summ = split_speaking_df(df_disp, 'speaking_probability')
+            df_summ = split_speaking_df(df_disp, 'speaking_probability', 470)
 
         else:
-            df_summ = get_summary(df_disp)
+            df_summ = get_summary(df_disp, 470)
 
         return df_landmark, df_disp, df_summ
 

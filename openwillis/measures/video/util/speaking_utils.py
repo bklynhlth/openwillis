@@ -1,7 +1,36 @@
 # author:    Kieran McVeigh
 # website:   http://www.bklynhlth.com
-
 from sklearn.mixture import GaussianMixture
+import pandas as pd
+
+def get_summary(df, start_at_col):
+    """
+    ---------------------------------------------------------------------------------------------------
+
+    This function calculates the summary measurements from the framewise displacement data.
+
+    Parameters:
+    ............
+    df : pandas.DataFrame
+        framewise euclidean displacement dataframe
+    start_at_col : int
+        column index to start summary calculations
+
+    Returns:
+    ............
+    df_summ : pandas.DataFrame
+         stat summary dataframe
+
+    ---------------------------------------------------------------------------------------------------
+    """
+
+    df_summ = pd.DataFrame()
+    if len(df.columns)>0:
+        df_mean = pd.DataFrame(df.mean()).T.iloc[:,start_at_col:].add_suffix('_mean')
+        df_std = pd.DataFrame(df.std()).T.iloc[:,start_at_col:].add_suffix('_std')
+
+        df_summ = pd.concat([df_mean, df_std], axis =1).reset_index(drop=True)
+    return df_summ
 
 def get_fps(df):
     """
@@ -61,3 +90,39 @@ def get_speaking_probabilities(df, rolling_std_seconds):
         
     df = df.merge(df_nona, on='frame', how='left')
     return df.speaking
+
+def split_speaking_df(df_disp, speaking_col, start_at_col):
+    """
+    ---------------------------------------------------------------------------------------------------
+
+    This function splits the displacement dataframe into two dataframes based on speaking probability.
+
+    Parameters:
+    ............
+    df_disp : pandas.DataFrame
+        displacement dataframe
+    speaking_col : str
+        speaking probability column name
+    start_at_col : int
+        column index to start summary calculations
+
+
+    Returns:
+    ............
+    df_summ : pandas.DataFrame
+        stat summary dataframe
+    ---------------------------------------------------------------------------------------------------
+    """
+    speaking_df = df_disp[df_disp[speaking_col] > 0.5]
+    not_speaking_df = df_disp[df_disp[speaking_col] <= 0.5]
+    speaking_df = speaking_df.drop(speaking_col, axis=1)
+    not_speaking_df = not_speaking_df.drop(speaking_col, axis=1)
+
+    speaking_df_summ = get_summary(speaking_df, start_at_col)
+    not_speaking_df_summ = get_summary(not_speaking_df, start_at_col)
+    speaking_df_summ = speaking_df_summ.add_suffix('_speaking')
+    not_speaking_df_summ = not_speaking_df_summ.add_suffix('_not_speaking')
+    
+    df_summ = pd.concat([speaking_df_summ, not_speaking_df_summ], axis=1)
+    
+    return df_summ

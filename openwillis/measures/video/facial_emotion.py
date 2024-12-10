@@ -15,7 +15,7 @@ import os
 import json
 import logging
 
-from openwillis.measures.video.util.speaking_utils import get_speaking_probabilities
+from openwillis.measures.video.util.speaking_utils import get_speaking_probabilities, split_speaking_df, get_summary
 from openwillis.measures.video.util.crop_utils import create_cropped_frame
 
 logging.basicConfig(level=logging.INFO)
@@ -412,65 +412,6 @@ def baseline(
 
     return df_emotion
 
-def split_speaking_df(df):
-    """
-    ---------------------------------------------------------------------------------------------------
-
-    This function splits the displacement dataframe into two dataframes based on speaking probability.
-
-    Parameters:
-    ............
-    df: pandas.DataFrame
-        The input dataframe containing the normalized facial emotion data.
-
-    Returns:
-    ............
-    df_summ : pandas.DataFrame
-        stat summary dataframe
-    ---------------------------------------------------------------------------------------------------
-    """
-    speaking_df = df[df['speaking_probability'] > 0.5]
-    not_speaking_df = df[df['speaking_probability'] <= 0.5]
-    speaking_df = speaking_df.drop('speaking_probability', axis=1)
-    not_speaking_df = not_speaking_df.drop('speaking_probability', axis=1)
-
-    speaking_df_summ = get_summary(speaking_df)
-    not_speaking_df_summ = get_summary(not_speaking_df)
-    speaking_df_summ = speaking_df_summ.add_suffix('_speaking')
-    not_speaking_df_summ = not_speaking_df_summ.add_suffix('_not_speaking')
-
-    df_sum = pd.concat([speaking_df_summ, not_speaking_df_summ], axis=1)
-    return df_sum
-
-def get_summary(df):
-    """
-    ------------------------------------------------------------------------------------------------------
-    This function calculates the summary statistics for the input dataframe containing the normalized facial
-    emotion data. It calculates the mean and standard deviation of each facial emotion measure and returns
-    them as a dataframe.
-
-    Parameters:
-    ..........
-    df: pandas dataframe
-        The input dataframe containing the normalized facial emotion data.
-
-    Returns:
-    ..........
-    df_summ: pandas dataframe
-        A dataframe containing the summary statistics for the normalized facial emotion data.
-    ------------------------------------------------------------------------------------------------------
-    """
-
-    df_summ = pd.DataFrame()
-    if len(df) > 0:
-
-        df_mean = pd.DataFrame(df.mean()).T.iloc[:, 2:].add_suffix('_mean')
-        df_std = pd.DataFrame(df.std()).T.iloc[:, 2:].add_suffix('_std')
-
-        df_summ = pd.concat([df_mean, df_std], axis=1).reset_index(drop=True)
-
-    return df_summ
-
 def emotional_expressivity(
     filepath,
     baseline_filepath='',
@@ -545,9 +486,9 @@ def emotional_expressivity(
                 df_norm_emo,
                 rolling_std_seconds
             )
-            df_summ = split_speaking_df(df_norm_emo)
+            df_summ = split_speaking_df(df_norm_emo,'speaking_probability', 2)
         else:
-            df_summ = get_summary(df_norm_emo)
+            df_summ = get_summary(df_norm_emo, 2)
 
         if os.path.exists(baseline_filepath):
             df_norm_emo -= 1
