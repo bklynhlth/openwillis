@@ -122,7 +122,7 @@ def detect_emotions(detector, frame, emo_cols, threshold=.95):
     landmarks = landmarks[0][0]
 
     emos_aus = np.hstack([emotions, aus])
-    df_emo = pd.DataFrame([emos_aus],columns=emo_cols)
+    df_emo = pd.DataFrame([emos_aus], columns=emo_cols)
     df_emo['mouth_openness'] = mouth_openness(landmarks)
 
     return df_emo
