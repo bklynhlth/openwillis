@@ -9,7 +9,7 @@ import cv2
 
 import feat
 from feat.utils import FEAT_EMOTION_COLUMNS
-from feat.pretrained import  AU_LANDMARK_MAP
+from feat.pretrained import AU_LANDMARK_MAP
 
 import os
 import json
