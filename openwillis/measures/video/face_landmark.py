@@ -271,6 +271,7 @@ def run_facemesh(path, bbox_list=[]):
                         face_mesh,
                         df_common
                     )
+                    
                 else:
                     
                     bbox = bbox_list[frame]

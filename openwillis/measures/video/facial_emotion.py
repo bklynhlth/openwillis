@@ -9,44 +9,18 @@ import cv2
 
 import feat
 from feat.utils import FEAT_EMOTION_COLUMNS
-from feat.pretrained import AU_LANDMARK_MAP
+from feat.pretrained import  AU_LANDMARK_MAP
 
 import os
 import json
 import logging
 
 from openwillis.measures.video.util.speaking_utils import get_speaking_probabilities
-from openwillis.measures.video.util.crop_utils import create_face_frame, create_cropped_frame, crop_img
+from openwillis.measures.video.util.crop_utils import create_cropped_frame
 
 logging.basicConfig(level=logging.INFO)
 logger=logging.getLogger()
 
-def get_config(filepath, json_file):
-    """
-    ------------------------------------------------------------------------------------------------------
-
-    This function reads the configuration file containing the column names for the output dataframes,
-    and returns the contents of the file as a dictionary.
-
-    Parameters:
-    ...........
-    filepath : str
-        The path to the configuration file.
-    json_file : str
-        The name of the configuration file.
-
-    Returns:
-    ...........
-    measures: A dictionary containing the names of the columns in the output dataframes.
-
-    ------------------------------------------------------------------------------------------------------
-    """
-    dir_name = os.path.dirname(filepath)
-    measure_path = os.path.abspath(os.path.join(dir_name, f"config/{json_file}"))
-
-    file = open(measure_path)
-    measures = json.load(file)
-    return measures
 
 def bb_dict_to_bb_list(bb_dict):
     """
@@ -65,37 +39,6 @@ def bb_dict_to_bb_list(bb_dict):
         bb_dict['bb_y'] + bb_dict['bb_y'],
         1# this is to formatt bb_list to be compatible with pyfeat (this is face confidence)
         ]]]
-
-def get_faces(detector, frame, bb_dict, threshold=.95):
-    '''
-    detect faces in frame if bb_dict is empty else use bb_dict
-
-    arguments:
-    detector: pyfeat detector object
-    frame: frame to detect faces in
-    bb_dict: dictionary with bounding box coordinates
-    threshold: threshold for face detection
-
-    returns:
-    faces: list of faces detected in frame
-    '''
-    #if a non-empty bb_dict is passed use it
-    #it may have null values though the next function handles that logic
-    if len(bb_dict.keys()):
-        frame = create_face_frame(
-            bb_dict,
-            frame,
-            crop=True,
-            trim=True,
-            debug=False
-        )
-    
-    faces = detector.detect_faces(
-        frame,
-        threshold=threshold,
-    )
-
-    return (faces, frame)
 
 def mouth_openness(
     landmarks,
@@ -131,20 +74,35 @@ def mouth_openness(
         lmk_dist.append(np.sqrt((upper_lip_x - lower_lip_x)**2 + (upper_lip_y - lower_lip_y)**2))
     return np.mean(lmk_dist)
 
-def detect_emotions(detector, frame, emo_cols, bb_dict={}, threshold=.95):
 
-    faces, frame = get_faces(
-        detector,
-        frame,
-        bb_dict,
-        threshold=threshold
-    )
+def detect_emotions(detector, frame, emo_cols, threshold=.95):
+    """
+    ------------------------------------------------------------------------------------------------------
+    This function takes a frame and a configuration object as input, and uses the py-feat package to fetch
+    facial emotion data for the frame. It returns a pandas dataframe containing the facial emotion data.
+
+    Parameters:
+    ..........
+    detector: pyfeat detector object
+        The pyfeat detector object used to detect facial emotions.
+    frame: numpy array
+        The frame for which facial emotion data is being fetched.
+    emo_cols: list
+        A list of column names for the facial emotion measures.
+    threshold: float
+        The threshold for face detection.
     
-    #need to figure this out 
-    # if frame == []:
-    #     raise ValueError('No faces detected in frame')
-    if len(faces[0])<1 or np.isnan(faces[0][0][:4]).sum() == 4:
-        raise ValueError('No faces detected in frame')
+    Returns:
+    ..........
+    df_emo: pandas dataframe
+        A dataframe containing facial emotion data for the input frame.
+    ------------------------------------------------------------------------------------------------------
+    """
+
+    faces = detector.detect_faces(
+        frame,
+        threshold=threshold,
+    )
     
     landmarks = detector.detect_landmarks(
         frame,
@@ -167,6 +125,66 @@ def detect_emotions(detector, frame, emo_cols, bb_dict={}, threshold=.95):
     df_emo = pd.DataFrame([emos_aus],columns=emo_cols)
     df_emo['mouth_openness'] = mouth_openness(landmarks)
 
+    return df_emo
+
+def crop_and_detect_emotions(
+    img,
+    bbox,
+    detector,
+    emo_cols,
+    fps,
+    frame,
+    df_common
+):
+    """
+    ------------------------------------------------------------------------------------------------------
+    This function crops the input frame using the bounding box information and then uses the pyfeat package to
+    fetch facial emotion data for the cropped frame. It returns a pandas dataframe containing the facial emotion
+    data.
+
+    Parameters:
+    ..........
+    img: numpy array
+        The input frame for which facial emotion data is being fetched.
+    bbox: dict
+        A dictionary containing the bounding box information for the face in the frame.
+    detector: pyfeat detector object
+        The pyfeat detector object used to detect facial emotions.
+    emo_cols: list
+        A list of column names for the facial emotion measures.
+    fps: float
+        The frame rate of the video.
+    frame: int
+        The frame number for which facial emotion data is being fetched.
+    df_common: pandas dataframe
+        A dataframe containing the frame number and time for the input frame.
+
+    Returns:
+    ..........
+    df_emo: pandas dataframe
+        A dataframe containing facial emotion data for the input frame.
+    ------------------------------------------------------------------------------------------------------
+    """
+
+    if not np.isnan(bbox['bb_x']):
+        
+        cropped_img = create_cropped_frame(
+            img,
+            bbox
+        )
+
+        df_emo = detect_emotions(
+            detector,
+            cropped_img,
+            emo_cols
+        )
+
+        df_emo = pd.concat([df_common, df_emo], axis=1)
+
+    else:
+
+        df_emo = get_undected_emotion(frame, emo_cols,fps)
+    
     return df_emo
 
 def run_pyfeat(path, skip_frames=5, bbox_list=[]):
@@ -205,7 +223,9 @@ def run_pyfeat(path, skip_frames=5, bbox_list=[]):
         frame = 0
         n_frames_skipped = skip_frames
 
-        if (len_bbox_list > 0) & (num_frames != len_bbox_list):
+        bbox_list_passed = len_bbox_list>0
+
+        if bbox_list_passed & (num_frames != len_bbox_list):
             raise ValueError('Number of frames in video and number of bounding boxes do not match')
         
         while True:
@@ -222,20 +242,32 @@ def run_pyfeat(path, skip_frames=5, bbox_list=[]):
                     df_emotion = get_undected_emotion(frame, emo_cols,fps)
 
                 elif n_frames_skipped == skip_frames:
-                    
                     n_frames_skipped = 0
-                    
-                    bbox = bbox_list[frame] if len_bbox_list>0 else {}
-
                     df_common = pd.DataFrame([[frame,frame/fps]], columns=['frame','time'])
-                    df_emo = detect_emotions(
-                        detector,
-                        img,
-                        emo_cols,
-                        bb_dict=bbox
-                    ) 
+                    # if there is a bounding box list crop the frame (or return a black frame)
+                    
+                    if bbox_list_passed:
 
-                    df_emotion = pd.concat([df_common, df_emo], axis=1)
+                        bbox = bbox_list[frame]
+                        df_emotion = crop_and_detect_emotions(
+                            img,
+                            bbox,
+                            detector,
+                            emo_cols,
+                            fps,
+                            frame,
+                            df_common
+                        )
+                    
+                    else:
+
+                        df_emo = detect_emotions(
+                            detector,
+                            img,
+                            emo_cols
+                        ) 
+
+                        df_emotion = pd.concat([df_common, df_emo], axis=1)
             
             except Exception as e:
                 logger.info(f'error processing frame:{frame} in file:{path} & Error: {e}')
@@ -437,6 +469,7 @@ def get_summary(df):
         df_std = pd.DataFrame(df.std()).T.iloc[:,2:].add_suffix('_std')
 
         df_summ = pd.concat([df_mean, df_std], axis =1).reset_index(drop=True)
+
     return df_summ
 
 def emotional_expressivity(
