@@ -11,8 +11,7 @@ import logging
 import mediapipe as mp
 from protobuf_to_dict import protobuf_to_dict
 
-from openwillis.measures.video.util.crop_utils import crop_with_padding_and_center
-from openwillis.measures.video.util.speaking_utils import get_speaking_probabilities, split_speaking_df, get_summary
+from .util import crop_with_padding_and_center, get_speaking_probabilities, split_speaking_df, get_summary
 
 logging.basicConfig(level=logging.INFO)
 logger=logging.getLogger()
@@ -552,7 +551,7 @@ def baseline(base_path, bbox_list=[], normalize=True, align=False):
     base_mean = disp_base_df.mean()
 
     base_df = pd.DataFrame(base_mean).T
-    base_df = base_df[~base_df.isin([np.nan, np.inf, -np.inf]).any(1)]
+    base_df = base_df[~base_df.isin([np.nan, np.inf, -np.inf])]
 
     base_df = base_df + 1 #Normalization
     return base_df

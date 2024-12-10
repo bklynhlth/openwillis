@@ -1,5 +1,9 @@
-from openwillis.measures.video.util.crop_utils import (
-    create_cropped_video
+from .crop_utils import (
+    create_cropped_video, create_cropped_frame
 )
 
-__all__ = ["create_cropped_video"]
+from .speaking_utils import (
+    get_speaking_probabilities, split_speaking_df, get_summary
+)
+
+__all__ = ["create_cropped_video", "create_cropped_frame", "get_speaking_probabilities", "split_speaking_df", "get_summary"]

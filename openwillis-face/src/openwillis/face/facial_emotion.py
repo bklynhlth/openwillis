@@ -12,11 +12,9 @@ from feat.utils import FEAT_EMOTION_COLUMNS
 from feat.pretrained import AU_LANDMARK_MAP
 
 import os
-import json
 import logging
 
-from openwillis.measures.video.util.speaking_utils import get_speaking_probabilities, split_speaking_df, get_summary
-from openwillis.measures.video.util.crop_utils import create_cropped_frame
+from .util import get_speaking_probabilities, split_speaking_df, get_summary, create_cropped_frame
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger()
@@ -401,8 +399,8 @@ def baseline(
     base_mean = base_emo.drop(
         columns=['frame', 'time', 'mouth_openness']).mean() + 1  # Normalization
 
-    base_df = pd.DataFrame(base_mean).T
-    base_df = base_df[~base_df.isin([np.nan, np.inf, -np.inf]).any(1)]
+    base_df = pd.DataFrame(base_mean)
+    base_df = base_df[~base_df.isin([np.nan, np.inf, -np.inf])]
 
     if len(base_df) > 0:
         df_emo = df_emo + 1  # Normalization
