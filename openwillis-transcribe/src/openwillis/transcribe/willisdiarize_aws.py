@@ -6,7 +6,7 @@ import os
 import json
 import logging
 
-from openwillis.measures.text.util import diarization_utils as dutil
+from .util import diarization_utils as dutil
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger()

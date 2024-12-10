@@ -5,8 +5,8 @@
 import os
 import json
 import logging
-from openwillis.measures.audio.util import transcribe_util as tutil
-from openwillis.measures.text import willisdiarize_aws as wd
+from .util import transcribe_util as tutil
+from .willisdiarize_aws import diarization_correction_aws
 
 logging.basicConfig(level=logging.INFO)
 logger=logging.getLogger()
@@ -126,7 +126,7 @@ def speech_transcription_aws(s3_uri, **kwargs):
         return json_response, transcript, willisdiarize_status
 
     if input_param['language'].lower()[:2] == 'en' and input_param['willisdiarize_endpoint'].lower() not in ['', 'none']:
-        json_response, willisdiarize_status = wd.diarization_correction_aws(
+        json_response, willisdiarize_status = diarization_correction_aws(
             json_response, input_param['willisdiarize_endpoint'],
             parallel_processing=input_param['willisdiarize_parallel'],
             region=input_param['region'], access_key=input_param['access_key'],

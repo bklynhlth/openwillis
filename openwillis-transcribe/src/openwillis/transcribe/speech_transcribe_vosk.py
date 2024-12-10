@@ -9,7 +9,7 @@ import json
 
 from vosk import Model, KaldiRecognizer
 from pydub import AudioSegment
-from openwillis.measures.audio.util import util as ut
+from .util import util as ut
 
 logging.basicConfig(level=logging.INFO)
 logger=logging.getLogger()

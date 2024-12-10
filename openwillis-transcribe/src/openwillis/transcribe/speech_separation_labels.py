@@ -6,7 +6,8 @@ import os
 import json
 import logging
 
-from openwillis.measures.audio.util import separation_util as sutil
+from .util import separation_util as sutil
+from .commons import whisperx_to_dataframe, transcribe_response_to_dataframe
 from pydub import AudioSegment
 
 logging.basicConfig(level=logging.INFO)
@@ -85,9 +86,9 @@ def speaker_separation_labels(filepath, transcript_json, volume_normalization=No
 
         audio_signal = AudioSegment.from_file(file = filepath, format = "wav")
         if not is_amazon_transcribe(transcript_json):
-            speaker_df, speaker_count = sutil.whisperx_to_dataframe(transcript_json)
+            speaker_df, speaker_count = whisperx_to_dataframe(transcript_json)
         else:
-            speaker_df, speaker_count = sutil.transcribe_response_to_dataframe(transcript_json)
+            speaker_df, speaker_count = transcribe_response_to_dataframe(transcript_json)
             
         if len(speaker_df)>0 and speaker_count>1:
             combined_df = sutil.combine_turns(speaker_df)

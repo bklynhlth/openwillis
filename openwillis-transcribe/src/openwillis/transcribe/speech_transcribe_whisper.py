@@ -7,8 +7,8 @@ import os
 import json
 import logging
 
-from openwillis.measures.audio.util import transcribe_util as tutil
-from openwillis.measures.text import willisdiarize as wd
+from .util import transcribe_util as tutil
+from .willisdiarize import diarization_correction
 
 logging.basicConfig(level=logging.INFO)
 logger=logging.getLogger()
@@ -103,7 +103,7 @@ def run_whisperx(filepath, input_param):
     if os.path.exists(filepath)== False or input_param['hf_token'] == '':
         return json_response, transcript
     
-    from openwillis.measures.audio.util import whisperx_util as wutil #import in-case of model=whisperx
+    from .util import whisperx_util as wutil #import in-case of model=whisperx
     json_response, transcript = wutil.get_whisperx_diariazation(filepath, input_param)
     
     if str(json_response) != '{}':
@@ -144,7 +144,7 @@ def speech_transcription_whisper(filepath, **kwargs):
     json_response, transcript = run_whisperx(filepath, input_param)
 
     if input_param['language'].lower()[:2] == 'en' and input_param['willisdiarize'] != '':
-        json_response = wd.diarization_correction(json_response, input_param['willisdiarize'], huggingface_token=input_param['hf_token'])
+        json_response = diarization_correction(json_response, input_param['willisdiarize'], huggingface_token=input_param['hf_token'])
 
     if input_param['context'].lower() in measures['scale'].split(','):
         

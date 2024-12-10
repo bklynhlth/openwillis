@@ -7,8 +7,7 @@ import json
 import logging
 
 from pyannote.audio import Pipeline
-from openwillis.measures.audio.util import separation_util as sutil
-from openwillis.measures.commons.common import to_audio, from_audio
+from .util import separation_util as sutil
 from pydub import AudioSegment
 import pandas as pd
 
