@@ -26,8 +26,8 @@ def get_summary(df, start_at_col):
 
     df_summ = pd.DataFrame()
     if len(df.columns)>0:
-        df_mean = pd.DataFrame(df.mean()).T.iloc[:,start_at_col:].add_suffix('_mean')
-        df_std = pd.DataFrame(df.std()).T.iloc[:,start_at_col:].add_suffix('_std')
+        df_mean = pd.DataFrame(df.mean()).T.iloc[:, start_at_col:].add_suffix('_mean')
+        df_std = pd.DataFrame(df.std()).T.iloc[:, start_at_col:].add_suffix('_std')
 
         df_summ = pd.concat([df_mean, df_std], axis =1).reset_index(drop=True)
     return df_summ
