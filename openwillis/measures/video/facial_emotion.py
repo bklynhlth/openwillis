@@ -522,7 +522,7 @@ def emotional_expressivity(
             df_norm_emo[['frame','time']] = df_norm_emo[['frame','time']] + 1
 
             if split_by_speaking:
-                df_norm_emo['speaking_probability'] = df_norm_emo['speaking_probability'] + 1
+                df_norm_emo['speaking_probability'] += 1
 
         df_norm_emo.dropna(inplace=True)
 
