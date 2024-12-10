@@ -49,7 +49,7 @@ def extract_phonation(speaker_df):
     phonation_df = pd.DataFrame()
     for phonation in PHONATIONS:
         phonation_list = PHONATIONS[phonation]
-        phonation_df_temp = speaker_df_clean[speaker_df_clean['content'].isin(phonation_list)]
+        phonation_df_temp = speaker_df_clean[speaker_df_clean['content'].isin(phonation_list)].copy()
         if phonation_df_temp.empty:
             continue
 

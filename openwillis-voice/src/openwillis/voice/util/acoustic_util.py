@@ -9,7 +9,6 @@ import math
 import numpy as np
 import pandas as pd
 import scipy
-import numpy.matlib
 
 from parselmouth import Sound
 from parselmouth.praat import call
