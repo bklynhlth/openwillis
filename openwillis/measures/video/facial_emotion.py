@@ -132,7 +132,7 @@ def mouth_openness(
     return np.mean(lmk_dist)
 
 
-def detect_emotions(detector, frame, emo_cols, bb_dict={},threshold=.95):
+def detect_emotions(detector, frame, emo_cols, bb_dict={}, threshold=.95):
 
     faces, frame = get_faces(
         detector,
