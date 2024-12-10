@@ -66,7 +66,7 @@ def bb_dict_to_bb_list(bb_dict):
         1# this is to formatt bb_list to be compatible with pyfeat (this is face confidence)
         ]]]
 
-def get_faces(detector,frame,bb_dict,threshold=.95):
+def get_faces(detector, frame, bb_dict, threshold=.95):
     '''
     detect faces in frame if bb_dict is empty else use bb_dict
 
