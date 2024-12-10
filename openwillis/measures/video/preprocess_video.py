@@ -609,6 +609,7 @@ def create_single_face_output(
     cluster_df['cluster_presences'] = np.cumsum(
         cluster_df.sample_time.diff() > ((frames_per_row / fps)*1.5) # 1.5 is hacky but just gives rounding room for fps and frames per row
     )
+
     for _, presence_df in cluster_df.groupby('cluster_presences'):
         n_frames_present = len(presence_df) * frames_per_row
         if n_frames_present > min_frames_face_present:
@@ -691,7 +692,6 @@ def prep_face_clusters_for_output(
             interpolate=interpolate
         )
         
-        #ensure all frames are included
         out_df = out_df.merge(
             face_bbox_df,
             how='outer',
@@ -728,7 +728,7 @@ def preprocess_face_video(
     - capture_n_frames_per_second (int): Number of frames to capture per second. Increasing this parameter should increase the quality of clustering but will cause the function to run for longer. Default is 2.
     - model_name (str): Name of the face recognition model to use. Default is 'Facenet'.
     - detector_backend (str): Backend to use for face detection. Can be any model used in the Deepface library. Default is 'mtcnn'.
-    - face_threshold (float): Similarity threshold for clustering faces. Default is 0.95.
+    - face_threshold (float): Similarity threshold for identifying faces. Default is 0.95.
     - min_sec_face_present (int): Minimum number of seconds a face must be present after clustering to not be filtered out. Default is 3.
     - n_frames (int): Maximum number of frames to process. Default is np.inf (i.e. process all frames).
     - interpolate (bool): Whether to interpolate missing values in the bounding box data. Default is True.
