@@ -525,6 +525,7 @@ def emotional_expressivity(
                 df_norm_emo['speaking_probability'] += 1
 
         df_norm_emo.dropna(inplace=True)
+        df_norm_emo.reset_index(drop=True, inplace=True)
 
         return df_norm_emo, df_summ
 
