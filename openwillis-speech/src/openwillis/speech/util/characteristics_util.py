@@ -8,9 +8,9 @@ import itertools
 import pandas as pd
 import numpy as np
 import nltk
-from openwillis.measures.text.util.speech.pause import get_pause_feature
-from openwillis.measures.text.util.speech.lexical import get_repetitions, get_sentiment, get_pos_tag
-from openwillis.measures.text.util.speech.coherence import get_word_coherence, get_phrase_coherence
+from .speech.pause import get_pause_feature
+from .speech.lexical import get_repetitions, get_sentiment, get_pos_tag
+from .speech.coherence import get_word_coherence, get_phrase_coherence
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger()

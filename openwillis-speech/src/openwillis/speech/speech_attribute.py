@@ -8,7 +8,7 @@ import logging
 
 import numpy as np
 import pandas as pd
-from openwillis.measures.text.util import characteristics_util as cutil
+from .util import characteristics_util as cutil
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger()
