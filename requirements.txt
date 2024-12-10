@@ -23,3 +23,4 @@ disvoice==0.1.8
 librosa==0.10.1
 scikit-learn==1.5.2
 spacy==3.7.6
+pyfeat==0.6.2
