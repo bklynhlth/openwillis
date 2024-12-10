@@ -9,7 +9,7 @@ import cv2
 
 import feat
 from feat.utils import FEAT_EMOTION_COLUMNS
-from feat.pretrained import  AU_LANDMARK_MAP
+from feat.pretrained import AU_LANDMARK_MAP
 
 import os
 import json
@@ -66,7 +66,7 @@ def bb_dict_to_bb_list(bb_dict):
         1# this is to formatt bb_list to be compatible with pyfeat (this is face confidence)
         ]]]
 
-def get_faces(detector,frame,bb_dict,threshold=.95):
+def get_faces(detector, frame, bb_dict, threshold=.95):
     '''
     detect faces in frame if bb_dict is empty else use bb_dict
 
@@ -131,8 +131,7 @@ def mouth_openness(
         lmk_dist.append(np.sqrt((upper_lip_x - lower_lip_x)**2 + (upper_lip_y - lower_lip_y)**2))
     return np.mean(lmk_dist)
 
-
-def detect_emotions(detector, frame, emo_cols, bb_dict={},threshold=.95):
+def detect_emotions(detector, frame, emo_cols, bb_dict={}, threshold=.95):
 
     faces, frame = get_faces(
         detector,
@@ -144,7 +143,7 @@ def detect_emotions(detector, frame, emo_cols, bb_dict={},threshold=.95):
     #need to figure this out 
     # if frame == []:
     #     raise ValueError('No faces detected in frame')
-    if len(faces[0])<1:
+    if len(faces[0])<1 or np.isnan(faces[0][0][:4]).sum() == 4:
         raise ValueError('No faces detected in frame')
     
     landmarks = detector.detect_landmarks(
@@ -523,9 +522,10 @@ def emotional_expressivity(
             df_norm_emo[['frame','time']] = df_norm_emo[['frame','time']] + 1
 
             if split_by_speaking:
-                df_norm_emo['speaking_probability'] = df_norm_emo['speaking_probability'] + 1
+                df_norm_emo['speaking_probability'] += 1
 
         df_norm_emo.dropna(inplace=True)
+        df_norm_emo.reset_index(drop=True, inplace=True)
 
         return df_norm_emo, df_summ
 
