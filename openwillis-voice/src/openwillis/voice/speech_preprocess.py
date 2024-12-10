@@ -1,7 +1,6 @@
 # author:    Georgios Efstathiadis
 # website:   http://www.bklynhlth.com
 import logging
-import os
 
 import numpy as np
 from pydub import AudioSegment

@@ -8,10 +8,12 @@ import shutil
 import json
 import logging
 
-from openwillis.measures.audio.util import separation_util as sutil
-from openwillis.measures.audio.util import phonation_util as putil
-from openwillis.measures.audio.acoustic import vocal_acoustics
-from openwillis.measures.commons.common import to_audio
+from .util import phonation_util as putil
+from .acoustic import vocal_acoustics
+from .commons import (
+    to_audio, volume_normalization, whisperx_to_dataframe,
+    transcribe_response_to_dataframe, vosk_to_dataframe
+)
 from pydub import AudioSegment
 import pandas as pd
 
@@ -86,11 +88,11 @@ def phonation_extraction(filepath, transcript_json, speaker_label=''):
     try:
         audio_signal = AudioSegment.from_file(file = filepath, format = "wav")
         if is_whisper_transcribe(transcript_json):
-            speaker_df, _ = sutil.whisperx_to_dataframe(transcript_json)
+            speaker_df, _ = whisperx_to_dataframe(transcript_json)
         elif is_amazon_transcribe(transcript_json):
-            speaker_df, _ = sutil.transcribe_response_to_dataframe(transcript_json)
+            speaker_df, _ = transcribe_response_to_dataframe(transcript_json)
         else:
-            speaker_df = sutil.vosk_to_dataframe(transcript_json)
+            speaker_df = vosk_to_dataframe(transcript_json)
 
         if speaker_label:
             speaker_df = speaker_df[speaker_df['speaker_label']==speaker_label]
@@ -133,7 +135,7 @@ def clean_acoustic_df(df, file, duration, measures):
     ------------------------------------------------------------------------------------------------------
     """
     df[measures['phonation_type']] = file.split('_')[-1][0]
-    df = df[[measures['phonation_type']] + [col for col in df.columns if col != measures['phonation_type']]]
+    df = df[[measures['phonation_type']] + [col for col in df.columns if col != measures['phonation_type']]].copy()
     df.loc[:, measures['duration']] = duration
 
     # remove unused columns - pause related measures
@@ -191,7 +193,7 @@ def phonation_acoustics(audio_path, transcript_json, speaker_label=''):
             try:
                 # standardize volume level
                 audio_signal = AudioSegment.from_file(file = os.path.join(temp_dir, file), format = "wav")
-                audio_signal = sutil.volume_normalization(audio_signal, -20)
+                audio_signal = volume_normalization(audio_signal, -20)
                 audio_signal.export(os.path.join(temp_dir, file), format="wav")
 
                 # compute advanced vocal acoustics measures

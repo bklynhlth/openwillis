@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 from parselmouth.praat import run_file
 
-from openwillis.measures.audio.util import acoustic_util as autil
+from .util import acoustic_util as autil
 
 logging.basicConfig(level=logging.INFO)
 logger=logging.getLogger()
@@ -173,7 +173,7 @@ def calculate_glottal(audio_path):
 
     ------------------------------------------------------------------------------------------------------
     """
-    from openwillis.measures.audio.util import disvoice_util as dutil
+    from .util import disvoice_util as dutil
 
     glottal_features = dutil.extract_features_file(audio_path)
 
