@@ -9,7 +9,7 @@ import cv2
 
 import feat
 from feat.utils import FEAT_EMOTION_COLUMNS
-from feat.pretrained import  AU_LANDMARK_MAP
+from feat.pretrained import AU_LANDMARK_MAP
 
 import os
 import json
@@ -19,7 +19,7 @@ from openwillis.measures.video.util.speaking_utils import get_speaking_probabili
 from openwillis.measures.video.util.crop_utils import create_cropped_frame
 
 logging.basicConfig(level=logging.INFO)
-logger=logging.getLogger()
+logger = logging.getLogger()
 
 
 def bb_dict_to_bb_list(bb_dict):
@@ -28,7 +28,7 @@ def bb_dict_to_bb_list(bb_dict):
     Args:
         bb_dict (dict): A dictionary containing bounding box coordinates with keys 'bb_x', 'bb_y', 'bb_w', and 'bb_h'.
     Returns:
-        list: A nested list representing the bounding box in the format 
+        list: A nested list representing the bounding box in the format
               [[[bb_x, bb_y, bb_x + bb_w, bb_y + bb_h, 1]]], where 1 is the face confidence.
     """
 
@@ -37,7 +37,7 @@ def bb_dict_to_bb_list(bb_dict):
         bb_dict['bb_y'],
         bb_dict['bb_x'] + bb_dict['bb_w'],
         bb_dict['bb_y'] + bb_dict['bb_y'],
-        1# this is to formatt bb_list to be compatible with pyfeat (this is face confidence)
+        1  # this is to formatt bb_list to be compatible with pyfeat (this is face confidence)
         ]]]
 
 def mouth_openness(
@@ -58,7 +58,7 @@ def mouth_openness(
         A list containing the indices of the landmarks that make up the upper lip.
     lower_lip_lmks: list
         A list containing the indices of the landmarks that make up the lower lip.
-    
+
     Returns:
     ..........
     lmk_dist: float
@@ -91,7 +91,7 @@ def detect_emotions(detector, frame, emo_cols, threshold=.95):
         A list of column names for the facial emotion measures.
     threshold: float
         The threshold for face detection.
-    
+
     Returns:
     ..........
     df_emo: pandas dataframe
@@ -103,7 +103,7 @@ def detect_emotions(detector, frame, emo_cols, threshold=.95):
         frame,
         threshold=threshold,
     )
-    
+
     landmarks = detector.detect_landmarks(
         frame,
         detected_faces=faces
@@ -117,7 +117,7 @@ def detect_emotions(detector, frame, emo_cols, threshold=.95):
         landmarks
     )
 
-    emotions = emotions[0][0] * 100 # convert from 0-1 to 0-100
+    emotions = emotions[0][0] * 100  # convert from 0-1 to 0-100
     aus = aus[0][0]
     landmarks = landmarks[0][0]
 
@@ -167,7 +167,7 @@ def crop_and_detect_emotions(
     """
 
     if not np.isnan(bbox['bb_x']):
-        
+
         cropped_img = create_cropped_frame(
             img,
             bbox
@@ -183,8 +183,8 @@ def crop_and_detect_emotions(
 
     else:
 
-        df_emo = get_undected_emotion(frame, emo_cols,fps)
-    
+        df_emo = get_undected_emotion(frame, emo_cols, fps)
+
     return df_emo
 
 def run_pyfeat(path, skip_frames=5, bbox_list=[]):
@@ -210,7 +210,7 @@ def run_pyfeat(path, skip_frames=5, bbox_list=[]):
     """
 
     try:
-        #init pyfeat
+        # init pyfeat
         emo_cols = FEAT_EMOTION_COLUMNS + AU_LANDMARK_MAP['Feat']
         detector = feat.Detector()
 
@@ -218,16 +218,16 @@ def run_pyfeat(path, skip_frames=5, bbox_list=[]):
         num_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         len_bbox_list = len(bbox_list)
         fps = cap.get(cv2.CAP_PROP_FPS)
-        
+
         df_list = []
         frame = 0
         n_frames_skipped = skip_frames
 
-        bbox_list_passed = len_bbox_list>0
+        bbox_list_passed = len_bbox_list > 0
 
         if bbox_list_passed & (num_frames != len_bbox_list):
             raise ValueError('Number of frames in video and number of bounding boxes do not match')
-        
+
         while True:
 
             try:
@@ -245,7 +245,7 @@ def run_pyfeat(path, skip_frames=5, bbox_list=[]):
                     n_frames_skipped = 0
                     df_common = pd.DataFrame([[frame, frame/fps]], columns=['frame', 'time'])
                     # if there is a bounding box list crop the frame (or return a black frame)
-                    
+
                     if bbox_list_passed:
 
                         bbox = bbox_list[frame]
@@ -258,33 +258,32 @@ def run_pyfeat(path, skip_frames=5, bbox_list=[]):
                             frame,
                             df_common
                         )
-                    
+
                     else:
 
                         df_emo = detect_emotions(
                             detector,
                             img,
                             emo_cols
-                        ) 
+                        )
 
                         df_emotion = pd.concat([df_common, df_emo], axis=1)
-            
+
             except Exception as e:
                 logger.info(f'error processing frame: {frame} in file: {path} & Error: {e}')
                 df_emotion = get_undected_emotion(frame, emo_cols, fps)
-            
+
             df_list.append(df_emotion)
-            
-            frame +=1
+
+            frame += 1
 
     except Exception as e:
         logger.info(f'Face error process file in pyfeat for file:{path} & Error: {e}')
 
-
     finally:
-        #Empty dataframe in case of insufficient datapoints
-        if len(df_list)==0:
-            df_emotion = pd.DataFrame(columns= emo_cols)
+        # Empty dataframe in case of insufficient datapoints
+        if len(df_list) == 0:
+            df_emotion = pd.DataFrame(columns=emo_cols)
 
             df_list.append(df_emotion)
             logger.info(f'Face not detected by pyfeat in: {path}')
@@ -314,7 +313,7 @@ def get_undected_emotion(frame, cols, fps):
     df_common = pd.DataFrame([[frame, frame/fps]], columns=['frame', 'time'])
     value = [np.nan] * len(cols)
 
-    df = pd.DataFrame([value], columns = cols)
+    df = pd.DataFrame([value], columns=cols)
     df_emotion = pd.concat([df_common, df], axis=1)
     return df_emotion
 
@@ -347,7 +346,7 @@ def get_emotion(path, skip_frames=5, bbox_list=[]):
         skip_frames=skip_frames
     )
 
-    if len(emotion_list)>0:
+    if len(emotion_list) > 0:
         df_emo = pd.concat(emotion_list).reset_index(drop=True)
     else:
         df_emo = pd.DataFrame()
@@ -394,19 +393,19 @@ def baseline(
     df_emo.drop(columns=['frame', 'time', 'mouth_openness'], inplace=True)
 
     base_emo = get_emotion(
-        base_path, 
+        base_path,
         bbox_list=base_bbox_list,
         skip_frames=skip_frames
     )
 
     base_mean = base_emo.drop(
-        columns=['frame','time','mouth_openness']).mean() + 1 #Normalization
+        columns=['frame', 'time', 'mouth_openness']).mean() + 1  # Normalization
 
     base_df = pd.DataFrame(base_mean).T
     base_df = base_df[~base_df.isin([np.nan, np.inf, -np.inf]).any(1)]
 
-    if len(base_df)>0:
-        df_emo = df_emo + 1 #Normalization
+    if len(base_df) > 0:
+        df_emo = df_emo + 1  # Normalization
         df_emo = df_emo.div(base_df.iloc[0])
 
     df_emotion = pd.concat([df_common, df_emo], axis=1)
@@ -439,7 +438,7 @@ def split_speaking_df(df):
     not_speaking_df_summ = get_summary(not_speaking_df)
     speaking_df_summ = speaking_df_summ.add_suffix('_speaking')
     not_speaking_df_summ = not_speaking_df_summ.add_suffix('_not_speaking')
-    
+
     df_sum = pd.concat([speaking_df_summ, not_speaking_df_summ], axis=1)
     return df_sum
 
@@ -463,12 +462,12 @@ def get_summary(df):
     """
 
     df_summ = pd.DataFrame()
-    if len(df)>0:
-        
-        df_mean = pd.DataFrame(df.mean()).T.iloc[:,2:].add_suffix('_mean')
-        df_std = pd.DataFrame(df.std()).T.iloc[:,2:].add_suffix('_std')
+    if len(df) > 0:
 
-        df_summ = pd.concat([df_mean, df_std], axis =1).reset_index(drop=True)
+        df_mean = pd.DataFrame(df.mean()).T.iloc[:, 2:].add_suffix('_mean')
+        df_std = pd.DataFrame(df.std()).T.iloc[:, 2:].add_suffix('_std')
+
+        df_summ = pd.concat([df_mean, df_std], axis=1).reset_index(drop=True)
 
     return df_summ
 
@@ -527,15 +526,15 @@ def emotional_expressivity(
     ------------------------------------------------------------------------------------------------------
     """
     try:
-        
+
         df_emotion = get_emotion(
             filepath,
             bbox_list=bbox_list,
             skip_frames=skip_frames
         )
-        
+
         df_norm_emo = baseline(
-            df_emotion, 
+            df_emotion,
             baseline_filepath,
             base_bbox_list=base_bbox_list,
             skip_frames=skip_frames
