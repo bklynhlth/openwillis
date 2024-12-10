@@ -1,4 +1,4 @@
-from openwillis.measures.gps.geolocation_processing import (
+from .geolocation_processing import (
     gps_analysis,
 )
 
