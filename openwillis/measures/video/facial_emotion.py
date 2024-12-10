@@ -92,7 +92,7 @@ def get_faces(detector,frame,bb_dict,threshold=.95):
     
     faces = detector.detect_faces(
         frame,
-        threshold=.95,
+        threshold=threshold,
     )
 
     return (faces, frame)
