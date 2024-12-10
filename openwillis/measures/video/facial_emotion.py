@@ -239,7 +239,7 @@ def run_pyfeat(path, skip_frames=5, bbox_list=[]):
                 if n_frames_skipped < skip_frames:
 
                     n_frames_skipped += 1
-                    df_emotion = get_undected_emotion(frame, emo_cols,fps)
+                    df_emotion = get_undected_emotion(frame, emo_cols, fps)
 
                 elif n_frames_skipped == skip_frames:
                     n_frames_skipped = 0
