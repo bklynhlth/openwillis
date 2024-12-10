@@ -486,7 +486,7 @@ def emotional_expressivity(
                 df_norm_emo,
                 rolling_std_seconds
             )
-            df_summ = split_speaking_df(df_norm_emo,'speaking_probability', 2)
+            df_summ = split_speaking_df(df_norm_emo, 'speaking_probability', 2)
         else:
             df_summ = get_summary(df_norm_emo, 2)
 
