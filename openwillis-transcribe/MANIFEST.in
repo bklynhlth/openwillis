@@ -1,2 +1,2 @@
 include requirements.txt
-include src/openwillis_test/transcribe/config/speech.json
+include src/openwillis/transcribe/config/speech.json

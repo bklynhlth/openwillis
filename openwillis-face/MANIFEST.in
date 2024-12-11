@@ -1,4 +1,4 @@
 include requirements.txt
-include src/openwillis_test/face/config/facial.json
-include src/openwillis_test/face/config/preprocess.json
-include src/openwillis_test/face/config/eye.json
+include src/openwillis/face/config/facial.json
+include src/openwillis/face/config/preprocess.json
+include src/openwillis/face/config/eye.json
