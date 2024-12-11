@@ -233,7 +233,11 @@ def gps_stats(traj, df, frequency, timezone):
                 mean_dist_home,
             ]
 
-        df = pd.concat([df, pd.DataFrame([res], columns=df.columns)], ignore_index=True)
+        df = (
+            pd.DataFrame([res], columns=df.columns) if df.empty
+            else pd.concat([df, pd.DataFrame([res], columns=df.columns)], ignore_index=True)
+        )
+
 
     return df
 
