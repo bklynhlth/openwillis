@@ -1,0 +1,2 @@
+include requirements.txt
+include src/openwillis/transcribe/config/speech.json

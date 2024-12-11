@@ -1,0 +1,10 @@
+include requirements.txt
+include src/openwillis/voice/config/acoustic.json
+include src/openwillis/voice/util/praat_tremor/vocal_tremor.praat
+include src/openwillis/voice/util/praat_tremor/procedures/amptrem.praat
+include src/openwillis/voice/util/praat_tremor/procedures/coninout.praat
+include src/openwillis/voice/util/praat_tremor/procedures/freqtrem.praat
+include src/openwillis/voice/util/praat_tremor/procedures/readPitchOb.praat
+include src/openwillis/voice/util/praat_tremor/procedures/tremHNR.praat
+include src/openwillis/voice/util/praat_tremor/procedures/tremIntIndex.praat
+include src/openwillis/voice/util/praat_tremor/procedures/tremProdSum.praat

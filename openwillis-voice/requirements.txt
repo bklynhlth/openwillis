@@ -1,0 +1,7 @@
+#Python (3+)
+pandas==2.2.3
+praat-parselmouth==0.4.5
+pydub==0.25.1
+scipy==1.11.4
+disvoice==0.1.8
+librosa==0.10.2.post1
