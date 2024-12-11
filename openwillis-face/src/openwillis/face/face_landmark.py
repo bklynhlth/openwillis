@@ -553,7 +553,7 @@ def baseline(base_path, bbox_list=[], normalize=True, align=False):
     base_df = pd.DataFrame(base_mean).T
     base_df = base_df[~base_df.isin([np.nan, np.inf, -np.inf])]
 
-    base_df = base_df + 1 #Normalization
+    base_df += 1 #Normalization
     return base_df
 
 def get_empty_dataframe():

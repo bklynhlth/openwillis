@@ -399,11 +399,11 @@ def baseline(
     base_mean = base_emo.drop(
         columns=['frame', 'time', 'mouth_openness']).mean() + 1  # Normalization
 
-    base_df = pd.DataFrame(base_mean)
+    base_df = pd.DataFrame(base_mean).T
     base_df = base_df[~base_df.isin([np.nan, np.inf, -np.inf])]
 
     if len(base_df) > 0:
-        df_emo = df_emo + 1  # Normalization
+        df_emo += 1  # Normalization
         df_emo = df_emo.div(base_df.iloc[0])
 
     df_emotion = pd.concat([df_common, df_emo], axis=1)
