@@ -7,6 +7,7 @@ import json
 import math
 
 import numpy as np
+import numpy.matlib
 import pandas as pd
 import scipy
 
@@ -469,7 +470,7 @@ def cpp(x, fs, normOpt, dBScaleOpt):
         w_rev = w[::-1]
         return np.concatenate((w, w_rev[int((np.ceil(N%2))):]))
     win = hanning(frame_len)
-    winmat = np.matlib.repmat(win, N, 1).transpose()
+    winmat = numpy.matlib.repmat(win, N, 1).transpose()
     frameMat = frameMat[0:frame_len, :]*winmat
     
     # Cepstrum
