@@ -6,7 +6,7 @@ on:
       - main
 
 jobs:
-  build-and-publish-openwillis:
+  build-and-publish:
     runs-on: ubuntu-latest
 
     steps:
@@ -23,160 +23,75 @@ jobs:
           python -m pip install --upgrade pip
           pip install build twine
 
-      - name: Build package
+      - name: Build package openwillis
         run: |
           cp README.md openwillis/
           cd openwillis
           python -m build
 
-      - name: Publish package
+      - name: Publish package openwillis
         env:
           TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
           TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
         run: |
           python -m twine upload openwillis/dist/*
 
-  build-and-publish-openwillis-face:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
-
-      - name: Set up Python
-        uses: actions/setup-python@v2
-        with:
-          python-version: '3.10.12'  # Specify the Python version you want to use
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install build twine
-
-      - name: Build package
+      - name: Build package openwillis-face
         run: |
           cd openwillis-face
           python -m build
 
-      - name: Publish package
+      - name: Publish package openwillis-face
         env:
           TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
           TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
         run: |
           python -m twine upload openwillis-face/dist/*
 
-  build-and-publish-openwillis-gps:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
-
-      - name: Set up Python
-        uses: actions/setup-python@v2
-        with:
-          python-version: '3.10.12'  # Specify the Python version you want to use
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install build twine
-
-      - name: Build package
+      - name: Build package openwillis-gps
         run: |
           cd openwillis-gps
           python -m build
 
-      - name: Publish package
+      - name: Publish package openwillis-gps
         env:
           TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
           TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
         run: |
           python -m twine upload openwillis-gps/dist/*
 
-  build-and-publish-openwillis-speech:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
-
-      - name: Set up Python
-        uses: actions/setup-python@v2
-        with:
-          python-version: '3.10.12'  # Specify the Python version you want to use
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install build twine
-
-      - name: Build package
+      - name: Build package openwillis-speech
         run: |
           cd openwillis-speech
           python -m build
 
-      - name: Publish package
+      - name: Publish package openwillis-speech
         env:
           TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
           TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
         run: |
           python -m twine upload openwillis-speech/dist/*
 
-  build-and-publish-openwillis-transcribe:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
-
-      - name: Set up Python
-        uses: actions/setup-python@v2
-        with:
-          python-version: '3.10.12'  # Specify the Python version you want to use
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install build twine
-
-      - name: Build package
+      - name: Build package openwillis-transcribe
         run: |
           cp -r commons/ openwillis-transcribe/src/openwillis/transcribe/commons/
           cd openwillis-transcribe
           python -m build
 
-      - name: Publish package
+      - name: Publish package openwillis-transcribe
         env:
           TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
           TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
         run: |
           python -m twine upload openwillis-transcribe/dist/*
 
-  build-and-publish-openwillis-voice:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
-
-      - name: Set up Python
-        uses: actions/setup-python@v2
-        with:
-          python-version: '3.10.12'  # Specify the Python version you want to use
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install build twine
-
-      - name: Build package
+      - name: Build package openwillis-voice
         run: |
           cp -r commons/ openwillis-voice/src/openwillis/voice/commons/
           cd openwillis-voice
           python -m build
 
-      - name: Publish package
+      - name: Publish package openwillis-voice
         env:
           TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
           TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
