@@ -1,0 +1,14 @@
+{
+    "rgb_back_ends":["mediapipe"],
+    "bbox_dict_cols":[
+        "bb_x",
+        "bb_y",
+        "bb_w",
+        "bb_h",
+        "right_eye_x",
+        "right_eye_y",
+        "left_eye_x",
+        "left_eye_y",
+        "frame_idx"
+    ]
+}

@@ -1,0 +1,3 @@
+include requirements.txt
+include src/openwillis/transcribe/config/speech.json
+include src/openwillis/transcribe/config/whisper_asr.json

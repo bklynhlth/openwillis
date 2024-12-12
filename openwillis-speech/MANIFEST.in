@@ -1,0 +1,3 @@
+include requirements.txt
+include src/openwillis/speech/config/speech.json
+include src/openwillis/speech/config/text.json

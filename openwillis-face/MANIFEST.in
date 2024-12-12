@@ -1,0 +1,4 @@
+include requirements.txt
+include src/openwillis/face/config/facial.json
+include src/openwillis/face/config/preprocess.json
+include src/openwillis/face/config/eye.json

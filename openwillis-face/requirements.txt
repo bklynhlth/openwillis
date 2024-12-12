@@ -1,0 +1,12 @@
+#Python (3+)
+tensorflow==2.15.1
+mediapipe==0.10.18
+opencv-python==4.10.0.84
+protobuf==4.25.5
+pandas==2.2.3
+protobuf3-to-dict==0.1.5
+deepface==0.0.93
+scipy==1.11.4
+scikit-learn==1.5.2
+tf-keras==2.15.1
+py-feat==0.6.2
