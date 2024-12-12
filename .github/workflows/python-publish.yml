@@ -34,7 +34,7 @@ jobs:
           TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
           TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
         run: |
-          python -m twine upload dist/*
+          python -m twine upload openwillis/dist/*
 
   build-and-publish-openwillis-face:
     runs-on: ubuntu-latest
@@ -63,7 +63,7 @@ jobs:
           TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
           TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
         run: |
-          python -m twine upload dist/*
+          python -m twine upload openwillis-face/dist/*
 
   build-and-publish-openwillis-gps:
     runs-on: ubuntu-latest
@@ -92,7 +92,7 @@ jobs:
           TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
           TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
         run: |
-          python -m twine upload dist/*
+          python -m twine upload openwillis-gps/dist/*
 
   build-and-publish-openwillis-speech:
     runs-on: ubuntu-latest
@@ -121,7 +121,7 @@ jobs:
           TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
           TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
         run: |
-          python -m twine upload dist/*
+          python -m twine upload openwillis-speech/dist/*
 
   build-and-publish-openwillis-transcribe:
     runs-on: ubuntu-latest
@@ -151,7 +151,7 @@ jobs:
           TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
           TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
         run: |
-          python -m twine upload dist/*
+          python -m twine upload openwillis-transcribe/dist/*
 
   build-and-publish-openwillis-voice:
     runs-on: ubuntu-latest
@@ -181,4 +181,4 @@ jobs:
           TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
           TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
         run: |
-          python -m twine upload dist/*
+          python -m twine upload openwillis-voice/dist/*
