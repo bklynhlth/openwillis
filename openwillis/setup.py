@@ -18,10 +18,10 @@ setup(
     author_email='admin@bklynhlth.com',
     license='Apache',
     install_requires=[
-        'openwillis-voice==1.0.0',
-        'openwillis-transcribe==1.0.0',
+        'openwillis-voice==1.0.1',
+        'openwillis-transcribe==1.0.1',
         'openwillis-gps==1.0.0',
         'openwillis-speech==1.0.0',
-        'openwillis-face==1.0.0',
+        'openwillis-face==1.0.1',
     ],
 )
