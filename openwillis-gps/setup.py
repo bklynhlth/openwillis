@@ -4,7 +4,7 @@ with open("requirements.txt", "r") as fp:
     install_requires = fp.read()
 
 setup(
-    name='openwillis_test-gps',
+    name='openwillis-gps',
     version='1.0.0',
     description='digital health measurement',
     long_description_content_type="text/markdown",

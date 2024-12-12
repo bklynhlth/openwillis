@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
     long_description = fh.read()
 
 setup(
-    name='openwillis_test',
+    name='openwillis',
     version='3.0.0',
     description='digital health measurement',
     long_description=long_description,
@@ -18,10 +18,10 @@ setup(
     author_email='admin@bklynhlth.com',
     license='Apache',
     install_requires=[
-        'openwillis_test-voice==1.0.0',
-        'openwillis_test-transcribe==1.0.0',
-        'openwillis_test-gps==1.0.0',
-        'openwillis_test-speech==1.0.0',
-        'openwillis_test-face==1.0.0',
+        'openwillis-voice==1.0.0',
+        'openwillis-transcribe==1.0.0',
+        'openwillis-gps==1.0.0',
+        'openwillis-speech==1.0.0',
+        'openwillis-face==1.0.0',
     ],
 )
