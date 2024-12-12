@@ -9,8 +9,11 @@ from whisperx.vad import load_vad_model
 from whisperx.asr import FasterWhisperPipeline, WhisperModel
 from typing import Optional
 
+import os
 import json
 import logging
+
+from ..commons import get_config
 
 logging.basicConfig(level=logging.INFO)
 logger=logging.getLogger()
@@ -227,36 +230,7 @@ def load_model(whisper_arch,
         print("No language specified, language will be first be detected for each audio file (increases inference time).")
         tokenizer = None
 
-    default_asr_options =  {
-        "beam_size": 5,
-        "best_of": 5,
-        "patience": 1,
-        "length_penalty": 1,
-        "repetition_penalty": 1,
-        "no_repeat_ngram_size": 0,
-        "temperatures": [0.0, 0.2, 0.4, 0.6, 0.8, 1.0],
-        "compression_ratio_threshold": 2.4,
-        "log_prob_threshold": -1.0,
-        "no_speech_threshold": 0.6,
-        "condition_on_previous_text": False,
-        "prompt_reset_on_temperature": 0.5,
-        "initial_prompt": None,
-        "prefix": None,
-        "suppress_blank": True,
-        "suppress_tokens": [-1],
-        "without_timestamps": True,
-        "max_initial_timestamp": 0.0,
-        "word_timestamps": False,
-        "prepend_punctuations": "\"'“¿([{-",
-        "append_punctuations": "\"'.。,，!！?？:：”)]}、",
-        "multilingual": False,
-        "suppress_numerals": False,
-        "max_new_tokens": None,
-        "clip_timestamps": None,
-        "hallucination_silence_threshold": None,
-        "hotwords": None
-    }
-
+    default_asr_options =  get_config(os.path.dirname(os.path.abspath(__file__)), 'whisper_asr.json')
     if asr_options is not None:
         default_asr_options.update(asr_options)
 

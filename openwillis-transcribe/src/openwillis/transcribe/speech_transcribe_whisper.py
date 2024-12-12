@@ -7,37 +7,13 @@ import os
 import json
 import logging
 
+from .commons import get_config
 from .util import transcribe_util as tutil
 from .willisdiarize import diarization_correction
 
 logging.basicConfig(level=logging.INFO)
 logger=logging.getLogger()
 
-
-def get_config():
-    """
-    ------------------------------------------------------------------------------------------------------
-
-    Load the configuration settings for the speech transcription.
-
-    Parameters:
-    ...........
-    None
-
-    Returns:
-    ...........
-    measures : dict
-        A dictionary containing the configuration settings.
-
-    ------------------------------------------------------------------------------------------------------
-    """
-    #Loading json config
-    dir_name = os.path.dirname(os.path.abspath(__file__))
-    measure_path = os.path.abspath(os.path.join(dir_name, 'config/speech.json'))
-
-    file = open(measure_path)
-    measures = json.load(file)
-    return measures
 
 def read_kwargs(kwargs):
     """
@@ -138,7 +114,7 @@ def speech_transcription_whisper(filepath, **kwargs):
 
     ------------------------------------------------------------------------------------------------------
     """
-    measures = get_config()
+    measures = get_config(os.path.abspath(__file__), 'speech.json')
     input_param = read_kwargs(kwargs)
     
     json_response, transcript = run_whisperx(filepath, input_param)
