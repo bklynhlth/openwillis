@@ -1,0 +1,11 @@
+#Python (3+)
+vaderSentiment==3.3.2
+nltk==3.9.1
+lexicalrichness==0.5.1
+pandas==2.2.3
+pytest==8.3.4
+transformers==4.46.3
+sentence-transformers==3.3.1
+huggingface-hub==0.26.3
+spacy==3.7.5
+tf-keras<=2.18.0,>=2.15.1

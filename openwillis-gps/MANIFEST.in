@@ -1,0 +1,2 @@
+include requirements.txt
+include src/openwillis/gps/config/gps.json
