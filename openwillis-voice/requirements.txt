@@ -5,3 +5,4 @@ pydub==0.25.1
 scipy==1.11.4
 disvoice==0.1.8
 librosa==0.10.2.post1
+numpy<1.28.0,>=1.23.5
