@@ -10,3 +10,4 @@ scipy==1.11.4
 scikit-learn==1.5.2
 tf-keras==2.15.1
 py-feat==0.6.2
+numpy==1.23.5
