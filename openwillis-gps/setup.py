@@ -5,7 +5,7 @@ with open("requirements.txt", "r") as fp:
 
 setup(
     name='openwillis-gps',
-    version='1.0.0',
+    version='1.0.2',
     description='digital health measurement',
     long_description_content_type="text/markdown",
     url='https://github.com/bklynhlth/openwillis',
