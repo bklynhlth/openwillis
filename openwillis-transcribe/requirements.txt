@@ -9,8 +9,5 @@ pyannote.audio==3.3.2
 huggingface-hub==0.26.3
 pydub==0.25.1
 tf-keras<=2.18.0,>=2.15.1
-faster-whisper==1.1.0
-torchaudio==2.5.1
-pandas==2.2.3
-nltk==3.9.1
+whisperx==3.3.0
 numpy<1.28.0,>=1.23.5
