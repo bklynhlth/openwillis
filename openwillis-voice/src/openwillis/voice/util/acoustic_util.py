@@ -37,10 +37,13 @@ def common_summary(df, col_name):
 
     ------------------------------------------------------------------------------------------------------
     """
-    mean = df.mean()
-    std = df.std()
-    min_val = df.min()
-    max_val = df.max()
+    df2 = df.copy()
+    df2 = df2[(df2[col_name].notnull()) & (df2[col_name] != 0)]
+
+    mean = df2.mean()
+    std = df2.std()
+    min_val = df2.min()
+    max_val = df2.max()
     range_val = max_val - min_val
 
     values = [mean, std, range_val]
