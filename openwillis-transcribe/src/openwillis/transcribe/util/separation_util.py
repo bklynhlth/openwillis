@@ -178,6 +178,36 @@ def get_diart_interval(diarization):
     df = prepare_diart_interval(start_time, end_time, speaker_list)
     return df
 
+def get_embedding_model(context_model):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    This function takes in a string containing the name of the embedding model to be used and returns
+    the corresponding pre-trained model and tokenizer.
+
+    Parameters:
+    ----------
+    context_model : str
+        A string containing the name of the embedding model to be used.
+
+    Returns:
+    -------
+    model : SentenceTransformer or AutoModel
+        A pre-trained sentence transformer model.
+    tokenizer : AutoTokenizer
+        A pre-trained tokenizer for the model.
+
+    ------------------------------------------------------------------------------------------------------
+    """
+    if context_model == 'sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2':
+        model = SentenceTransformer(context_model)
+        tokenizer = None
+    else:
+        tokenizer = AutoTokenizer.from_pretrained(context_model)
+        model = AutoModel.from_pretrained(context_model)
+
+    return model, tokenizer
+
 def get_patient_rater_label(df, measures, scale, signal, context_model):
     """
     ------------------------------------------------------------------------------------------------------
@@ -217,12 +247,7 @@ def get_patient_rater_label(df, measures, scale, signal, context_model):
     
     score_string = scale.lower()+'_string'
 
-    if context_model == 'sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2':
-        tokenizer = None
-        model = SentenceTransformer(context_model)
-    else:
-        tokenizer = AutoTokenizer.from_pretrained(context_model)
-        model = AutoModel.from_pretrained(context_model)
+    model, tokenizer = get_embedding_model(context_model)
 
     spk1_score = match_transcript(measures[score_string], spk1_txt, model, tokenizer)
     spk2_score = match_transcript(measures[score_string], spk2_txt, model, tokenizer)
