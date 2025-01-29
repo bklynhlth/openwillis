@@ -195,7 +195,7 @@ def exponential_backoff_decorator(max_retries, base_delay):
     return decorator
 
 @exponential_backoff_decorator(max_retries=3, base_delay=90)
-def get_clinical_labels(scale, measures, content_dict, json_response):
+def get_clinical_labels(scale, measures, content_dict, json_response, context_model):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -211,6 +211,8 @@ def get_clinical_labels(scale, measures, content_dict, json_response):
         A dictionary containing speaker-based content.
     json_response: json
         Speech transcription response
+    context_model: str
+        A string containing the name of the embedding model to be used.
 
     Returns:
     ...........
@@ -222,10 +224,12 @@ def get_clinical_labels(scale, measures, content_dict, json_response):
     #Check if content is available for all the speaker
     if len(content_dict) <2:
         return json_response
-        
+
+    model, tokenizer = sutil.get_embedding_model(context_model)
+
     score_string = scale.lower()+'_string'
-    spk1_score = sutil.match_transcript(measures[score_string], content_dict['speaker0'])
-    spk2_score = sutil.match_transcript(measures[score_string], content_dict['speaker1'])
+    spk1_score = sutil.match_transcript(measures[score_string], content_dict['speaker0'], model, tokenizer)
+    spk2_score = sutil.match_transcript(measures[score_string], content_dict['speaker1'], model, tokenizer)
 
     if spk1_score > spk2_score:
         json_response = replace_speaker_labels(json_response, ['speaker0', 'speaker1'], ['clinician', 'participant'])
@@ -427,7 +431,7 @@ def replace_whisperx_speaker_labels(json_data, check_label, replace_label):
 
     return updated_data
 
-def get_whisperx_clinical_labels(scale, measures, content_dict, json_response):
+def get_whisperx_clinical_labels(scale, measures, content_dict, json_response, context_model):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -443,6 +447,8 @@ def get_whisperx_clinical_labels(scale, measures, content_dict, json_response):
         A dictionary containing speaker-based content.
     json_response: json
         Speech transcription response
+    context_model: str
+        A string containing the name of the embedding model to be used.
 
     Returns:
     ...........
@@ -454,10 +460,12 @@ def get_whisperx_clinical_labels(scale, measures, content_dict, json_response):
     #Check if content is available for all the speaker
     if len(content_dict) <2:
         return json_response
-    
+
+    model, tokenizer = sutil.get_embedding_model(context_model)
+
     score_string = scale.lower()+'_string'
-    spk1_score = sutil.match_transcript(measures[score_string], content_dict['speaker0'])
-    spk2_score = sutil.match_transcript(measures[score_string], content_dict['speaker1'])
+    spk1_score = sutil.match_transcript(measures[score_string], content_dict['speaker0'], model, tokenizer)
+    spk2_score = sutil.match_transcript(measures[score_string], content_dict['speaker1'], model, tokenizer)
     
     if spk1_score > spk2_score:
         json_response = replace_whisperx_speaker_labels(json_response, ['speaker0', 'speaker1'], ['clinician', 'participant'])

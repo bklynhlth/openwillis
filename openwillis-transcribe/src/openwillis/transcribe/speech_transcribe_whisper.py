@@ -38,6 +38,7 @@ def read_kwargs(kwargs):
     input_param['language'] = kwargs.get('language', 'en')
     
     input_param['context'] = kwargs.get('context', '')
+    input_param['context_model'] = kwargs.get('context_model', 'sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2')
     input_param['max_speakers'] = kwargs.get('max_speakers', None)
     input_param['min_speakers'] = kwargs.get('min_speakers', None)
 
@@ -122,8 +123,8 @@ def speech_transcription_whisper(filepath, **kwargs):
     if input_param['language'].lower()[:2] == 'en' and input_param['willisdiarize'] != '':
         json_response = diarization_correction(json_response, input_param['willisdiarize'], huggingface_token=input_param['hf_token'])
 
-    if input_param['context'].lower() in measures['scale'].split(','):
-        
+    if input_param['context'].lower() in measures['scale'].split(',') and input_param['context_model'] in measures['embedding_models']:
         content_dict = tutil.get_whisperx_content(json_response)
-        json_response = tutil.get_whisperx_clinical_labels(input_param['context'], measures, content_dict, json_response)
+        json_response = tutil.get_whisperx_clinical_labels(input_param['context'], measures, content_dict, json_response, input_param['context_model'])
+
     return json_response, transcript
