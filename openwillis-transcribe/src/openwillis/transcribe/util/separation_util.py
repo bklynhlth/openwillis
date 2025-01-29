@@ -40,7 +40,7 @@ def get_similarity_prob(sentence_embeddings):
     prob = pscore[0][0]
     return prob
 
-def match_transcript(sigma_string, speech):
+def match_transcript(sigma_string, speech, embedding_model='sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2'):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -54,6 +54,8 @@ def match_transcript(sigma_string, speech):
         a string of sigma script
     speech : str
         a string containing the speech to be matched with the PANSS or MADRS script sentences
+    embedding_model : str
+        a string containing the name of the embedding model to be used
 
     Returns:
     ...........
@@ -64,7 +66,7 @@ def match_transcript(sigma_string, speech):
     """
     prob_list = []
 
-    model = SentenceTransformer('sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2')
+    model = SentenceTransformer(embedding_model)
     sigma_script = sigma_string.split(',')
 
     for script in sigma_script:
@@ -147,7 +149,7 @@ def get_diart_interval(diarization):
     df = prepare_diart_interval(start_time, end_time, speaker_list)
     return df
 
-def get_patient_rater_label(df, measures, scale, signal):
+def get_patient_rater_label(df, measures, scale, signal, context_model):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -164,6 +166,8 @@ def get_patient_rater_label(df, measures, scale, signal):
         A clinical scale.
     signal : list
         A list of audio signals.
+    context_model : str
+        A string containing the name of the embedding model to be used.
 
     Returns:
     -------
@@ -183,9 +187,10 @@ def get_patient_rater_label(df, measures, scale, signal):
         return signal
     
     score_string = scale.lower()+'_string'
-    spk1_score = match_transcript(measures[score_string], spk1_txt)
-    
-    spk2_score = match_transcript(measures[score_string], spk2_txt)
+
+    spk1_score = match_transcript(measures[score_string], spk1_txt, context_model)
+    spk2_score = match_transcript(measures[score_string], spk2_txt, context_model)
+
     signal_label = {'clinician': signal['speaker1'], 'participant':signal['speaker0']}
 
     if spk1_score > spk2_score:
@@ -229,7 +234,7 @@ def get_segment_signal(audio_signal, df):
 
     return signal_dict
 
-def generate_audio_signal(df, audio_signal, scale, measures):
+def generate_audio_signal(df, audio_signal, scale, context_model, measures):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -243,6 +248,8 @@ def generate_audio_signal(df, audio_signal, scale, measures):
         The original audio signal.
     scale : str
         A clinical scale
+    context_model : str
+        A string containing the name of the embedding model to be used.
     measures : dict
         A config dictionary.
 
@@ -259,7 +266,7 @@ def generate_audio_signal(df, audio_signal, scale, measures):
     signal_dict = get_segment_signal(audio_signal, df)
     signal_dict = {key: np.concatenate(value) for key, value in signal_dict.items()}
 
-    signal_label = get_patient_rater_label(df, measures, scale, signal_dict)
+    signal_label = get_patient_rater_label(df, measures, scale, signal_dict, context_model)
     return signal_label
 
 def get_speaker_identification(df1, df2):
