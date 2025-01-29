@@ -117,6 +117,10 @@ def speech_transcription_whisper(filepath, **kwargs):
     """
     measures = get_config(os.path.abspath(__file__), 'speech.json')
     input_param = read_kwargs(kwargs)
+
+    if not os.path.exists(filepath):
+        logger.error("File path does not exist")
+        return {}, ''
     
     json_response, transcript = run_whisperx(filepath, input_param)
 
