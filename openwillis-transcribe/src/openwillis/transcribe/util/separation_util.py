@@ -10,42 +10,75 @@ import logging
 import shutil
 
 from sentence_transformers import SentenceTransformer
-from sklearn.metrics.pairwise import cosine_similarity
 from pydub import AudioSegment
+from transformers import AutoTokenizer, AutoModel
+import torch
+import torch.nn.functional as F
 from ..commons import to_audio, from_audio, volume_normalization
 
 logging.basicConfig(level=logging.INFO)
 logger=logging.getLogger()
 
-def get_similarity_prob(sentence_embeddings):
+def average_pool(last_hidden_states, attention_mask):
     """
     ------------------------------------------------------------------------------------------------------
-
-    This function takes in a list of sentence embeddings and computes the cosine similarity between them,
-    and returns the similarity score as a float.
-
+    
+    This function takes in the last hidden states and attention mask of a transformer model, and computes
+    the average pooling of the last hidden states based on the attention mask.
+    
     Parameters:
     ...........
-    sentence_embeddings : list
-        a list of sentence embeddings as numpy arrays
-
+    last_hidden_states : torch.Tensor
+        The last hidden states of the transformer model.
+    attention_mask : torch.Tensor
+        The attention mask of the transformer model.
+    
     Returns:
     ...........
-    prob : float
-        a float value representing the cosine similarity between the two input sentence embeddings
-
+    last_hidden : torch.Tensor
+        The average pooled last hidden states of the transformer model.
+    
     ------------------------------------------------------------------------------------------------------
     """
-    pscore = cosine_similarity([sentence_embeddings[0]],[sentence_embeddings[1]])
-    prob = pscore[0][0]
-    return prob
+    last_hidden = last_hidden_states.masked_fill(~attention_mask[..., None].bool(), 0.0)
+    return last_hidden.sum(dim=1) / attention_mask.sum(dim=1)[..., None]
 
-def match_transcript(sigma_string, speech, embedding_model='sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2'):
+def get_embeddings(model, tokenizer, sentences):
+    if tokenizer is None:
+        embeddings = model.encode(sentences, normalize_embeddings=True)
+        embeddings = np.array(embeddings)
+    else:
+        sentences[0] = f'Instruct: Retrieve semantically similar text.\nQuery: {sentences[0]}'
+
+        embeddings = []
+        batch_size = 8 
+        for i in range(0, len(sentences), batch_size):
+            sen_list2 = sentences[i:i+batch_size]
+            batch_dict = tokenizer(sen_list2, max_length=512, padding=True, truncation=True, return_tensors='pt')
+
+            with torch.no_grad():
+                outputs = model(**batch_dict)
+            embeddings2 = average_pool(outputs.last_hidden_state, batch_dict['attention_mask'])
+
+            embeddings2 = F.normalize(embeddings2, p=2, dim=1)
+            if len(embeddings) == 0:
+                embeddings = embeddings2
+            else:
+                embeddings = torch.cat((embeddings, embeddings2), dim=0)
+
+            del outputs, embeddings2
+            torch.cuda.empty_cache()
+
+        embeddings = embeddings.cpu().detach().numpy()
+
+    return embeddings
+
+def match_transcript(sigma_string, speech, model, tokenizer):
     """
     ------------------------------------------------------------------------------------------------------
 
-    The function uses a pre-trained BERT-based sentence transformer model to compute the similarity between
-    the speech and a list of pre-defined PANSS or MADRS script sentences. It
+    The function uses a pre-trained sentence transformer model to compute the similarity between
+    the speech and a list of pre-defined script sentences. It
     returns the average similarity score of the top 5 matches.
 
     Parameters:
@@ -53,9 +86,11 @@ def match_transcript(sigma_string, speech, embedding_model='sentence-transformer
     sigma_string : str
         a string of sigma script
     speech : str
-        a string containing the speech to be matched with the PANSS or MADRS script sentences
-    embedding_model : str
-        a string containing the name of the embedding model to be used
+        a string containing the speech to be matched with the script sentences
+    model : SentenceTransformer or AutoModel
+        a pre-trained sentence transformer model
+    tokenizer : AutoTokenizer
+        a pre-trained tokenizer for the model
 
     Returns:
     ...........
@@ -64,20 +99,14 @@ def match_transcript(sigma_string, speech, embedding_model='sentence-transformer
 
     ------------------------------------------------------------------------------------------------------
     """
-    prob_list = []
-
-    model = SentenceTransformer(embedding_model)
     sigma_script = sigma_string.split(',')
+    sen_list = [speech] + sigma_script
 
-    for script in sigma_script:
-        sen_list = [script, speech]
+    sentence_embeddings = get_embeddings(model, tokenizer, sen_list)
+    probs = sentence_embeddings[:1] @ sentence_embeddings[1:].T
 
-        sentence_embeddings = model.encode(sen_list)
-        prob = get_similarity_prob(sentence_embeddings)
-        prob_list.append(prob)
-
-    prob_list.sort(reverse=True)
-    match_score = np.mean(prob_list[:5]) #top 5 probability score
+    top_5 = np.argsort(probs[0])[-5:]
+    match_score = np.mean(probs[0][top_5])
     return match_score
 
 def prepare_diart_interval(start_time, end_time, speaker_list):
@@ -188,8 +217,15 @@ def get_patient_rater_label(df, measures, scale, signal, context_model):
     
     score_string = scale.lower()+'_string'
 
-    spk1_score = match_transcript(measures[score_string], spk1_txt, context_model)
-    spk2_score = match_transcript(measures[score_string], spk2_txt, context_model)
+    if context_model == 'sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2':
+        tokenizer = None
+        model = SentenceTransformer(context_model)
+    else:
+        tokenizer = AutoTokenizer.from_pretrained(context_model)
+        model = AutoModel.from_pretrained(context_model)
+
+    spk1_score = match_transcript(measures[score_string], spk1_txt, model, tokenizer)
+    spk2_score = match_transcript(measures[score_string], spk2_txt, model, tokenizer)
 
     signal_label = {'clinician': signal['speaker1'], 'participant':signal['speaker0']}
 
