@@ -38,7 +38,7 @@ def common_summary(df, col_name):
     ------------------------------------------------------------------------------------------------------
     """
     df2 = df.copy()
-    df2 = df2[(df2[col_name].notnull()) & (df2[col_name] != 0)]
+    df2 = df2[(df2.notnull()) & (df2 != 0)]
 
     mean = df2.mean()
     std = df2.std()
