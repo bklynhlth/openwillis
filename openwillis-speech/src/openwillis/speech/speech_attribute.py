@@ -83,7 +83,7 @@ def is_whisper_transcribe(json_conf):
                 return True
     return False
 
-def filter_transcribe(json_conf, measures):
+def filter_transcribe(json_conf, language, measures):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -94,6 +94,8 @@ def filter_transcribe(json_conf, measures):
     ...........
     json_conf: dict
         aws transcribe json response.
+    language: str
+        Language type
     measures: dict
         A dictionary containing the names of the columns in the output dataframes.
 
@@ -112,7 +114,7 @@ def filter_transcribe(json_conf, measures):
     for i, item in enumerate(item_data): # create_index_column
         item[measures["old_index"]] = i
 
-    utterances = cutil.create_turns_aws(item_data, measures)
+    utterances = cutil.create_turns_aws(item_data, language, measures)
 
     filter_json = cutil.filter_json_transcribe_aws(item_data, measures)
 
@@ -296,7 +298,7 @@ def process_transcript(df_list, json_conf, measures, min_turn_length, min_cohere
         info = filter_whisper(json_conf, measures)
 
     elif source == 'aws':
-        info = filter_transcribe(json_conf, measures)
+        info = filter_transcribe(json_conf, language, measures)
 
     else:
         info = filter_vosk(json_conf, measures)

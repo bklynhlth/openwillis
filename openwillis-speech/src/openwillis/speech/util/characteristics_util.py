@@ -17,6 +17,26 @@ logger = logging.getLogger()
 # Suppress warnings from transformers
 logging.getLogger("transformers").setLevel(logging.ERROR)
 
+LANG_DICT = {
+    'cs': 'czech',
+    'da': 'danish',
+    'nl': 'dutch',
+    'en': 'english',
+    'et': 'estonian',
+    'fi': 'finnish',
+    'fr': 'french',
+    'de': 'german',
+    'el': 'greek',
+    'it': 'italian',
+    'no': 'norwegian',
+    'pl': 'polish',
+    'pt': 'portuguese',
+    'sl': 'slovene',
+    'es': 'spanish',
+    'sv': 'swedish',
+    'tr': 'turkish'
+}
+
 def create_empty_dataframes(measures):
     """
     ------------------------------------------------------------------------------------------------------
@@ -129,7 +149,7 @@ def download_nltk_resources():
     except LookupError:
         nltk.download("averaged_perceptron_tagger")
         
-def process_utterance(utterances, current_utterance, utterance_texts, current_words, words_texts, current_speaker, measures):
+def process_utterance(utterances, current_utterance, utterance_texts, current_words, words_texts, current_speaker, language, measures):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -149,6 +169,8 @@ def process_utterance(utterances, current_utterance, utterance_texts, current_wo
         A list of word texts.
     current_speaker: str
         Speaker label
+    language: str
+        Language type
     measures: dict
         A dictionary containing the names of the columns in the output dataframes.
 
@@ -160,7 +182,7 @@ def process_utterance(utterances, current_utterance, utterance_texts, current_wo
     ------------------------------------------------------------------------------------------------------
     """
     # split utterance into phrases
-    phrases = nltk.tokenize.sent_tokenize(' '.join(utterance_texts))
+    phrases = nltk.tokenize.sent_tokenize(' '.join(utterance_texts), language=language) if language else [' '.join(utterance_texts)]
     word_counts = np.array([len(phrase.split()) for phrase in phrases])
     # Compute the start indices using cumulative sum and add the starting index of the first phrase
     start_indices = np.cumsum(np.concatenate(([0], word_counts[:-1]))) + current_utterance[0]
@@ -181,7 +203,7 @@ def process_utterance(utterances, current_utterance, utterance_texts, current_wo
 
     return utterances
 
-def create_turns_aws(item_data, measures):
+def create_turns_aws(item_data, language, measures):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -191,6 +213,8 @@ def create_turns_aws(item_data, measures):
     ...........
     item_data: dict
         JSON response object.
+    language: str
+        Language type
     measures: dict
         A dictionary containing the names of the columns in the output dataframes.
 
@@ -208,8 +232,13 @@ def create_turns_aws(item_data, measures):
     current_speaker = None
     utterance_id = 0
 
+    language_punkt = LANG_DICT[language] if language in LANG_DICT else None
+
     for item in item_data:
         # Check if the item is a continuation of the current speaker's turn
+        if 'speaker_label' not in item:
+            continue
+
         if item['speaker_label'] == current_speaker:
             current_utterance.append(utterance_id)
             utterance_texts.append(item['alternatives'][0]['content'])
@@ -219,7 +248,10 @@ def create_turns_aws(item_data, measures):
         else:
             # If not, save the current utterance (if any) and start a new one
             if current_utterance:
-                utterances = process_utterance(utterances, current_utterance, utterance_texts, current_words, words_texts, current_speaker, measures)
+                utterances = process_utterance(
+                    utterances, current_utterance, utterance_texts,
+                    current_words, words_texts, current_speaker, language_punkt, measures
+                )
                 current_utterance.clear()
                 utterance_texts.clear()
                 current_words.clear()
@@ -236,7 +268,10 @@ def create_turns_aws(item_data, measures):
 
     # Don't forget to add the last utterance if the loop ends
     if current_utterance:
-        utterances = process_utterance(utterances, current_utterance, utterance_texts, current_words, words_texts, current_speaker, measures)
+        utterances = process_utterance(
+            utterances, current_utterance, utterance_texts,
+            current_words, words_texts, current_speaker, language_punkt, measures
+        )
 
     return pd.DataFrame(utterances)
 
