@@ -115,7 +115,7 @@ def detect_emotions(detector, frame, emo_cols, threshold=.95):
         landmarks
     )
 
-    emotions = emotions[0][0] * 100  # convert from 0-1 to 0-100
+    emotions = emotions[0][0]
     aus = aus[0][0]
     landmarks = landmarks[0][0]
 
