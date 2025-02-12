@@ -46,6 +46,7 @@ def read_kwargs(kwargs):
     input_param['del_model'] = kwargs.get('del_model', False) #Temp filter
     input_param['infra_model'] = kwargs.get('infra_model', [True, None, None]) #Temp filter
     input_param['compute_type'] = kwargs.get('compute_type', 'int16')
+    input_param['device_type'] = kwargs.get('device_type', 'cpu')
     input_param['batch_size'] = kwargs.get('batch_size', 16)
 
     input_param['willisdiarize'] = kwargs.get('willisdiarize', '')
@@ -81,7 +82,7 @@ def run_whisperx(filepath, input_param):
         return json_response, transcript
     
     from .util import whisperx_util as wutil #import in-case of model=whisperx
-    json_response, transcript = wutil.get_whisperx_diariazation(filepath, input_param)
+    json_response, transcript = wutil.get_whisperx_diarization(filepath, input_param)
     
     if str(json_response) != '{}':
         json_response = tutil.filter_labels_whisper(json_response)
