@@ -62,6 +62,7 @@ def read_kwargs(kwargs):
     input_param['max_speakers'] = kwargs.get('max_speakers', 2)
 
     input_param['context'] = kwargs.get('context', '')
+    input_param['context_model'] = kwargs.get('context_model', 'sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2')
     input_param['access_key'] = kwargs.get('access_key', '')
     input_param['secret_key'] = kwargs.get('secret_key', '')
 
@@ -97,6 +98,8 @@ def speech_transcription_aws(s3_uri, **kwargs):
             Max number of speakers
         context : str, optional
             scale to use for slicing the separated audio files, if any.
+        context_model : str, optional
+            model to use for speaker identification, if context is provided.
         willisdiarize_endpoint : str, optional
             The SageMaker endpoint for the Willisdiarize API.
         willisdiarize_parallel : int, optional
@@ -133,8 +136,8 @@ def speech_transcription_aws(s3_uri, **kwargs):
             secret_key=input_param['secret_key']
         )
 
-    if input_param['speaker_labels'] == True and input_param['context'].lower() in measures['scale'].split(','):
+    if input_param['speaker_labels'] == True and input_param['context'].lower() in measures['scale'].split(',') and input_param['context_model'] in measures['embedding_models']:
         content_dict = tutil.extract_content(json_response)
-        
-        json_response = tutil.get_clinical_labels(input_param['context'], measures, content_dict, json_response)
+        json_response = tutil.get_clinical_labels(input_param['context'], measures, content_dict, json_response, input_param['context_model'])
+
     return json_response, transcript, willisdiarize_status

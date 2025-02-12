@@ -129,7 +129,7 @@ def transcribe_whisper(filepath, model, device, compute_type, batch_size, infra_
     transcribe_json = model_whisp.transcribe(audio, batch_size=batch_size, language=language)
     return transcribe_json, audio
 
-def get_whisperx_diariazation(filepath, input_param):
+def get_whisperx_diarization(filepath, input_param):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -151,17 +151,15 @@ def get_whisperx_diariazation(filepath, input_param):
 
     ------------------------------------------------------------------------------------------------------
     """
-    device = 'cpu'
+    device = input_param['device_type']
     compute_type = input_param['compute_type']
     
     json_response = json.dumps({})
     transcript = ''
     
     try:
-        if torch.cuda.is_available():
-            device = 'cuda'
-            if not compute_type.startswith('float'):
-                compute_type = "float16"
+        if not torch.cuda.is_available() and device == 'cuda':
+            raise Exception('CUDA is not available')
 
         transcribe_json, audio = transcribe_whisper(filepath, input_param['model'], device, compute_type, input_param['batch_size'], input_param['infra_model'], input_param['language'])
     
