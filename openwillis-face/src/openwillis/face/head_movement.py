@@ -220,8 +220,11 @@ def head_movement(video_path, skip_frames=5, normalize_by_bb_size=False):
     ----------
     video_path : str
         Path to the input video file.
+    @TODO make this consistent with other functions and make about samples per second
     skip_frames : int, optional
         Process only every n-th frame; frames in between are skipped. Default is 5.
+    normalize_by_bb_size : bool, optional
+        If True, normalize the xy displacement by the bounding box width. Default is False.
 
     Returns
     -------
