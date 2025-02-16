@@ -211,10 +211,10 @@ def compute_rotation_angles_vectorized(pitch: np.ndarray, yaw: np.ndarray, roll:
 
     return np.degrees(rotation_angles)  # Convert to degrees
 
-def head_movement(video_path, skip_frames=5):
+def head_movement(video_path, skip_frames=5, normalize_by_bb_size=False):
     """
     Extract bounding boxes and facial landmark coordinates for each frame (or every nth frame)
-    of a video using py-feat's Detector.
+    of a video using py-feat's Detector, and compute various head movement metrics.
 
     Parameters
     ----------
@@ -225,47 +225,95 @@ def head_movement(video_path, skip_frames=5):
 
     Returns
     -------
-    pd.DataFrame
-        A DataFrame with columns:
-            ['frame', 'bb_x1', 'bb_y1', 'bb_x2', 'bb_y2', 'face_confidence', 'landmarks']
-        - 'frame': The frame index in the video.
-        - 'bb_x1', 'bb_y1', 'bb_x2', 'bb_y2': The bounding box coordinates of the detected face.
-        - 'face_confidence': A float indicating the detection confidence from py-feat.
-        - 'landmarks': A list of (x, y) tuples for each facial landmark detected.
+    out_df : pd.DataFrame
+        DataFrame containing per-frame results including bounding boxes, landmarks,
+        displacement, and computed rotation metrics.
+    summary_df : pd.DataFrame
+        A one-row DataFrame summarizing mean and std of selected metrics.
     """
-
+    # Step 1: Extract raw landmarks and bounding boxes
     out_df = extract_landmarks_and_bboxes(video_path, skip_frames=skip_frames)
 
-    out_df['bb_center_x'] = out_df[['bb_x1', 'bb_x2']].mean(axis=1)
-    out_df['bb_center_y'] = out_df[['bb_y1', 'bb_y2']].mean(axis=1)
+    out_df = _compute_bb_centers(out_df)
 
-    sampled_frames = out_df.loc[out_df['frame'] % skip_frames == 0].copy()
-    sampled_frames['xy_disp'] = get_fw_xy_displacement(sampled_frames)
+    sampled_frames = _sample_frames(out_df, skip_frames)
+    sampled_frames = _compute_xy_disp(
+        sampled_frames, 
+        normalize_by_bb_size=normalize_by_bb_size
+    )
 
-    angles_df = sampled_frames[['pitch','yaw','roll']].dropna()
-    # if some frames are dropped this re-indexes correctly to align with sampled frames
+    sampled_frames = _compute_euclidean_angles(sampled_frames)
+
+    out_df[['xy_disp', 'euclidean_angle', 'euclidean_angle_disp']] = sampled_frames[
+        ['xy_disp', 'euclidean_angle', 'euclidean_angle_disp']
+    ]
+
+    summary_df = _compute_summary_stats(out_df)
+
+    return out_df, summary_df
+
+# -------------------------------------------------------------------------
+# Helper Functions
+# -------------------------------------------------------------------------
+def _compute_bb_centers(df):
+    """Compute the center of the bounding box for each frame."""
+    df['bb_center_x'] = df[['bb_x1', 'bb_x2']].mean(axis=1)
+    df['bb_center_y'] = df[['bb_y1', 'bb_y2']].mean(axis=1)
+    return df
+
+def _sample_frames(df, skip_frames):
+    """Return only every nth frame (based on the 'frame' column)."""
+    return df.loc[df['frame'] % skip_frames == 0].copy()
+
+def _compute_xy_disp(sampled_df, normalize_by_bb_size=False):
+    """Compute the frame-wise XY displacement."""
+    sampled_df['xy_disp'] = get_fw_xy_displacement(sampled_df)
+
+    if normalize_by_bb_size:
+        sampled_df['xy_disp'] /= (sampled_df['bb_x2'] - sampled_df['bb_x1']).abs()
+
+    return sampled_df
+
+def _compute_euclidean_angles(sampled_df):
+    """
+    Compute the total Euclidean rotation angle based on pitch, yaw, and roll.
+    Also calculate the absolute frame-to-frame change in this angle.
+    """
+    angles_df = sampled_df[['pitch', 'yaw', 'roll']].dropna().copy()
+    
     angles_df['euclidean_angle'] = compute_rotation_angles_vectorized(
         angles_df['pitch'], 
         angles_df['yaw'], 
         angles_df['roll']
     )
-    sampled_frames['euclidean_angle'] = angles_df['euclidean_angle']
-    sampled_frames['euclidean_angle_disp'] = sampled_frames['euclidean_angle'].diff().abs()
+    
+    # Map back the computed angles to the sampled DataFrame
+    sampled_df['euclidean_angle'] = angles_df['euclidean_angle']
+    
+    sampled_df['euclidean_angle_disp'] = sampled_df['euclidean_angle'].diff().abs()
+    
+    return sampled_df
 
-    out_df[['xy_disp','euclidean_angle','euclidean_angle_disp']] = sampled_frames[
-        ['xy_disp',
-         'euclidean_angle',
-         'euclidean_angle_disp'
-    ]]
+def _compute_summary_stats(df):
+    """Compute summary statistics (mean and std) for key metrics."""
+    stats_cols = ['xy_disp', 'pitch', 'yaw', 'roll', 'euclidean_angle_disp']
+    mean_series = df[stats_cols].mean()
+    std_series = df[stats_cols].std()
 
-    mean_df = out_df[['xy_disp','pitch','yaw','roll','euclidean_angle_disp']].mean()
-    std_df = out_df[['xy_disp','pitch','yaw','roll','euclidean_angle_disp']].std()
-
-    summary_df = pd.concat([mean_df, std_df], axis=1)
-    summary_df.columns = [col + '_mean' for col in [
-        'xy_disp','pitch','yaw','roll','euclidean_angle_disp']] + [col + '_std' for col in ['xy_disp','pitch','yaw','roll','euclidean_angle_disp']]
-
-    return out_df, summary_df
+    summary_df = pd.DataFrame({
+        'xy_disp_mean': [mean_series['xy_disp']],
+        'pitch_mean': [mean_series['pitch']],
+        'yaw_mean': [mean_series['yaw']],
+        'roll_mean': [mean_series['roll']],
+        'euclidean_angle_disp_mean': [mean_series['euclidean_angle_disp']],
+        'xy_disp_std': [std_series['xy_disp']],
+        'pitch_std': [std_series['pitch']],
+        'yaw_std': [std_series['yaw']],
+        'roll_std': [std_series['roll']],
+        'euclidean_angle_disp_std': [std_series['euclidean_angle_disp']]
+    })
+    return summary_df
+    
 
 
 
