@@ -82,15 +82,13 @@ def extract_landmarks_and_bboxes(video_path, skip_frames=5):
     detector = feat.Detector()
     cap = cv2.VideoCapture(video_path)
 
+    fps = cap.get(cv2.CAP_PROP_FPS)
+
     if not cap.isOpened():
         raise IOError(f"Cannot open video file: {video_path}")
 
     frame_index = 0
-
     faces_list = []
-
-   
-
             
     while True:
 
@@ -130,7 +128,88 @@ def extract_landmarks_and_bboxes(video_path, skip_frames=5):
         'yaw']
     )
 
+    out_df['time'] = out_df['frame']/fps
     return out_df
+
+def get_fw_xy_displacement(sampled_frames):
+    """Calculates the frame-wise displacement in the x-y plane.
+
+        Args:
+            sampled_frames (pd.DataFrame): A DataFrame containing the bounding box center coordinates
+                in the 'bb_center_x' and 'bb_center_y' columns for each frame.
+
+        Returns:
+            pd.Series: A Series containing the frame-wise displacement magnitudes.
+                Returns an empty series if the input DataFrame has fewer than 2 rows.
+        """
+
+    displacement_xy = sampled_frames[['bb_center_x','bb_center_y']].diff()
+    displacement_xy = displacement_xy.dropna()
+    sampled_frames = (displacement_xy**2).sum(axis=1)**0.5
+
+    return sampled_frames
+
+def compute_rotation_angles_vectorized(pitch: np.ndarray, yaw: np.ndarray, roll: np.ndarray, order: str = "ZYX") -> np.ndarray:
+    """
+    Computes the total rotation angles for multiple sets of pitch, yaw, and roll angles in degrees,
+    with correct matrix multiplication order.
+
+    Args:
+    - pitch (np.ndarray): Array of rotations about the Y-axis in degrees.
+    - yaw (np.ndarray): Array of rotations about the Z-axis in degrees.
+    - roll (np.ndarray): Array of rotations about the X-axis in degrees.
+    - order (str): Rotation order (e.g., "XYZ" means roll->pitch->yaw).
+
+    Returns:
+    - np.ndarray: Array of total rotation angles in degrees.
+    """
+    # Convert degrees to radians
+    pitch_rad = np.radians(pitch)
+    yaw_rad = np.radians(yaw)
+    roll_rad = np.radians(roll)
+
+    # Compute cosines and sines in batch
+    cos_p, sin_p = np.cos(pitch_rad), np.sin(pitch_rad)
+    cos_y, sin_y = np.cos(yaw_rad), np.sin(yaw_rad)
+    cos_r, sin_r = np.cos(roll_rad), np.sin(roll_rad)
+
+    # Define batch rotation matrices (shape: (N, 3, 3))
+    R_x = np.stack([
+        np.stack([np.ones_like(roll_rad), np.zeros_like(roll_rad), np.zeros_like(roll_rad)], axis=-1),
+        np.stack([np.zeros_like(roll_rad), cos_r, -sin_r], axis=-1),
+        np.stack([np.zeros_like(roll_rad), sin_r, cos_r], axis=-1)
+    ], axis=1)  # Shape (N, 3, 3)
+
+    R_y = np.stack([
+        np.stack([cos_p, np.zeros_like(pitch_rad), sin_p], axis=-1),
+        np.stack([np.zeros_like(pitch_rad), np.ones_like(pitch_rad), np.zeros_like(pitch_rad)], axis=-1),
+        np.stack([-sin_p, np.zeros_like(pitch_rad), cos_p], axis=-1)
+    ], axis=1)  # Shape (N, 3, 3)
+
+    R_z = np.stack([
+        np.stack([cos_y, -sin_y, np.zeros_like(yaw_rad)], axis=-1),
+        np.stack([sin_y, cos_y, np.zeros_like(yaw_rad)], axis=-1),
+        np.stack([np.zeros_like(yaw_rad), np.zeros_like(yaw_rad), np.ones_like(yaw_rad)], axis=-1)
+    ], axis=1)  # Shape (N, 3, 3)
+
+    # Apply rotations in specified order correctly
+    order_map = {
+        "XYZ": lambda: np.einsum("nij,njk,nkl->nil", R_x, R_y, R_z),  # Roll -> Pitch -> Yaw
+        "YXZ": lambda: np.einsum("nij,njk,nkl->nil", R_y, R_x, R_z),  # Pitch -> Roll -> Yaw
+        "ZXY": lambda: np.einsum("nij,njk,nkl->nil", R_z, R_x, R_y),  # Yaw -> Roll -> Pitch
+        "ZYX": lambda: np.einsum("nij,njk,nkl->nil", R_z, R_y, R_x),  # Yaw -> Pitch -> Roll
+    }
+
+    if order not in order_map:
+        raise ValueError("Invalid rotation order. Use 'XYZ', 'YXZ', 'ZXY', or 'ZYX'.")
+
+    R = order_map[order]()  # Shape: (N, 3, 3)
+
+    # Compute the total rotation angles from the trace of R
+    trace_R = np.einsum("nii->n", R)  
+    rotation_angles = np.arccos(np.clip((trace_R - 1) / 2, -1.0, 1.0))  
+
+    return np.degrees(rotation_angles)  # Convert to degrees
 
 def head_movement(video_path, skip_frames=5):
     """
@@ -156,4 +235,35 @@ def head_movement(video_path, skip_frames=5):
     """
 
     out_df = extract_landmarks_and_bboxes(video_path, skip_frames=skip_frames)
-    return out_df
+
+    out_df['bb_center_x'] = out_df[['bb_x1', 'bb_x2']].mean(axis=1)
+    out_df['bb_center_y'] = out_df[['bb_y1', 'bb_y2']].mean(axis=1)
+
+    sampled_frames = out_df.loc[out_df['frame'] % skip_frames == 0].copy()
+    sampled_frames['xy_disp'] = get_fw_xy_displacement(sampled_frames)
+
+    angles_df = sampled_frames[['pitch','yaw','roll']].dropna()
+    # if some frames are dropped this re-indexes correctly to align with sampled frames
+    angles_df['euclidean_angle'] = compute_rotation_angles_vectorized(
+        angles_df['pitch'], 
+        angles_df['yaw'], 
+        angles_df['roll']
+    )
+    sampled_frames['euclidean_angle'] = angles_df['euclidean_angle']
+    sampled_frames['euclidean_angle_disp'] = sampled_frames['euclidean_angle'].diff().abs()
+
+    out_df[['xy_disp','euclidean_angle','euclidean_angle_disp']] = sampled_frames[
+        ['xy_disp',
+         'euclidean_angle',
+         'euclidean_angle_disp'
+    ]]
+
+    mean_df = out_df[['xy_disp','pitch','yaw','roll','euclidean_angle_disp']].mean()
+    std_df = out_df[['xy_disp','pitch','yaw','roll','euclidean_angle_disp']].std()
+
+    summary_df = pd.join(mean_df, std_df, lsuffix='_mean', rsuffix='_std')
+
+    return out_df, summary_df
+
+
+
