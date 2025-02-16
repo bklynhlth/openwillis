@@ -261,7 +261,9 @@ def head_movement(video_path, skip_frames=5):
     mean_df = out_df[['xy_disp','pitch','yaw','roll','euclidean_angle_disp']].mean()
     std_df = out_df[['xy_disp','pitch','yaw','roll','euclidean_angle_disp']].std()
 
-    summary_df = pd.join(mean_df, std_df, lsuffix='_mean', rsuffix='_std')
+    summary_df = pd.concat([mean_df, std_df], axis=1)
+    summary_df.columns = [col + '_mean' for col in [
+        'xy_disp','pitch','yaw','roll','euclidean_angle_disp']] + [col + '_std' for col in ['xy_disp','pitch','yaw','roll','euclidean_angle_disp']]
 
     return out_df, summary_df
 
