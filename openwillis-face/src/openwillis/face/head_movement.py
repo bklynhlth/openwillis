@@ -2,6 +2,7 @@ import cv2
 import numpy as np
 import pandas as pd
 import feat 
+from .util import create_cropped_frame
 
 import logging
 
@@ -44,6 +45,7 @@ def get_facepose(frame_index, frame, detector):
         A numpy array with the following values:
         [frame_index, bb_x1, bb_y1, bb_x2, bb_y2, face_confidence, pitch, roll, yaw]
     """
+    
     faceposes = detector.detect_facepose(frame)
 
     # (x1, y1, x2, y2, face_confidence)
@@ -56,7 +58,36 @@ def get_facepose(frame_index, frame, detector):
 
     return facepose
 
-def extract_landmarks_and_bboxes(video_path, skip_frames=5):
+def crop_and_get_facepose(frame_index, frame, detector, bbox):
+    """
+    Extract bounding box and facial landmark coordinates for a frame using py-feat's Detector.
+
+    Parameters
+    ----------
+    frame_index : int
+        The frame index in the video.
+    frame : np.ndarray
+        The frame image.
+    detector : feat.Detector
+        An instance of py-feat's Detector class.
+    bbox : dict
+        A dictionary containing the bounding box coordinates of the face.                           
+        Keys: ['bb_x1', 'bb_y1', 'w', 'h']
+
+    Returns
+    -------
+    np.ndarray
+        A numpy array with the following values:
+        [frame_index, bb_x1, bb_y1, bb_x2, bb_y2, face_confidence, pitch, roll, yaw]
+    """
+    frame = create_cropped_frame(frame, bbox)
+    facepose = get_facepose(frame_index, frame, detector)
+    bbox_face_pose_fmt = [bbox['bb_x'], bbox['bb_y'], bbox['bb_x']+bbox['bb_w'], bbox['bb_y']+bbox['bb_h'],1]
+    facepose[1:6]=bbox_face_pose_fmt
+
+    return facepose
+
+def extract_landmarks_and_bboxes(video_path, skip_frames=5, bbox_list = []):
     """
     Extract bounding boxes and facial landmark coordinates for each frame (or every nth frame)
     of a video using py-feat's Detector.
@@ -98,7 +129,18 @@ def extract_landmarks_and_bboxes(video_path, skip_frames=5):
                 break  
 
             if frame_index % skip_frames == 0:
-                facepose = get_facepose(frame_index, frame, detector)
+
+                if len(bbox_list)!=0:
+
+                    facepose = crop_and_get_facepose(
+                        frame_index,
+                        frame,
+                        detector,
+                        bbox_list[frame_index]
+                    )
+
+                else:
+                    facepose = get_facepose(frame_index, frame, detector)
             else:
                 facepose = get_undected_facepose(frame_index) 
             
@@ -211,7 +253,7 @@ def compute_rotation_angles_vectorized(pitch: np.ndarray, yaw: np.ndarray, roll:
 
     return np.degrees(rotation_angles)  # Convert to degrees
 
-def head_movement(video_path, skip_frames=5, normalize_by_bb_size=False):
+def head_movement(video_path, skip_frames=5, normalize_by_bb_size=False, bbox_list=[]):
     """
     Extract bounding boxes and facial landmark coordinates for each frame (or every nth frame)
     of a video using py-feat's Detector, and compute various head movement metrics.
@@ -220,11 +262,14 @@ def head_movement(video_path, skip_frames=5, normalize_by_bb_size=False):
     ----------
     video_path : str
         Path to the input video file.
-    @TODO make this consistent with other functions and make about samples per second
     skip_frames : int, optional
         Process only every n-th frame; frames in between are skipped. Default is 5.
     normalize_by_bb_size : bool, optional
         If True, normalize the xy displacement by the bounding box width. Default is False.
+    bounding_boxes : list of dict, optional
+        A list of bounding boxes, each represented as a dictionary with keys:
+        ['bb_x1', 'bb_y1', 'w', 'h']. If provided, these bounding boxes will be used 
+        instead of detecting them.
 
     Returns
     -------
@@ -234,9 +279,13 @@ def head_movement(video_path, skip_frames=5, normalize_by_bb_size=False):
     summary_df : pd.DataFrame
         A one-row DataFrame summarizing mean and std of selected metrics.
     """
-    # Step 1: Extract raw landmarks and bounding boxes
-    out_df = extract_landmarks_and_bboxes(video_path, skip_frames=skip_frames)
-
+    
+    out_df = extract_landmarks_and_bboxes(
+        video_path,
+        skip_frames=skip_frames,
+        bbox_list=bbox_list
+    )
+    
     out_df = _compute_bb_centers(out_df)
 
     sampled_frames = _sample_frames(out_df, skip_frames)

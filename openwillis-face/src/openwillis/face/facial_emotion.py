@@ -231,6 +231,7 @@ def run_pyfeat(path, skip_frames=5, bbox_list=[]):
             try:
 
                 ret_type, img = cap.read()
+                
                 if ret_type is not True:
                     break
 
