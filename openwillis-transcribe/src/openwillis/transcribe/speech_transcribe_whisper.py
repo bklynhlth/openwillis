@@ -38,6 +38,7 @@ def read_kwargs(kwargs):
     input_param['language'] = kwargs.get('language', 'en')
     
     input_param['context'] = kwargs.get('context', '')
+    input_param['context_model'] = kwargs.get('context_model', 'sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2')
     input_param['max_speakers'] = kwargs.get('max_speakers', None)
     input_param['min_speakers'] = kwargs.get('min_speakers', None)
 
@@ -45,6 +46,7 @@ def read_kwargs(kwargs):
     input_param['del_model'] = kwargs.get('del_model', False) #Temp filter
     input_param['infra_model'] = kwargs.get('infra_model', [True, None, None]) #Temp filter
     input_param['compute_type'] = kwargs.get('compute_type', 'int16')
+    input_param['device_type'] = kwargs.get('device_type', 'cpu')
     input_param['batch_size'] = kwargs.get('batch_size', 16)
 
     input_param['willisdiarize'] = kwargs.get('willisdiarize', '')
@@ -80,7 +82,7 @@ def run_whisperx(filepath, input_param):
         return json_response, transcript
     
     from .util import whisperx_util as wutil #import in-case of model=whisperx
-    json_response, transcript = wutil.get_whisperx_diariazation(filepath, input_param)
+    json_response, transcript = wutil.get_whisperx_diarization(filepath, input_param)
     
     if str(json_response) != '{}':
         json_response = tutil.filter_labels_whisper(json_response)
@@ -116,14 +118,18 @@ def speech_transcription_whisper(filepath, **kwargs):
     """
     measures = get_config(os.path.abspath(__file__), 'speech.json')
     input_param = read_kwargs(kwargs)
+
+    if not os.path.exists(filepath):
+        logger.error("File path does not exist")
+        return {}, ''
     
     json_response, transcript = run_whisperx(filepath, input_param)
 
     if input_param['language'].lower()[:2] == 'en' and input_param['willisdiarize'] != '':
         json_response = diarization_correction(json_response, input_param['willisdiarize'], huggingface_token=input_param['hf_token'])
 
-    if input_param['context'].lower() in measures['scale'].split(','):
-        
+    if input_param['context'].lower() in measures['scale'].split(',') and input_param['context_model'] in measures['embedding_models']:
         content_dict = tutil.get_whisperx_content(json_response)
-        json_response = tutil.get_whisperx_clinical_labels(input_param['context'], measures, content_dict, json_response)
+        json_response = tutil.get_whisperx_clinical_labels(input_param['context'], measures, content_dict, json_response, input_param['context_model'])
+
     return json_response, transcript
