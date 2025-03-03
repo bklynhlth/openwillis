@@ -92,7 +92,7 @@ def speaker_separation_labels(filepath, transcript_json, volume_normalization=No
             
         if len(speaker_df)>0 and speaker_count>1:
             combined_df = sutil.combine_turns(speaker_df)
-            signal_label = sutil.generate_audio_signal(combined_df, audio_signal, '', measures)
+            signal_label = sutil.generate_audio_signal(combined_df, audio_signal, '', '', measures)
 
             if volume_normalization:
                 if type(volume_normalization) != int or volume_normalization < -60 or volume_normalization > 0:
