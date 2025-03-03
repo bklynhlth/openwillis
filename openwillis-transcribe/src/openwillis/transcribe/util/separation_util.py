@@ -258,7 +258,7 @@ def get_patient_rater_label(df, measures, scale, signal, context_model):
         signal_label = {'clinician': signal['speaker0'], 'participant':signal['speaker1']}
     return signal_label
 
-def get_segment_signal(audio_signal, df):
+def get_segment_signal(audio_signal, df, split_turns=False):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -270,6 +270,8 @@ def get_segment_signal(audio_signal, df):
         The audio signal.
     df : pandas DataFrame
         The dataframe containing speaker information.
+    split_turns : bool
+        Whether to split into turns. Default is False.
 
     Returns:
     -------
@@ -291,11 +293,14 @@ def get_segment_signal(audio_signal, df):
         speaker_array = np.array(speaker_audio.get_array_of_samples())
 
         if speaker_label in ['speaker0', 'speaker1', 'clinician', 'participant']:
-            signal_dict.setdefault(speaker_label, []).append(speaker_array)
+            if split_turns:
+                signal_dict[f"{speaker_label}-{index}"] = speaker_array
+            else:
+                signal_dict.setdefault(speaker_label, []).append(speaker_array)
 
     return signal_dict
 
-def generate_audio_signal(df, audio_signal, scale, context_model, measures):
+def generate_audio_signal(df, audio_signal, scale, context_model, measures, split_turns=False):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -313,6 +318,8 @@ def generate_audio_signal(df, audio_signal, scale, context_model, measures):
         A string containing the name of the embedding model to be used.
     measures : dict
         A config dictionary.
+    split_turns : bool
+        Whether to split into turns. Default is False.
 
     Returns:
     -------
@@ -324,8 +331,9 @@ def generate_audio_signal(df, audio_signal, scale, context_model, measures):
     df['start_time'] = df['start_time'].astype(float) *1000
     df['end_time'] = df['end_time'].astype(float)*1000
 
-    signal_dict = get_segment_signal(audio_signal, df)
-    signal_dict = {key: np.concatenate(value) for key, value in signal_dict.items()}
+    signal_dict = get_segment_signal(audio_signal, df, split_turns)
+    if not split_turns:
+        signal_dict = {key: np.concatenate(value) for key, value in signal_dict.items()}
 
     signal_label = get_patient_rater_label(df, measures, scale, signal_dict, context_model)
     return signal_label

@@ -55,7 +55,7 @@ def is_amazon_transcribe(json_conf):
     """
     return "jobName" in json_conf and "results" in json_conf
 
-def speaker_separation_labels(filepath, transcript_json, volume_normalization=None):
+def speaker_separation_labels(filepath, transcript_json, volume_normalization=None, split_turns=False):
     """
     ------------------------------------------------------------------------------------------------------
 
@@ -69,6 +69,8 @@ def speaker_separation_labels(filepath, transcript_json, volume_normalization=No
         Speech transcription json response.
     volume_normalization : int
         The volume normalization level. Default is None.
+    split_turns : bool
+        Whether to split into turns. Default is False.
 
     Returns:
     ...........
@@ -92,7 +94,7 @@ def speaker_separation_labels(filepath, transcript_json, volume_normalization=No
             
         if len(speaker_df)>0 and speaker_count>1:
             combined_df = sutil.combine_turns(speaker_df)
-            signal_label = sutil.generate_audio_signal(combined_df, audio_signal, '', '', measures)
+            signal_label = sutil.generate_audio_signal(combined_df, audio_signal, '', '', measures, split_turns)
 
             if volume_normalization:
                 if type(volume_normalization) != int or volume_normalization < -60 or volume_normalization > 0:
