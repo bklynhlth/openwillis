@@ -378,7 +378,7 @@ def vocal_acoustics(audio_path, voiced_segments = True, option='simple'):
                     df_turns = pd.concat([df_turns, df_summary_audio], axis=0)
 
             df_summary = df_turns.drop(columns=['file'])
-            df_summary = df_summary.mean(axis=1)
+            df_summary = df_summary.mean(axis=0).to_frame().T
         else:
             raise ValueError("Audio path should be a string or a list of strings")
     except Exception as e:
