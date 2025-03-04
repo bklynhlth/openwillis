@@ -283,6 +283,53 @@ def get_advanced_summary(df_summary, audio_path, option, duration_seconds, measu
     df_summary = pd.concat([df_summary, glottal_summ, tremor_summ], axis=1)
     return df_summary
 
+def process_audio(audio_path, voiced_segments = True, option='simple'):
+    """
+    ------------------------------------------------------------------------------------------------------
+
+    Processes a single audio file and returns the framewise and summary statistics.
+
+    Parameters:
+    ...........
+    audio_path : str
+        path to the audio file
+    voiced_segments : bool
+        whether to summarize framewise measures on voiced segments over 100ms
+    option : str
+        whether to calculate the advanced vocal acoustic variables
+
+    Returns:
+    ...........
+    framewise : pandas dataframe
+        dataframe containing pitch, loudness, HNR, and formant frequency values
+    df_summary2 : pandas dataframe
+        dataframe containing the summary of all acoustic variables
+
+    ------------------------------------------------------------------------------------------------------
+    """
+    sound, measures = autil.read_audio(audio_path)
+    duration_seconds = sound.get_total_duration()
+    df_pitch = autil.pitchfreq(sound, measures, 75, 500)
+    df_loudness = autil.loudness(sound, measures)
+
+    df_jitter = autil.jitter(sound, measures)
+    df_shimmer = autil.shimmer(sound, measures)
+
+    df_hnr = autil.harmonic_ratio(sound, measures)
+    df_gne = autil.glottal_ratio(sound, measures)
+    df_formant = autil.formfreq(sound, measures)
+    df_silence = autil.get_voice_silence(audio_path, 500, measures)
+    df_cepstral = autil.get_cepstral_features(audio_path, measures)
+
+    framewise = pd.concat([df_pitch, df_formant, df_loudness, df_hnr], axis=1)
+    sig_df = pd.concat([df_jitter, df_shimmer, df_gne, df_cepstral], axis=1)
+
+    df_summary = get_summary(sound, framewise, sig_df, df_silence, voiced_segments, measures)
+    df_summary2 = get_advanced_summary(df_summary, audio_path, option, duration_seconds, measures)
+
+    return framewise, df_summary2
+
+
 def vocal_acoustics(audio_path, voiced_segments = True, option='simple'):
     """
     ------------------------------------------------------------------------------------------------------
@@ -291,7 +338,7 @@ def vocal_acoustics(audio_path, voiced_segments = True, option='simple'):
 
     Parameters:
     ...........
-    audio_path : str
+    audio_path : str | list
         path to the audio file
     voiced_segments : bool
         whether to summarize framewise measures on voiced segments over 100ms
@@ -303,8 +350,8 @@ def vocal_acoustics(audio_path, voiced_segments = True, option='simple'):
     ...........
     framewise : pandas dataframe
         dataframe containing pitch, loudness, HNR, and formant frequency values
-    df_silence : pandas dataframe
-        dataframe containing the silence window values
+    df_turns : pandas dataframe
+        dataframe containing the summary of all acoustic variables for each turn
     df_summary : pandas dataframe
         dataframe containing the summary of all acoustic variables
 
@@ -314,26 +361,27 @@ def vocal_acoustics(audio_path, voiced_segments = True, option='simple'):
         if option not in ['simple', 'advanced', 'tremor']:
             raise ValueError("Option should be either 'simple', 'advanced' or 'tremor'")
 
-        sound, measures = autil.read_audio(audio_path)
-        duration_seconds = sound.get_total_duration()
-        df_pitch = autil.pitchfreq(sound, measures, 75, 500)
-        df_loudness = autil.loudness(sound, measures)
+        if isinstance(audio_path, str):
+            framewise, df_summary = process_audio(audio_path, voiced_segments, option)
+            df_turns = pd.DataFrame()
+        elif isinstance(audio_path, list):
+            framewise, df_turns = pd.DataFrame(), pd.DataFrame()
+            for audio in audio_path:
+                framewise_audio, df_summary_audio = process_audio(audio, voiced_segments, option)
+                framewise_audio['file'] = audio
+                df_summary_audio['file'] = audio
+                if framewise.empty:
+                    framewise = framewise_audio
+                    df_turns = df_summary_audio
+                else:
+                    framewise = pd.concat([framewise, framewise_audio], axis=0)
+                    df_turns = pd.concat([df_turns, df_summary_audio], axis=0)
 
-        df_jitter = autil.jitter(sound, measures)
-        df_shimmer = autil.shimmer(sound, measures)
-
-        df_hnr = autil.harmonic_ratio(sound, measures)
-        df_gne = autil.glottal_ratio(sound, measures)
-        df_formant = autil.formfreq(sound, measures)
-        df_silence = autil.get_voice_silence(audio_path, 500, measures)
-        df_cepstral = autil.get_cepstral_features(audio_path, measures)
-
-        framewise = pd.concat([df_pitch, df_formant, df_loudness, df_hnr], axis=1)
-        sig_df = pd.concat([df_jitter, df_shimmer, df_gne, df_cepstral], axis=1)
-
-        df_summary = get_summary(sound, framewise, sig_df, df_silence, voiced_segments, measures)
-        df_summary2 = get_advanced_summary(df_summary, audio_path, option, duration_seconds, measures)
-        return framewise, df_summary2
-
+            df_summary = df_turns.drop(columns=['file'])
+            df_summary = df_summary.mean(axis=1)
+        else:
+            raise ValueError("Audio path should be a string or a list of strings")
     except Exception as e:
         logger.info(f'Error in acoustic calculation- file: {audio_path} & Error: {e}')
+    finally:
+        return framewise, df_turns, df_summary
