@@ -5,6 +5,7 @@
 import os
 import logging
 
+import scipy.stats
 import numpy as np
 import pandas as pd
 from parselmouth.praat import run_file
@@ -61,8 +62,9 @@ def get_summary(sound, framewise, sig_df, df_silence, voiced_segments, measures)
     voice_pct = autil.voice_frame(sound, measures)
 
     df_relative = calculate_relative_stds(framewise, df_silence, measures)
+    df_f0_stats = calculate_f0_stats(framewise2, measures)
 
-    df_concat = pd.concat(df_list+ [sig_df, summ_silence, voice_pct, df_relative], axis=1)
+    df_concat = pd.concat(df_list+ [sig_df, summ_silence, voice_pct, df_relative, df_f0_stats], axis=1)
     return df_concat
 
 def get_voiced_segments(df_silence, framewise, min_duration, measures):
@@ -119,6 +121,34 @@ def get_voiced_segments(df_silence, framewise, min_duration, measures):
 
     speech_indices_expanded = speech_indices_expanded.astype(int)
     return speech_indices_expanded
+
+def calculate_f0_stats(framewise, measures):
+    """
+    ------------------------------------------------------------------------------------------------------
+    
+    Calculates the F0 kurtosis and skewness.
+
+    Parameters:
+    ...........
+    framewise : pandas dataframe
+        dataframe containing pitch, loudness, HNR, and formant frequency values
+    measures : dict
+        a dictionary containing the measures names for the calculated statistics.
+
+    Returns:
+    ...........
+    df_f0_stats : pandas dataframe
+        dataframe containing the F0 kurtosis and skewness
+
+    ------------------------------------------------------------------------------------------------------
+    """
+    f0 = framewise[measures['fundfreq']]
+    f0 = f0[~np.isnan(f0)]
+    f0_kurtosis = scipy.stats.kurtosis(f0)
+    f0_skewness = scipy.stats.skew(f0)
+
+    df_f0_stats = pd.DataFrame([[f0_kurtosis, f0_skewness]], columns=[measures['f0_kurtosis'], measures['f0_skewness']])
+    return df_f0_stats
 
 def calculate_relative_stds(framewise, df_silence, measures):
     """
@@ -320,9 +350,10 @@ def process_audio(audio_path, voiced_segments = True, option='simple'):
     df_formant = autil.formfreq(sound, measures)
     df_silence = autil.get_voice_silence(audio_path, 500, measures)
     df_cepstral = autil.get_cepstral_features(audio_path, measures)
+    df_lhr = autil.calculate_lhr(sound, measures)
 
     framewise = pd.concat([df_pitch, df_formant, df_loudness, df_hnr], axis=1)
-    sig_df = pd.concat([df_jitter, df_shimmer, df_gne, df_cepstral], axis=1)
+    sig_df = pd.concat([df_jitter, df_shimmer, df_gne, df_cepstral, df_lhr], axis=1)
 
     df_summary = get_summary(sound, framewise, sig_df, df_silence, voiced_segments, measures)
     df_summary2 = get_advanced_summary(df_summary, audio_path, option, duration_seconds, measures)

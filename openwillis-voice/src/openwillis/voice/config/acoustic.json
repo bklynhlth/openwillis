@@ -26,6 +26,8 @@
   "silence_ratio": "silence_ratio",
   "relF0sd": "rel_f0_sd",
   "relSE0SD": "rel_se0_sd",
+  "f0_kurtosis": "f0_kurtosis",
+  "f0_skewness": "f0_skewness",
   "spir": "spir",
   "pause_meddur": "dur_med",
   "pause_maddur": "dur_mad",
@@ -83,7 +85,13 @@
   "mfcc14_var": "mfcc14_var",
   "cpp_mean": "cpp_mean",
   "cpp_var": "cpp_var",
+  "cpp_kurtosis": "cpp_kurtosis",
+  "cpp_skewness": "cpp_skewness",
   "spectral_variability": "spectral_variability",
+  "lhr_mean": "lhr_mean",
+  "lhr_var": "lhr_var",
+  "lhr_kurtosis": "lhr_kurtosis",
+  "lhr_skewness": "lhr_skewness",
   "phonation_type": "phonation_type",
   "duration": "duration"
 }

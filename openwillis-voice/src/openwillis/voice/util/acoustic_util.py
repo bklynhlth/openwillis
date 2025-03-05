@@ -101,6 +101,57 @@ def silence_summary(sound, df, measures):
     )
     return silence_summ
 
+def calculate_lhr(sound, measures, window_ms=20, overlap=0.75):
+    """
+    Calculates the Low/High frequency Ratio (LHR) - the ratio between acoustic energy 
+    above and below 4 kHz.
+
+    Parameters:
+    ...........
+    sound : sound obj
+        Praat sound object
+    measures : dict
+        Dictionary containing measure names
+    window_ms : float
+        Window size in milliseconds (default: 20ms)
+    overlap : float
+        Overlap between windows (default: 0.75 or 75%)
+
+    Returns:
+    ...........
+    df_lhr : pandas dataframe
+        Dataframe containing LHR values for each frame
+    """
+    # Convert sound to numpy array and get sampling rate
+    y = sound.values[0]
+    sr = sound.sampling_frequency
+
+    # Calculate window and hop length in samples
+    window_length = int(window_ms * sr / 1000)  # convert ms to samples
+    hop_length = int(window_length * (1 - overlap))
+
+    # Calculate STFT (Short-time Fourier Transform)
+    stft = librosa.stft(y, n_fft=window_length, hop_length=hop_length, window='hann')
+    frequencies = librosa.fft_frequencies(sr=sr, n_fft=window_length)
+
+    # Get magnitude spectrogram
+    mag_spec = np.abs(stft)
+
+    # Find frequency bin index corresponding to 4 kHz
+    freq_4k_idx = np.where(frequencies >= 4000)[0][0]
+
+    # Calculate energy in low and high frequency bands
+    low_energy = np.sum(mag_spec[:freq_4k_idx, :], axis=0)
+    high_energy = np.sum(mag_spec[freq_4k_idx:, :], axis=0)
+
+    # Calculate LHR (add small constant to avoid division by zero)
+    lhr = low_energy / (high_energy + 1e-10)
+    lhr_measures = [np.mean(lhr), np.var(lhr), scipy.stats.kurtosis(lhr), scipy.stats.skew(lhr)]
+
+    # Create dataframe
+    df_lhr = pd.DataFrame([lhr_measures], columns=[measures['lhr_mean'], measures['lhr_var'], measures['lhr_kurtosis'], measures['lhr_skewness']])
+    return df_lhr
+
 def voice_frame(sound, measures):
     """
     ------------------------------------------------------------------------------------------------------
@@ -533,10 +584,12 @@ def get_cepstral_features(audio_path, measures):
     cpp_0 = cpp(y, sr, 'line', True)
     cpp_0_mean = np.mean(cpp_0)
     cpp_0_var = np.var(cpp_0)
+    cpp_0_kurtosis = scipy.stats.kurtosis(cpp_0)
+    cpp_0_skewness = scipy.stats.skew(cpp_0)
 
     spectral_variability = np.median(np.abs(mfccs.T[:, 1] - np.median(mfccs.T[:, 1])))
 
-    df_cepstral = pd.DataFrame([mfccs_mean + mfccs_var + [cpp_0_mean] + [cpp_0_var] + [spectral_variability]], columns = [
+    df_cepstral = pd.DataFrame([mfccs_mean + mfccs_var + [cpp_0_mean, cpp_0_var, cpp_0_kurtosis, cpp_0_skewness] + [spectral_variability]], columns = [
         measures['mfcc1_mean'], measures['mfcc2_mean'], measures['mfcc3_mean'], measures['mfcc4_mean'],
         measures['mfcc5_mean'], measures['mfcc6_mean'], measures['mfcc7_mean'], measures['mfcc8_mean'],
         measures['mfcc9_mean'], measures['mfcc10_mean'], measures['mfcc11_mean'], measures['mfcc12_mean'],
@@ -544,6 +597,7 @@ def get_cepstral_features(audio_path, measures):
         measures['mfcc3_var'], measures['mfcc4_var'], measures['mfcc5_var'], measures['mfcc6_var'],
         measures['mfcc7_var'], measures['mfcc8_var'], measures['mfcc9_var'], measures['mfcc10_var'],
         measures['mfcc11_var'], measures['mfcc12_var'], measures['mfcc13_var'], measures['mfcc14_var'],
-        measures['cpp_mean'], measures['cpp_var'], measures['spectral_variability']
+        measures['cpp_mean'], measures['cpp_var'], measures['cpp_kurtosis'], measures['cpp_skewness'],
+        measures['spectral_variability']
     ])
     return df_cepstral
