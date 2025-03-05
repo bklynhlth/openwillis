@@ -357,6 +357,7 @@ def vocal_acoustics(audio_path, voiced_segments = True, option='simple'):
 
     ------------------------------------------------------------------------------------------------------
     """
+    framewise, df_turns, df_summary = pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
     try:
         if option not in ['simple', 'advanced', 'tremor']:
             raise ValueError("Option should be either 'simple', 'advanced' or 'tremor'")
