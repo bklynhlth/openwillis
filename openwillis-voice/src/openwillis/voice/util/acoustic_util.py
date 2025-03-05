@@ -90,7 +90,7 @@ def silence_summary(sound, df, measures):
 
         dur_med = df2[measures['voicesilence']].median()
 
-        dur_mad = np.median(np.abs(df2[measures['voicesilence']] - df2[measures['voicesilence']].mean()))
+        dur_mad = np.median(np.abs(df2[measures['voicesilence']] - np.median(df2[measures['voicesilence']])))
 
     cols = [
         measures['spir'], measures['pause_meddur'], measures['pause_maddur']    
@@ -534,7 +534,9 @@ def get_cepstral_features(audio_path, measures):
     cpp_0_mean = np.mean(cpp_0)
     cpp_0_var = np.var(cpp_0)
 
-    df_cepstral = pd.DataFrame([mfccs_mean + mfccs_var + [cpp_0_mean] + [cpp_0_var]], columns = [
+    spectral_variability = np.median(np.abs(mfccs.T[:, 1] - np.median(mfccs.T[:, 1])))
+
+    df_cepstral = pd.DataFrame([mfccs_mean + mfccs_var + [cpp_0_mean] + [cpp_0_var] + [spectral_variability]], columns = [
         measures['mfcc1_mean'], measures['mfcc2_mean'], measures['mfcc3_mean'], measures['mfcc4_mean'],
         measures['mfcc5_mean'], measures['mfcc6_mean'], measures['mfcc7_mean'], measures['mfcc8_mean'],
         measures['mfcc9_mean'], measures['mfcc10_mean'], measures['mfcc11_mean'], measures['mfcc12_mean'],
@@ -542,6 +544,6 @@ def get_cepstral_features(audio_path, measures):
         measures['mfcc3_var'], measures['mfcc4_var'], measures['mfcc5_var'], measures['mfcc6_var'],
         measures['mfcc7_var'], measures['mfcc8_var'], measures['mfcc9_var'], measures['mfcc10_var'],
         measures['mfcc11_var'], measures['mfcc12_var'], measures['mfcc13_var'], measures['mfcc14_var'],
-        measures['cpp_mean'], measures['cpp_var']
+        measures['cpp_mean'], measures['cpp_var'], measures['spectral_variability']
     ])
     return df_cepstral

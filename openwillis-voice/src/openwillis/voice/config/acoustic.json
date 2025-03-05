@@ -83,6 +83,7 @@
   "mfcc14_var": "mfcc14_var",
   "cpp_mean": "cpp_mean",
   "cpp_var": "cpp_var",
+  "spectral_variability": "spectral_variability",
   "phonation_type": "phonation_type",
   "duration": "duration"
 }
