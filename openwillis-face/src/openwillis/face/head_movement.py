@@ -9,7 +9,7 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger()
 
-def get_undected_facepose(frame_index):
+def get_undetected_facepose(frame_index):
     """
     Return a placeholder face pose when no face is detected in the frame.
 
@@ -87,17 +87,18 @@ def crop_and_get_facepose(frame_index, frame, detector, bbox):
 
     return facepose
 
-def extract_landmarks_and_bboxes(video_path, skip_frames=5, bbox_list = []):
+def extract_landmarks_and_bboxes(video_path, frames_per_second=3, bbox_list = []):
     """
-    Extract bounding boxes and facial landmark coordinates for each frame (or every nth frame)
-    of a video using py-feat's Detector.
+    Extract bounding boxes and facial landmark coordinates from a video using py-feat's Detector,
+    sampling at a specified number of frames per second.
 
     Parameters
     ----------
     video_path : str
         Path to the input video file.
-    skip_frames : int, optional
-        Process only every n-th frame; frames in between are skipped. Default is 5.
+    frames_per_second : float, optional
+        The number of frames to sample per second of video. Default is 3.
+        This determines the temporal resolution of the analysis.
 
     Returns
     -------
@@ -113,40 +114,38 @@ def extract_landmarks_and_bboxes(video_path, skip_frames=5, bbox_list = []):
     detector = feat.Detector()
     cap = cv2.VideoCapture(video_path)
 
-    fps = cap.get(cv2.CAP_PROP_FPS)
-
+    video_fps = cap.get(cv2.CAP_PROP_FPS)
+    
     if not cap.isOpened():
         raise IOError(f"Cannot open video file: {video_path}")
+    
+    skip_interval = max(1, int(video_fps / frames_per_second))
 
     frame_index = 0
     faces_list = []
             
     while True:
-
         try:
             ret, frame = cap.read()
             if not ret:
                 break  
 
-            if frame_index % skip_frames == 0:
-
+            if frame_index % skip_interval == 0:
                 if len(bbox_list)!=0:
-
                     facepose = crop_and_get_facepose(
                         frame_index,
                         frame,
                         detector,
                         bbox_list[frame_index]
                     )
-
                 else:
                     facepose = get_facepose(frame_index, frame, detector)
             else:
-                facepose = get_undected_facepose(frame_index) 
+                facepose = get_undetected_facepose(frame_index) 
             
         except Exception as e:
             logger.info(f'error processing frame: {frame_index} in file: {video_path} & Error: {e}')
-            facepose = get_undected_facepose(frame_index) 
+            facepose = get_undetected_facepose(frame_index) 
         
         frame_index += 1
         faces_list.append(facepose)
@@ -170,26 +169,32 @@ def extract_landmarks_and_bboxes(video_path, skip_frames=5, bbox_list = []):
         'yaw']
     )
 
-    out_df['time'] = out_df['frame']/fps
+    out_df['time'] = out_df['frame']/video_fps
+    
     return out_df
 
 def get_fw_xy_displacement(sampled_frames):
     """Calculates the frame-wise displacement in the x-y plane.
 
-        Args:
-            sampled_frames (pd.DataFrame): A DataFrame containing the bounding box center coordinates
-                in the 'bb_center_x' and 'bb_center_y' columns for each frame.
+    Args:
+        sampled_frames (pd.DataFrame): A DataFrame containing the bounding box center coordinates
+            in the 'bb_center_x' and 'bb_center_y' columns for each frame.
 
-        Returns:
-            pd.Series: A Series containing the frame-wise displacement magnitudes.
-                Returns an empty series if the input DataFrame has fewer than 2 rows.
-        """
-
-    displacement_xy = sampled_frames[['bb_center_x','bb_center_y']].diff()
-    displacement_xy = displacement_xy.dropna()
-    sampled_frames = (displacement_xy**2).sum(axis=1)**0.5
-
-    return sampled_frames
+    Returns:
+        pd.Series: A Series containing the frame-wise displacement magnitudes.
+            Returns an empty series if the input DataFrame has fewer than 2 rows.
+    """
+    # First drop any rows where either x or y coordinate is null
+    valid_frames = sampled_frames[['bb_center_x', 'bb_center_y']].dropna()
+    
+    if len(valid_frames) < 2:
+        return pd.Series()
+        
+    displacement_xy = valid_frames.diff()
+    
+    displacement_magnitudes = (displacement_xy**2).sum(axis=1)**0.5
+    
+    return displacement_magnitudes
 
 def compute_rotation_angles_vectorized(pitch: np.ndarray, yaw: np.ndarray, roll: np.ndarray, order: str = "ZYX") -> np.ndarray:
     """
@@ -253,17 +258,18 @@ def compute_rotation_angles_vectorized(pitch: np.ndarray, yaw: np.ndarray, roll:
 
     return np.degrees(rotation_angles)  # Convert to degrees
 
-def head_movement(video_path, skip_frames=5, normalize_by_bb_size=False, bbox_list=[]):
+def head_movement(video_path, frames_per_second=3, normalize_by_bb_size=False, bbox_list=[]):
     """
-    Extract bounding boxes and facial landmark coordinates for each frame (or every nth frame)
-    of a video using py-feat's Detector, and compute various head movement metrics.
+    Extract bounding boxes and facial landmark coordinates from a video using py-feat's Detector,
+    sampling at a specified number of frames per second, and compute various head movement metrics.
 
     Parameters
     ----------
     video_path : str
         Path to the input video file.
-    skip_frames : int, optional
-        Process only every n-th frame; frames in between are skipped. Default is 5.
+    frames_per_second : float, optional
+        The number of frames to sample per second of video. Default is 3.
+        This determines the temporal resolution of the analysis.
     normalize_by_bb_size : bool, optional
         If True, normalize the xy displacement by the bounding box width. Default is False.
     bounding_boxes : list of dict, optional
@@ -282,23 +288,29 @@ def head_movement(video_path, skip_frames=5, normalize_by_bb_size=False, bbox_li
     
     out_df = extract_landmarks_and_bboxes(
         video_path,
-        skip_frames=skip_frames,
+        frames_per_second=frames_per_second,
         bbox_list=bbox_list
     )
     
     out_df = _compute_bb_centers(out_df)
 
-    sampled_frames = _sample_frames(out_df, skip_frames)
+    sampled_frames = _sample_frames(out_df)
     sampled_frames = _compute_xy_disp(
         sampled_frames, 
         normalize_by_bb_size=normalize_by_bb_size
     )
 
-    sampled_frames = _compute_euclidean_angles(sampled_frames)
+    out_df['euclidean_angle'] = compute_rotation_angles_vectorized(
+        out_df['pitch'], 
+        out_df['yaw'], 
+        out_df['roll']
+    )
+    
+    sampled_angles = out_df['euclidean_angle'].dropna()
+    print(sampled_angles)
+    out_df['euclidean_angle_disp'] = sampled_angles.diff().abs()
 
-    out_df[['xy_disp', 'euclidean_angle', 'euclidean_angle_disp']] = sampled_frames[
-        ['xy_disp', 'euclidean_angle', 'euclidean_angle_disp']
-    ]
+    out_df['xy_disp'] = sampled_frames['xy_disp']
 
     summary_df = _compute_summary_stats(out_df)
 
@@ -313,9 +325,9 @@ def _compute_bb_centers(df):
     df['bb_center_y'] = df[['bb_y1', 'bb_y2']].mean(axis=1)
     return df
 
-def _sample_frames(df, skip_frames):
-    """Return only every nth frame (based on the 'frame' column)."""
-    return df.loc[df['frame'] % skip_frames == 0].copy()
+def _sample_frames(df):
+    """Return all frames since we're already sampling in extract_landmarks_and_bboxes."""
+    return df.copy()
 
 def _compute_xy_disp(sampled_df, normalize_by_bb_size=False):
     """Compute the frame-wise XY displacement."""
