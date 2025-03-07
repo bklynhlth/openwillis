@@ -413,7 +413,7 @@ def get_distance(df):
         df_dist = pd.DataFrame(dist, columns=['lmk' + str(col+1).zfill(3)])
         disp_list.append(df_dist)
 
-    displacement_df = pd.concat(disp_list, axis=1).reset_index(drop=True)
+    displacement_df = pd.concat(disp_list, axis=1)
     return displacement_df
 
 def get_mouth_height(df, measures):
@@ -642,12 +642,10 @@ def get_displacement(
     displacement_df = get_empty_dataframe()
 
     try:
+
         df_meta = lmk_df[['frame','time']]
-#TODO adjust for if there are missing frames 
+
         if len(lmk_df)>1:
-            # here is where we need to adjust for missing frames
-            # we need to drop the rows where the landmarks are not detected
-            # but we need to maintain columns so we just need to index correclty
             disp_actual_df = get_distance(lmk_df)
             disp_actual_df['overall'] = pd.DataFrame(disp_actual_df.mean(axis=1))
 
@@ -668,10 +666,11 @@ def get_displacement(
                     disp_actual_df = disp_actual_df - 1
 
             disp_actual_df = calculate_areas_displacement(disp_actual_df, measures)
-            displacement_df = pd.concat([df_meta, disp_actual_df], axis=1).reset_index(drop=True)
+            displacement_df = pd.concat([df_meta, disp_actual_df], axis=1)#.reset_index(drop=True)
     except Exception as e:
 
         logger.info(f'Error in displacement calculation is {e}')
+    print(len(displacement_df))
     return displacement_df
 
 def calculate_areas_displacement(displacement_df, measures):
@@ -958,8 +957,11 @@ def facial_expressivity(
         if normalize:
             df_landmark = normalize_face_landmarks(df_landmark, align=align)
         
+        # only pass in frames that are not null
+        sampled_frames = df_landmark.dropna()
+
         df_disp = get_displacement(
-            df_landmark,
+            sampled_frames,
             baseline_filepath,
             config,
             base_bbox_list=base_bbox_list,
@@ -968,7 +970,7 @@ def facial_expressivity(
         )
 
         # use mouth height to calculate mouth openness
-        df_disp['mouth_openness'] = get_mouth_openness(df_landmark, config)
+        df_disp['mouth_openness'] = get_mouth_openness(sampled_frames, config)
 
         if split_by_speaking:
             df_disp['speaking_probability'] = get_speaking_probabilities(
