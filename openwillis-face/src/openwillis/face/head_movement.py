@@ -197,16 +197,17 @@ def get_fw_xy_displacement(sampled_frames):
     
     return displacement_magnitudes
 
-def compute_rotation_angles_vectorized(pitch: np.ndarray, yaw: np.ndarray, roll: np.ndarray, order: str = "ZYX") -> np.ndarray:
+def compute_rotation_angles_vectorized(pitch: np.ndarray, yaw: np.ndarray, roll: np.ndarray, order: str = "XYZ") -> np.ndarray:
     """
     Computes the total rotation angles for multiple sets of pitch, yaw, and roll angles in degrees,
-    with correct matrix multiplication order.
+    with correct matrix multiplication order. Calculates total angle following openface convention:
+        https://github.com/TadasBaltrusaitis/OpenFace/wiki/Output-Format#featureextraction
 
     Args:
-    - pitch (np.ndarray): Array of rotations about the Y-axis in degrees.
-    - yaw (np.ndarray): Array of rotations about the Z-axis in degrees.
-    - roll (np.ndarray): Array of rotations about the X-axis in degrees.
-    - order (str): Rotation order (e.g., "XYZ" means roll->pitch->yaw).
+    - pitch (np.ndarray): Array of rotations about the X-axis in degrees (pitch).
+    - yaw (np.ndarray): Array of rotations about the Y-axis in degrees (yaw).
+    - roll (np.ndarray): Array of rotations about the Z-axis in degrees (roll).
+    - order (str): Rotation order (e.g., "XYZ" means pitch->yaw->roll).
 
     Returns:
     - np.ndarray: Array of total rotation angles in degrees.
@@ -222,30 +223,34 @@ def compute_rotation_angles_vectorized(pitch: np.ndarray, yaw: np.ndarray, roll:
     cos_r, sin_r = np.cos(roll_rad), np.sin(roll_rad)
 
     # Define batch rotation matrices (shape: (N, 3, 3))
+    # Pitch around X-axis
     R_x = np.stack([
-        np.stack([np.ones_like(roll_rad), np.zeros_like(roll_rad), np.zeros_like(roll_rad)], axis=-1),
-        np.stack([np.zeros_like(roll_rad), cos_r, -sin_r], axis=-1),
-        np.stack([np.zeros_like(roll_rad), sin_r, cos_r], axis=-1)
+        np.stack([np.ones_like(pitch_rad), np.zeros_like(pitch_rad), np.zeros_like(pitch_rad)], axis=-1),
+        np.stack([np.zeros_like(pitch_rad), cos_p, -sin_p], axis=-1),
+        np.stack([np.zeros_like(pitch_rad), sin_p, cos_p], axis=-1)
     ], axis=1)  # Shape (N, 3, 3)
 
+    # Yaw around Y-axis
     R_y = np.stack([
-        np.stack([cos_p, np.zeros_like(pitch_rad), sin_p], axis=-1),
-        np.stack([np.zeros_like(pitch_rad), np.ones_like(pitch_rad), np.zeros_like(pitch_rad)], axis=-1),
-        np.stack([-sin_p, np.zeros_like(pitch_rad), cos_p], axis=-1)
+        np.stack([cos_y, np.zeros_like(yaw_rad), sin_y], axis=-1),
+        np.stack([np.zeros_like(yaw_rad), np.ones_like(yaw_rad), np.zeros_like(yaw_rad)], axis=-1),
+        np.stack([-sin_y, np.zeros_like(yaw_rad), cos_y], axis=-1)
     ], axis=1)  # Shape (N, 3, 3)
 
+    # Roll around Z-axis
     R_z = np.stack([
-        np.stack([cos_y, -sin_y, np.zeros_like(yaw_rad)], axis=-1),
-        np.stack([sin_y, cos_y, np.zeros_like(yaw_rad)], axis=-1),
-        np.stack([np.zeros_like(yaw_rad), np.zeros_like(yaw_rad), np.ones_like(yaw_rad)], axis=-1)
+        np.stack([cos_r, -sin_r, np.zeros_like(roll_rad)], axis=-1),
+        np.stack([sin_r, cos_r, np.zeros_like(roll_rad)], axis=-1),
+        np.stack([np.zeros_like(roll_rad), np.zeros_like(roll_rad), np.ones_like(roll_rad)], axis=-1)
     ], axis=1)  # Shape (N, 3, 3)
 
     # Apply rotations in specified order correctly
+    # Convention: R = Rx * Ry * Rz (pitch -> yaw -> roll)
     order_map = {
-        "XYZ": lambda: np.einsum("nij,njk,nkl->nil", R_x, R_y, R_z),  # Yaw -> Pitch -> Roll
-        "YXZ": lambda: np.einsum("nij,njk,nkl->nil", R_y, R_x, R_z),  # Yaw -> Roll -> Pitch
-        "ZXY": lambda: np.einsum("nij,njk,nkl->nil", R_z, R_x, R_y),  # Pitch -> Roll -> Yaw
-        "ZYX": lambda: np.einsum("nij,njk,nkl->nil", R_z, R_y, R_x),  # Roll -> Pitch -> Yaw
+        "XYZ": lambda: np.einsum("nij,njk,nkl->nil", R_x, R_y, R_z),  # pitch -> yaw -> roll
+        "YXZ": lambda: np.einsum("nij,njk,nkl->nil", R_y, R_x, R_z),  # yaw -> pitch -> roll
+        "ZXY": lambda: np.einsum("nij,njk,nkl->nil", R_z, R_x, R_y),  # roll -> pitch -> yaw
+        "ZYX": lambda: np.einsum("nij,njk,nkl->nil", R_z, R_y, R_x),  # roll -> yaw -> pitch
     }
 
     if order not in order_map:
