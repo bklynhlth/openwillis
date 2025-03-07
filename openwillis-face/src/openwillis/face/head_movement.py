@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 import pandas as pd
 import feat 
-from .util import create_cropped_frame
+from .util import create_cropped_frame, calculate_padding
 
 import logging
 
@@ -44,21 +44,18 @@ def get_facepose(frame_index, frame, detector):
     np.ndarray
         A numpy array with the following values:
         [frame_index, bb_x1, bb_y1, bb_x2, bb_y2, face_confidence, pitch, roll, yaw]
+        If no face is detected, returns array with NaN values except for frame_index.
     """
-    
-    faceposes = detector.detect_facepose(frame)
+    try:
+        faceposes = detector.detect_facepose(frame)
+        faces = faceposes['faces'][0][0]  # (x1, y1, x2, y2, face_confidence)
+        poses = faceposes['poses'][0][0]  # (pitch, roll, yaw)
+        return np.hstack(([frame_index], faces, poses))
+    except Exception as e:
+        logger.info(f'Error processing frame {frame_index}: {str(e)}')
+        return get_undetected_facepose(frame_index)
 
-    # (x1, y1, x2, y2, face_confidence)
-    faces = faceposes['faces'][0][0]#assume only one face in the frame
-    
-    # pitch, roll, yaw
-    poses = faceposes['poses'][0][0]
-
-    facepose = np.hstack(([frame_index], faces, poses))
-
-    return facepose
-
-def crop_and_get_facepose(frame_index, frame, detector, bbox):
+def crop_and_get_facepose(frame_index, frame, detector, bbox, padding_percent=0.1):
     """
     Extract bounding box and facial landmark coordinates for a frame using py-feat's Detector.
 
@@ -80,15 +77,15 @@ def crop_and_get_facepose(frame_index, frame, detector, bbox):
         A numpy array with the following values:
         [frame_index, bb_x1, bb_y1, bb_x2, bb_y2, face_confidence, pitch, roll, yaw]
     """
-    
-    frame = create_cropped_frame(frame, bbox)
+    padded_bbox = calculate_padding(bbox, padding_percent)
+    frame = create_cropped_frame(frame, padded_bbox)
     facepose = get_facepose(frame_index, frame, detector)
     bbox_face_pose_fmt = [bbox['bb_x'], bbox['bb_y'], bbox['bb_x']+bbox['bb_w'], bbox['bb_y']+bbox['bb_h'],1]
     facepose[1:6]=bbox_face_pose_fmt
 
     return facepose
 
-def extract_landmarks_and_bboxes(video_path, frames_per_second=3, bbox_list = []):
+def extract_landmarks_and_bboxes(video_path, frames_per_second=3, bbox_list=[], padding_percent=0.1):
     """
     Extract bounding boxes and facial landmark coordinates from a video using py-feat's Detector,
     sampling at a specified number of frames per second.
@@ -100,6 +97,11 @@ def extract_landmarks_and_bboxes(video_path, frames_per_second=3, bbox_list = []
     frames_per_second : float, optional
         The number of frames to sample per second of video. Default is 3.
         This determines the temporal resolution of the analysis.
+    bbox_list : list of dict, optional
+        A list of bounding boxes for each frame.
+    padding_percent : float, optional
+        Amount of padding to add around the bounding box as a percentage of its size.
+        Default is 0.1 (10%).
 
     Returns
     -------
@@ -137,7 +139,8 @@ def extract_landmarks_and_bboxes(video_path, frames_per_second=3, bbox_list = []
                         frame_index,
                         frame,
                         detector,
-                        bbox_list[frame_index]
+                        bbox_list[frame_index],
+                        padding_percent=padding_percent
                     )
                 else:
                     facepose = get_facepose(frame_index, frame, detector)
@@ -264,7 +267,7 @@ def compute_rotation_angles_vectorized(pitch: np.ndarray, yaw: np.ndarray, roll:
 
     return np.degrees(rotation_angles)  # Convert to degrees
 
-def head_movement(video_path, frames_per_second=3, normalize_by_bb_size=False, bbox_list=[]):
+def head_movement(video_path, frames_per_second=3, normalize_by_bb_size=False, bbox_list=[], padding_percent=0.1):
     """
     Extract bounding boxes and facial landmark coordinates from a video using py-feat's Detector,
     sampling at a specified number of frames per second, and compute various head movement metrics.
@@ -278,10 +281,13 @@ def head_movement(video_path, frames_per_second=3, normalize_by_bb_size=False, b
         This determines the temporal resolution of the analysis.
     normalize_by_bb_size : bool, optional
         If True, normalize the xy displacement by the bounding box width. Default is False.
-    bounding_boxes : list of dict, optional
+    bbox_list : list of dict, optional
         A list of bounding boxes, each represented as a dictionary with keys:
         ['bb_x1', 'bb_y1', 'w', 'h']. If provided, these bounding boxes will be used 
         instead of detecting them.
+    padding_percent : float, optional
+        Amount of padding to add around the bounding box as a percentage of its size.
+        Default is 0.1 (10%).
 
     Returns
     -------
@@ -295,7 +301,8 @@ def head_movement(video_path, frames_per_second=3, normalize_by_bb_size=False, b
     out_df = extract_landmarks_and_bboxes(
         video_path,
         frames_per_second=frames_per_second,
-        bbox_list=bbox_list
+        bbox_list=bbox_list,
+        padding_percent=padding_percent
     )
     
     out_df = _compute_bb_centers(out_df)
