@@ -80,6 +80,7 @@ def crop_and_get_facepose(frame_index, frame, detector, bbox):
         A numpy array with the following values:
         [frame_index, bb_x1, bb_y1, bb_x2, bb_y2, face_confidence, pitch, roll, yaw]
     """
+    
     frame = create_cropped_frame(frame, bbox)
     facepose = get_facepose(frame_index, frame, detector)
     bbox_face_pose_fmt = [bbox['bb_x'], bbox['bb_y'], bbox['bb_x']+bbox['bb_w'], bbox['bb_y']+bbox['bb_h'],1]
@@ -241,10 +242,10 @@ def compute_rotation_angles_vectorized(pitch: np.ndarray, yaw: np.ndarray, roll:
 
     # Apply rotations in specified order correctly
     order_map = {
-        "XYZ": lambda: np.einsum("nij,njk,nkl->nil", R_x, R_y, R_z),  # Roll -> Pitch -> Yaw
-        "YXZ": lambda: np.einsum("nij,njk,nkl->nil", R_y, R_x, R_z),  # Pitch -> Roll -> Yaw
-        "ZXY": lambda: np.einsum("nij,njk,nkl->nil", R_z, R_x, R_y),  # Yaw -> Roll -> Pitch
-        "ZYX": lambda: np.einsum("nij,njk,nkl->nil", R_z, R_y, R_x),  # Yaw -> Pitch -> Roll
+        "XYZ": lambda: np.einsum("nij,njk,nkl->nil", R_x, R_y, R_z),  # Yaw -> Pitch -> Roll
+        "YXZ": lambda: np.einsum("nij,njk,nkl->nil", R_y, R_x, R_z),  # Yaw -> Roll -> Pitch
+        "ZXY": lambda: np.einsum("nij,njk,nkl->nil", R_z, R_x, R_y),  # Pitch -> Roll -> Yaw
+        "ZYX": lambda: np.einsum("nij,njk,nkl->nil", R_z, R_y, R_x),  # Roll -> Pitch -> Yaw
     }
 
     if order not in order_map:
@@ -307,7 +308,7 @@ def head_movement(video_path, frames_per_second=3, normalize_by_bb_size=False, b
     )
     
     sampled_angles = out_df['euclidean_angle'].dropna()
-    print(sampled_angles)
+    
     out_df['euclidean_angle_disp'] = sampled_angles.diff().abs()
 
     out_df['xy_disp'] = sampled_frames['xy_disp']
