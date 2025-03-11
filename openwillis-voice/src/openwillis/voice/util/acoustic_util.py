@@ -11,7 +11,6 @@ import numpy.matlib
 import pandas as pd
 import scipy
 
-from parselmouth import Sound
 from parselmouth.praat import call
 from pydub import AudioSegment, silence
 import librosa
@@ -181,35 +180,26 @@ def voice_frame(sound, measures):
     df = pd.DataFrame([voice_pct], columns=[measures['silence_ratio']])
     return df
 
-def read_audio(path):
+def get_measures():
     """
     ------------------------------------------------------------------------------------------------------
-
-    Reads an audio file and returns the Praat sound object and a dictionary of measures names.
-
-    Parameters:
-    ...........
-    path : str
-        The path to the audio file.
-
+    
+    Reads the measures configuration file and returns the measures dictionary.
+    
     Returns:
     ...........
-    sound : praat sound object
-        the Praat sound object for the given audio file.
     measures : dict
         a dictionary containing the measures names for the calculated statistics.
-
+        
     ------------------------------------------------------------------------------------------------------
     """
-    #Loading json config
     dir_name = os.path.dirname(os.path.abspath(__file__))
     measure_path = os.path.abspath(os.path.join(dir_name, '../config/acoustic.json'))
 
     file = open(measure_path)
     measures = json.load(file)
-    sound = Sound(path)
 
-    return sound, measures
+    return measures
 
 def pitchfreq(sound, measures, f0min, f0max):
     """
