@@ -93,5 +93,8 @@
   "lhr_kurtosis": "lhr_kurtosis",
   "lhr_skewness": "lhr_skewness",
   "phonation_type": "phonation_type",
-  "duration": "duration"
+  "duration": "duration",
+  "ACF1": "acf1",
+  "ACF2": "acf2",
+  "ACF3": "acf3"
 }

@@ -11,6 +11,7 @@ import pandas as pd
 from parselmouth.praat import run_file
 
 from .util import acoustic_util as autil
+from .util import coordination_util as cutil
 
 logging.basicConfig(level=logging.INFO)
 logger=logging.getLogger()
@@ -351,9 +352,10 @@ def process_audio(audio_path, voiced_segments = True, option='simple'):
     df_silence = autil.get_voice_silence(audio_path, 500, measures)
     df_cepstral = autil.get_cepstral_features(audio_path, measures)
     df_lhr = autil.calculate_lhr(sound, measures)
+    df_coordination = cutil.calculate_articulation_coordination(audio_path, measures)
 
     framewise = pd.concat([df_pitch, df_formant, df_loudness, df_hnr], axis=1)
-    sig_df = pd.concat([df_jitter, df_shimmer, df_gne, df_cepstral, df_lhr], axis=1)
+    sig_df = pd.concat([df_jitter, df_shimmer, df_gne, df_cepstral, df_lhr, df_coordination], axis=1)
 
     df_summary = get_summary(sound, framewise, sig_df, df_silence, voiced_segments, measures)
     df_summary2 = get_advanced_summary(df_summary, audio_path, option, duration_seconds, measures)
