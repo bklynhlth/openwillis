@@ -8,3 +8,4 @@ librosa==0.10.2.post1
 numpy<1.28.0,>=1.23.5
 speechbrain==1.0.2
 torch==2.5.1
+transformers==4.46.3
