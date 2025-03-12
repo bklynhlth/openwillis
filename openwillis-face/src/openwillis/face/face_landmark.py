@@ -898,7 +898,7 @@ def facial_expressivity(
     baseline_filepath='',
     bbox_list=[],
     base_bbox_list=[],
-    frames_per_second=3,
+    frames_per_second=10,
     normalize=True,
     align=False,
     rolling_std_seconds=3,
