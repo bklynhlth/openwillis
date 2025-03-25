@@ -900,6 +900,40 @@ def normalize_face_landmarks(
 
     return norm_df
 
+def adjust_summary_stats(df_summ, skip_interval):
+        """
+        ---------------------------------------------------------------------------------------------------
+        Adjusts the mean and standard deviation columns in the summary dataframe based on the skip interval.
+
+        Parameters:
+        ............
+        df_summ : pandas.DataFrame
+        Summary statistics dataframe.
+        skip_interval : int
+        The number of frames skipped during landmark extraction.
+
+        Returns:
+        ............
+        pandas.DataFrame
+        Adjusted summary statistics dataframe.
+        ---------------------------------------------------------------------------------------------------
+        """
+        if skip_interval<0:
+            #raise exception
+            Rai
+            return df_summ
+        
+        scale = skip_interval + 1
+        mean_cols = [col for col in df_summ.columns if 'mean' in col]
+        mean_cols = [col for col in mean_cols if 'mouth_openness_mean' not in col]
+        std_cols = [col for col in df_summ.columns if 'std' in col]
+        std_cols = [col for col in std_cols if 'mouth_openness_std' not in col]
+
+        df_summ[mean_cols] = df_summ[mean_cols] / (scale)
+        df_summ[std_cols] = df_summ[std_cols] / np.sqrt(scale)
+
+        return df_summ
+
 def facial_expressivity(
     filepath,
     baseline_filepath='',
@@ -955,6 +989,10 @@ def facial_expressivity(
     config = get_config(os.path.abspath(__file__), "facial.json")
 
     try:
+
+        if frames_per_second < 1:
+            raise ValueError('frames_per_second must be greater than 1')
+
         df_landmark, skip_interval = get_landmarks(
             filepath,
             bbox_list=bbox_list,
@@ -991,12 +1029,7 @@ def facial_expressivity(
         else:
             df_summ = get_summary(df_disp, 470)
 
-        if skip_interval > 0:
-            mean_cols = [col for col in df_summ.columns if 'mean' in col]
-            std_cols = [col for col in df_summ.columns if 'std' in col]
-
-            df_summ[mean_cols] = df_summ[mean_cols] / (skip_interval+1)
-            df_summ[std_cols] = df_summ[std_cols] / np.sqrt(skip_interval+1)
+        df_summ = adjust_summary_stats(df_summ, skip_interval)
 
         return df_landmark, df_disp, df_summ
 
