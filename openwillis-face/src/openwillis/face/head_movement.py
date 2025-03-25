@@ -116,43 +116,52 @@ def extract_landmarks_and_bboxes(video_path, frames_per_second=3, bbox_list=[], 
 
     detector = feat.Detector()
     cap = cv2.VideoCapture(video_path)
-
+    num_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     video_fps = cap.get(cv2.CAP_PROP_FPS)
-    
-    if not cap.isOpened():
-        raise IOError(f"Cannot open video file: {video_path}")
     
     skip_interval = max(1, int(video_fps / frames_per_second))
 
     frame_index = 0
     faces_list = []
-            
-    while True:
-        try:
-            ret, frame = cap.read()
-            if not ret:
-                break  
+    bbox_list_len = len(bbox_list)
 
-            if frame_index % skip_interval == 0:
-                if len(bbox_list)!=0:
-                    facepose = crop_and_get_facepose(
-                        frame_index,
-                        frame,
-                        detector,
-                        bbox_list[frame_index],
-                        padding_percent=padding_percent
-                    )
+    try:
+        if not cap.isOpened():
+            raise IOError(f"Cannot open video file: {video_path}")
+        
+        if bbox_list_len > 0 and num_frames != bbox_list_len:
+            raise ValueError('Number of frames in video and number of bounding boxes do not match')
+        
+        while True:
+            try:
+                
+                ret, frame = cap.read()
+                if not ret:
+                    break  
+
+                if frame_index % skip_interval == 0:
+                    if len(bbox_list)!=0:
+                        facepose = crop_and_get_facepose(
+                            frame_index,
+                            frame,
+                            detector,
+                            bbox_list[frame_index],
+                            padding_percent=padding_percent
+                        )
+                    else:
+                        facepose = get_facepose(frame_index, frame, detector)
                 else:
-                    facepose = get_facepose(frame_index, frame, detector)
-            else:
+                    facepose = get_undetected_facepose(frame_index) 
+            
+            except Exception as e:
+                logger.info(f'error processing frame: {frame_index} in file: {video_path} & Error: {e}')
                 facepose = get_undetected_facepose(frame_index) 
             
-        except Exception as e:
-            logger.info(f'error processing frame: {frame_index} in file: {video_path} & Error: {e}')
-            facepose = get_undetected_facepose(frame_index) 
-        
-        frame_index += 1
-        faces_list.append(facepose)
+            frame_index += 1
+            faces_list.append(facepose)
+
+    except Exception as e:
+        logger.info(f'error processing file: {video_path} & Error: {e}')
  
 
     cap.release()
