@@ -220,7 +220,7 @@ def run_pyfeat(path, frames_per_second=3, bbox_list=[]):
         len_bbox_list = len(bbox_list)
         video_fps = cap.get(cv2.CAP_PROP_FPS)
         
-        skip_interval = max(1, int(video_fps / frames_per_second))
+        skip_interval = max(0, int(video_fps / frames_per_second))
 
         df_list = []
         frame = 0

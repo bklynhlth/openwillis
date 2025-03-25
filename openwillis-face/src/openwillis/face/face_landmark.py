@@ -250,7 +250,10 @@ def run_facemesh(path, frames_per_second=3, bbox_list=[]):
         len_bbox_list = len(bbox_list)
         
         # Calculate skip interval to get desired frames per second
-        skip_interval = max(1, int(video_fps / frames_per_second))
+        if frames_per_second >= video_fps:
+            skip_interval = 0
+        else:
+            skip_interval = max(0, int(video_fps / frames_per_second))
         
         face_mesh = init_facemesh()
         bbox_list_passed = len_bbox_list > 0
@@ -273,12 +276,13 @@ def run_facemesh(path, frames_per_second=3, bbox_list=[]):
 
                 elif n_frames_skipped == skip_interval:
                     n_frames_skipped = 0
+                    img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
                     df_common = pd.DataFrame([[frame, frame/video_fps]], columns=['frame', 'time'])
                     
                     if bbox_list_passed:
                         bbox = bbox_list[frame]
                         df_landmark = crop_and_process_face_mesh(
-                            img,
+                            img_rgb,
                             face_mesh,
                             df_common,
                             bbox,
@@ -287,7 +291,7 @@ def run_facemesh(path, frames_per_second=3, bbox_list=[]):
                         )
                     else:
                         df_landmark = process_and_format_face_mesh(
-                            img,
+                            img_rgb,
                             face_mesh,
                             df_common
                         )
@@ -309,7 +313,7 @@ def run_facemesh(path, frames_per_second=3, bbox_list=[]):
             df_list.append(df_landmark)
             logger.info(f'Face not detected by facemesh in: {path}')
 
-    return df_list
+    return df_list, skip_interval
 
 def get_undected_markers(frame,fps):
     """
@@ -371,7 +375,7 @@ def get_landmarks(path, frames_per_second=3, bbox_list=[]):
     ---------------------------------------------------------------------------------------------------
     """
 
-    landmark_list = run_facemesh(
+    landmark_list, skip_interval = run_facemesh(
         path,
         bbox_list=bbox_list,
         frames_per_second=frames_per_second
@@ -382,7 +386,7 @@ def get_landmarks(path, frames_per_second=3, bbox_list=[]):
     else:
         df_landmark = get_empty_dataframe()
 
-    return df_landmark
+    return df_landmark, skip_interval
 
 def get_distance(df):
     """
@@ -560,7 +564,7 @@ def baseline(base_path, frames_per_second=3, bbox_list=[], normalize=True, align
     """
     config = get_config(os.path.abspath(__file__), "facial.json")
 
-    base_landmark = get_landmarks(
+    base_landmark, skip_interval = get_landmarks(
         base_path, 
         frames_per_second=frames_per_second,
         bbox_list=bbox_list
@@ -568,7 +572,10 @@ def baseline(base_path, frames_per_second=3, bbox_list=[], normalize=True, align
     
     if normalize:
         base_landmark = normalize_face_landmarks(base_landmark, align=align)
-        
+
+     
+    base_landmark = base_landmark.iloc[::(skip_interval+1), :]
+
     disp_base_df = get_distance(base_landmark)
 
     disp_base_df['overall'] = pd.DataFrame(disp_base_df.mean(axis=1))
@@ -948,7 +955,7 @@ def facial_expressivity(
     config = get_config(os.path.abspath(__file__), "facial.json")
 
     try:
-        df_landmark = get_landmarks(
+        df_landmark, skip_interval = get_landmarks(
             filepath,
             bbox_list=bbox_list,
             frames_per_second=frames_per_second
@@ -957,8 +964,10 @@ def facial_expressivity(
         if normalize:
             df_landmark = normalize_face_landmarks(df_landmark, align=align)
         
-        sampled_frames = df_landmark.dropna().reset_index()
-
+        sampled_frames = df_landmark.iloc[::(skip_interval+1), :]
+       
+        
+        sampled_frames = sampled_frames.reset_index(drop=True)
         df_disp = get_displacement(
             sampled_frames,
             baseline_filepath,
@@ -976,10 +985,18 @@ def facial_expressivity(
                 df_disp, 
                 rolling_std_seconds
             )
+
             df_summ = split_speaking_df(df_disp, 'speaking_probability', 470)
 
         else:
             df_summ = get_summary(df_disp, 470)
+
+        if skip_interval > 0:
+            mean_cols = [col for col in df_summ.columns if 'mean' in col]
+            std_cols = [col for col in df_summ.columns if 'std' in col]
+
+            df_summ[mean_cols] = df_summ[mean_cols] / (skip_interval+1)
+            df_summ[std_cols] = df_summ[std_cols] / np.sqrt(skip_interval+1)
 
         return df_landmark, df_disp, df_summ
 
