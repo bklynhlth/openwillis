@@ -958,7 +958,7 @@ def facial_expressivity(
             df_landmark = normalize_face_landmarks(df_landmark, align=align)
         
         # only pass in frames that are not null
-        sampled_frames = df_landmark.dropna()
+        sampled_frames = df_landmark.dropna().reset_index()
 
         df_disp = get_displacement(
             sampled_frames,
