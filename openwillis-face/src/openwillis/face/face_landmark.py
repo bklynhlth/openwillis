@@ -1,4 +1,4 @@
-# author:    Vijay Yadav
+# author:    Vijay Yadav/Kieran McVeigh
 # website:   http://www.bklynhlth.com
 
 # import the required packages
@@ -666,7 +666,7 @@ def get_displacement(
                     disp_actual_df = disp_actual_df - 1
 
             disp_actual_df = calculate_areas_displacement(disp_actual_df, measures)
-            displacement_df = pd.concat([df_meta, disp_actual_df], axis=1)#.reset_index(drop=True)
+            displacement_df = pd.concat([df_meta, disp_actual_df], axis=1)
     except Exception as e:
 
         logger.info(f'Error in displacement calculation is {e}')
@@ -957,7 +957,6 @@ def facial_expressivity(
         if normalize:
             df_landmark = normalize_face_landmarks(df_landmark, align=align)
         
-        # only pass in frames that are not null
         sampled_frames = df_landmark.dropna().reset_index()
 
         df_disp = get_displacement(
