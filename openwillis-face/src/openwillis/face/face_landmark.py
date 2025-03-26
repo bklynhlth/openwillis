@@ -677,7 +677,6 @@ def get_displacement(
     except Exception as e:
 
         logger.info(f'Error in displacement calculation is {e}')
-    print(len(displacement_df))
     return displacement_df
 
 def calculate_areas_displacement(displacement_df, measures):
@@ -918,10 +917,8 @@ def adjust_summary_stats(df_summ, skip_interval):
         Adjusted summary statistics dataframe.
         ---------------------------------------------------------------------------------------------------
         """
-        if skip_interval<0:
-            #raise exception
-            Rai
-            return df_summ
+        if skip_interval < 0:
+            raise ValueError('skip_interval must be greater than or equal to 0')
         
         scale = skip_interval + 1
         mean_cols = [col for col in df_summ.columns if 'mean' in col]
