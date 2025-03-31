@@ -6,7 +6,7 @@ with open("README.md", "r") as fh:
 
 setup(
     name='openwillis',
-    version='3.0.4',
+    version='3.1.0',
     description='digital health measurement',
     long_description=long_description,
     long_description_content_type="text/markdown",
@@ -18,10 +18,10 @@ setup(
     author_email='admin@bklynhlth.com',
     license='Apache',
     install_requires=[
-        'openwillis-voice==1.0.4',
-        'openwillis-transcribe==1.0.4',
-        'openwillis-gps==1.0.4',
-        'openwillis-speech==1.0.4',
-        'openwillis-face==1.0.4',
+        'openwillis-voice==1.1.0',
+        'openwillis-transcribe==1.1.0',
+        'openwillis-gps==1.1.0',
+        'openwillis-speech==1.1.0',
+        'openwillis-face==1.1.0',
     ],
 )

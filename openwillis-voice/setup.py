@@ -5,7 +5,7 @@ with open("requirements.txt", "r") as fp:
 
 setup(
     name='openwillis-voice',
-    version='1.0.4',
+    version='1.1.0',
     description='digital health measurement',
     long_description_content_type="text/markdown",
     url='https://github.com/bklynhlth/openwillis',
