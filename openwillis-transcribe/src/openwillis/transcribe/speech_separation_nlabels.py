@@ -92,6 +92,7 @@ def read_kwargs(kwargs):
     
     input_param['transcript_json'] = kwargs.get('transcript_json', json.dumps({}))
     input_param['context'] = kwargs.get('context', '')
+    input_param['context_model'] = kwargs.get('context_model', 'sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2')
 
     input_param['volume_normalization'] = kwargs.get('volume_normalization', None)
 
@@ -142,6 +143,8 @@ def speaker_separation_nolabels(filepath, **kwargs):
         Access token for HuggingFace to access pre-trained models.
     context : str, optional
         scale to use for slicing the separated audio files, if any.
+    context_model : str, optional
+        model to use for speaker identification, if context is provided.
     volume_normalization : int
         The volume normalization level. Default is None.
 
@@ -160,13 +163,16 @@ def speaker_separation_nolabels(filepath, **kwargs):
     try:
         if not os.path.exists(filepath) or 'transcript_json' not in kwargs:
             return signal_label
+        
+        if input_param['context_model'] not in measures['embedding_models']:
+            raise ValueError(f"Model {input_param['context_model']} not found in the config file")
 
         speaker_df, speaker_count = get_pyannote(input_param, filepath)
         audio_signal = AudioSegment.from_file(file = filepath, format = "wav")
 
         if len(speaker_df)>0 and speaker_count>1:
             combined_df = sutil.combine_turns(speaker_df)
-            signal_label = sutil.generate_audio_signal(combined_df, audio_signal, input_param['context'], measures)
+            signal_label = sutil.generate_audio_signal(combined_df, audio_signal, input_param['context'], input_param['context_model'], measures)
 
             if input_param['volume_normalization']:
                 if type(input_param['volume_normalization']) != int or input_param['volume_normalization'] < -60 or input_param['volume_normalization'] > 0:
