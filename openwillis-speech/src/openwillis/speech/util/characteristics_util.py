@@ -1,16 +1,17 @@
 # author:    Vijay Yadav, Georgios Efstathiadis
 # website:   http://www.bklynhlth.com
 
+import itertools
 # import the required packages
 import logging
-import itertools
 
-import pandas as pd
-import numpy as np
 import nltk
+import numpy as np
+import pandas as pd
+
+from .speech.coherence import get_phrase_coherence, get_word_coherence
+from .speech.lexical import get_pos_tag, get_repetitions, get_sentiment
 from .speech.pause import get_pause_feature
-from .speech.lexical import get_repetitions, get_sentiment, get_pos_tag
-from .speech.coherence import get_word_coherence, get_phrase_coherence
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger()
@@ -70,6 +71,7 @@ def create_empty_dataframes(measures):
                                     measures["pause_meandur"], measures["pause_var"], measures["pos"], measures["neg"], 
                                     measures["neu"], measures["compound"], measures["speech_mattr_5"],
                                     measures["speech_mattr_10"], measures["speech_mattr_25"], measures["speech_mattr_50"], measures["speech_mattr_100"],
+                                    measures["honore_statistic"], measures["brunet_index"],
                                     measures["first_person_percentage"], measures["first_person_sentiment_positive"], measures["first_person_sentiment_negative"],
                                     measures["word_repeat_percentage"], measures["phrase_repeat_percentage"],
                                     measures["sentence_tangeniality1"], measures["sentence_tangeniality2"],
@@ -82,6 +84,7 @@ def create_empty_dataframes(measures):
                 measures["syllable_rate"], measures["word_pause_mean"], measures["word_pause_var"], 
                 measures["speech_percentage"], measures["pos"], measures["neg"], measures["neu"], measures["compound"],
                 measures["speech_mattr_5"], measures["speech_mattr_10"], measures["speech_mattr_25"], measures["speech_mattr_50"], measures["speech_mattr_100"],
+                measures['honore_statistic'], measures['brunet_index'],
                 measures["first_person_percentage"], measures["first_person_sentiment_positive"],
                 measures["first_person_sentiment_negative"], measures["first_person_sentiment_overall"],
                 measures["word_repeat_percentage"], measures["phrase_repeat_percentage"],
