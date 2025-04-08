@@ -1,16 +1,17 @@
 # author:    Georgios Efstathiadis
 # website:   http://www.bklynhlth.com
 
-# import the required packages
-import pandas as pd
-import numpy as np
-import string
 import logging
+import string
+from collections import Counter
 
 import nltk
-from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
-from lexicalrichness import LexicalRichness
+import numpy as np
+# import the required packages
+import pandas as pd
 import spacy
+from lexicalrichness import LexicalRichness
+from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger()
@@ -22,6 +23,7 @@ TAG_DICT = {"PRP": "Pronoun", "PRP$": "Pronoun", "VB": "Verb", "VBD": "Verb", "V
 FIRST_PERSON_PRONOUNS = ["I", "me", "my", "mine", "myself"]
 PRESENT = ["VBP", "VBZ"]
 PAST = ["VBD", "VBN"]
+MIN_WORDS = 10
 
 def get_mattr(text, lemmatizer, window_size=50):
     """
@@ -59,6 +61,98 @@ def get_mattr(text, lemmatizer, window_size=50):
         mattr = lex_richness.mattr(window_size=min(window_size, lex_richness.words))
 
     return mattr
+
+def preprocess_text(text, lemmatizer):
+    """
+    Preprocess the input text: tokenize, remove punctuation, lowercase, lemmatize.
+
+    Parameters:
+    ...........
+    text: str
+            The input text to be analyzed.
+    lemmatizer: spacy lemmatizer
+            The lemmatizer to be used.
+
+    Returns:
+    ...........
+    words_texts : list 
+        List of lemmatized words.
+    """
+    words = nltk.word_tokenize(text)
+    words = [w.translate(str.maketrans('', '', string.punctuation)).lower() for w in words]
+    words = [w for w in words if w != '']
+    words_texts = [token.lemma_ for token in lemmatizer(' '.join(words))]
+    return words_texts
+
+def get_brunet_index(text, lemmatizer, a=0.172):
+    """
+    ------------------------------------------------------------------------------------------------------
+    This function calculates Brunet's Index to measure lexical diversity 
+    of the input text.
+
+    Parameters:
+    ...........
+    text : str
+        The input text to be analyzed.
+    lemmatizer : spacy lemmatizer
+        The lemmatizer to be used in the calculation.
+    a : float
+        A constant parameter for Brunet's Index (default is 0.172).
+
+    Returns:
+    ...........
+    brunet : float
+        The calculated Brunet's Index value.
+
+    ------------------------------------------------------------------------------------------------------
+    """
+    words = preprocess_text(text, lemmatizer)
+    
+    N = len(words)       # Total number of words (tokens)
+    
+    if N < MIN_WORDS:
+        return np.nan  # Avoid unreliable results
+    
+    V = len(set(words))  # Number of unique words (types)
+    
+    return N ** (V**-a)
+
+def get_honore_statistic(text, lemmatizer):
+    """
+    ------------------------------------------------------------------------------------------------------
+    This function calculates Honoré's Statistic to measure lexical richness 
+    of the input text.
+
+    Parameters:
+    ...........
+    text : str
+        The input text to be analyzed.
+    lemmatizer : spacy lemmatizer
+        The lemmatizer to be used in the calculation.
+
+    Returns:
+    ...........
+    honore : float
+        The calculated Honoré's Statistic value.
+
+    ------------------------------------------------------------------------------------------------------
+    """
+    words = preprocess_text(text, lemmatizer)
+    N = len(words)       # Total number of words (tokens)
+
+    if N < MIN_WORDS:
+        return np.nan  # Avoid unreliable results for small texts
+
+    V = len(set(words))  # Number of unique words (types)
+
+    freq_counts = Counter(words)
+    V1 = sum(1 for word in freq_counts if freq_counts[word] == 1)  # Count of hapax legomena: words that occur once.
+
+    if V == V1:  # Prevent division by zero
+        return np.nan
+
+    return 100 * (np.log(N) / (1 - (V1 / V)))
+
 
 def get_tag(word_df, word_list, measures):
     """
@@ -322,14 +416,17 @@ def get_sentiment(df_list, text_list, measures):
         lemmatizer = spacy.load('en_core_web_sm')
 
         sentiment = SentimentIntensityAnalyzer()
-        cols = [measures["neg"], measures["neu"], measures["pos"], measures["compound"], measures["speech_mattr_5"], measures["speech_mattr_10"], measures["speech_mattr_25"], measures["speech_mattr_50"], measures["speech_mattr_100"]]
+        #cols = [measures["neg"], measures["neu" ], measures["pos"], measures["compound"], measures["speech_mattr_5"], measures["speech_mattr_10"], measures["speech_mattr_25"], measures["speech_mattr_50"], measures["speech_mattr_100"]]
+        cols = [measures["neg"], measures["neu"], measures["pos"], measures["compound"], measures["speech_mattr_5"], measures["speech_mattr_10"], measures["speech_mattr_25"], measures["speech_mattr_50"], measures["speech_mattr_100"], measures["brunet_index"], measures["honore_statistic"]]
 
         for idx, u in enumerate(turn_list):
             try:
 
                 sentiment_dict = sentiment.polarity_scores(u)
                 mattrs = [get_mattr(u, lemmatizer, window_size=ws) for ws in [5, 10, 25, 50, 100]]
-                turn_df.loc[idx, cols] = list(sentiment_dict.values()) + mattrs
+                brunet = get_brunet_index(u, lemmatizer)
+                honore = get_honore_statistic(u, lemmatizer)
+                turn_df.loc[idx, cols] = list(sentiment_dict.values()) + mattrs + [brunet, honore]
 
             except Exception as e:
                 logger.info(f"Error in sentiment analysis: {e}")
@@ -337,8 +434,11 @@ def get_sentiment(df_list, text_list, measures):
 
         sentiment_dict = sentiment.polarity_scores(full_text)
         mattrs = [get_mattr(full_text, lemmatizer, window_size=ws) for ws in [5, 10, 25, 50, 100]]
+        brunet = get_brunet_index(full_text, lemmatizer)
+        honore = get_honore_statistic(full_text, lemmatizer)
 
-        summ_df.loc[0, cols] = list(sentiment_dict.values()) + mattrs
+        summ_df.loc[0, cols] = list(sentiment_dict.values()) + mattrs + [brunet, honore]
+
         df_list = [word_df, turn_df, summ_df]
     except Exception as e:
         logger.info(f"Error in sentiment feature calculation: {e}")
