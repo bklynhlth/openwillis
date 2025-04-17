@@ -416,7 +416,6 @@ def get_sentiment(df_list, text_list, measures):
         lemmatizer = spacy.load('en_core_web_sm')
 
         sentiment = SentimentIntensityAnalyzer()
-        #cols = [measures["neg"], measures["neu" ], measures["pos"], measures["compound"], measures["speech_mattr_5"], measures["speech_mattr_10"], measures["speech_mattr_25"], measures["speech_mattr_50"], measures["speech_mattr_100"]]
         cols = [measures["neg"], measures["neu"], measures["pos"], measures["compound"], measures["speech_mattr_5"], measures["speech_mattr_10"], measures["speech_mattr_25"], measures["speech_mattr_50"], measures["speech_mattr_100"], measures["brunet_index"], measures["honore_statistic"]]
 
         for idx, u in enumerate(turn_list):
