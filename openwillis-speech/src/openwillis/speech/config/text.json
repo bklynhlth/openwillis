@@ -15,6 +15,8 @@
   "speech_mattr_25": "mattr_25",
   "speech_mattr_50": "mattr_50",
   "speech_mattr_100": "mattr_100",
+  "brunet_index": "brunet_index",
+  "honore_statistic": "honore_statistic",
   "rate_of_speech": "rate_of_speech",
   "pause_meandur": "mean_pause_length",
   "pause_var": "pause_variability",
