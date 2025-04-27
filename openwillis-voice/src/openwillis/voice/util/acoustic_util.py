@@ -11,7 +11,6 @@ import numpy.matlib
 import pandas as pd
 import scipy
 
-from parselmouth import Sound
 from parselmouth.praat import call
 from pydub import AudioSegment, silence
 import librosa
@@ -38,7 +37,7 @@ def common_summary(df, col_name):
     ------------------------------------------------------------------------------------------------------
     """
     df2 = df.copy()
-    df2 = df2[(df2[col_name].notnull()) & (df2[col_name] != 0)]
+    df2 = df2[(df2.notnull()) & (df2 != 0)]
 
     mean = df2.mean()
     std = df2.std()
@@ -90,7 +89,7 @@ def silence_summary(sound, df, measures):
 
         dur_med = df2[measures['voicesilence']].median()
 
-        dur_mad = np.median(np.abs(df2[measures['voicesilence']] - df2[measures['voicesilence']].mean()))
+        dur_mad = np.median(np.abs(df2[measures['voicesilence']] - np.median(df2[measures['voicesilence']])))
 
     cols = [
         measures['spir'], measures['pause_meddur'], measures['pause_maddur']    
@@ -100,6 +99,57 @@ def silence_summary(sound, df, measures):
         [[spir, dur_med, dur_mad]], columns = cols
     )
     return silence_summ
+
+def calculate_lhr(sound, measures, window_ms=20, overlap=0.75):
+    """
+    Calculates the Low/High frequency Ratio (LHR) - the ratio between acoustic energy 
+    above and below 4 kHz.
+
+    Parameters:
+    ...........
+    sound : sound obj
+        Praat sound object
+    measures : dict
+        Dictionary containing measure names
+    window_ms : float
+        Window size in milliseconds (default: 20ms)
+    overlap : float
+        Overlap between windows (default: 0.75 or 75%)
+
+    Returns:
+    ...........
+    df_lhr : pandas dataframe
+        Dataframe containing LHR values for each frame
+    """
+    # Convert sound to numpy array and get sampling rate
+    y = sound.values[0]
+    sr = sound.sampling_frequency
+
+    # Calculate window and hop length in samples
+    window_length = int(window_ms * sr / 1000)  # convert ms to samples
+    hop_length = int(window_length * (1 - overlap))
+
+    # Calculate STFT (Short-time Fourier Transform)
+    stft = librosa.stft(y, n_fft=window_length, hop_length=hop_length, window='hann')
+    frequencies = librosa.fft_frequencies(sr=sr, n_fft=window_length)
+
+    # Get magnitude spectrogram
+    mag_spec = np.abs(stft)
+
+    # Find frequency bin index corresponding to 4 kHz
+    freq_4k_idx = np.where(frequencies >= 4000)[0][0]
+
+    # Calculate energy in low and high frequency bands
+    low_energy = np.sum(mag_spec[:freq_4k_idx, :], axis=0)
+    high_energy = np.sum(mag_spec[freq_4k_idx:, :], axis=0)
+
+    # Calculate LHR (add small constant to avoid division by zero)
+    lhr = low_energy / (high_energy + 1e-10)
+    lhr_measures = [np.mean(lhr), np.var(lhr), scipy.stats.kurtosis(lhr), scipy.stats.skew(lhr)]
+
+    # Create dataframe
+    df_lhr = pd.DataFrame([lhr_measures], columns=[measures['lhr_mean'], measures['lhr_var'], measures['lhr_kurtosis'], measures['lhr_skewness']])
+    return df_lhr
 
 def voice_frame(sound, measures):
     """
@@ -130,35 +180,26 @@ def voice_frame(sound, measures):
     df = pd.DataFrame([voice_pct], columns=[measures['silence_ratio']])
     return df
 
-def read_audio(path):
+def get_measures():
     """
     ------------------------------------------------------------------------------------------------------
-
-    Reads an audio file and returns the Praat sound object and a dictionary of measures names.
-
-    Parameters:
-    ...........
-    path : str
-        The path to the audio file.
-
+    
+    Reads the measures configuration file and returns the measures dictionary.
+    
     Returns:
     ...........
-    sound : praat sound object
-        the Praat sound object for the given audio file.
     measures : dict
         a dictionary containing the measures names for the calculated statistics.
-
+        
     ------------------------------------------------------------------------------------------------------
     """
-    #Loading json config
     dir_name = os.path.dirname(os.path.abspath(__file__))
     measure_path = os.path.abspath(os.path.join(dir_name, '../config/acoustic.json'))
 
     file = open(measure_path)
     measures = json.load(file)
-    sound = Sound(path)
 
-    return sound, measures
+    return measures
 
 def pitchfreq(sound, measures, f0min, f0max):
     """
@@ -533,8 +574,12 @@ def get_cepstral_features(audio_path, measures):
     cpp_0 = cpp(y, sr, 'line', True)
     cpp_0_mean = np.mean(cpp_0)
     cpp_0_var = np.var(cpp_0)
+    cpp_0_kurtosis = scipy.stats.kurtosis(cpp_0)
+    cpp_0_skewness = scipy.stats.skew(cpp_0)
 
-    df_cepstral = pd.DataFrame([mfccs_mean + mfccs_var + [cpp_0_mean] + [cpp_0_var]], columns = [
+    spectral_variability = np.median(np.abs(mfccs.T[:, 1] - np.median(mfccs.T[:, 1])))
+
+    df_cepstral = pd.DataFrame([mfccs_mean + mfccs_var + [cpp_0_mean, cpp_0_var, cpp_0_kurtosis, cpp_0_skewness] + [spectral_variability]], columns = [
         measures['mfcc1_mean'], measures['mfcc2_mean'], measures['mfcc3_mean'], measures['mfcc4_mean'],
         measures['mfcc5_mean'], measures['mfcc6_mean'], measures['mfcc7_mean'], measures['mfcc8_mean'],
         measures['mfcc9_mean'], measures['mfcc10_mean'], measures['mfcc11_mean'], measures['mfcc12_mean'],
@@ -542,6 +587,7 @@ def get_cepstral_features(audio_path, measures):
         measures['mfcc3_var'], measures['mfcc4_var'], measures['mfcc5_var'], measures['mfcc6_var'],
         measures['mfcc7_var'], measures['mfcc8_var'], measures['mfcc9_var'], measures['mfcc10_var'],
         measures['mfcc11_var'], measures['mfcc12_var'], measures['mfcc13_var'], measures['mfcc14_var'],
-        measures['cpp_mean'], measures['cpp_var']
+        measures['cpp_mean'], measures['cpp_var'], measures['cpp_kurtosis'], measures['cpp_skewness'],
+        measures['spectral_variability']
     ])
     return df_cepstral

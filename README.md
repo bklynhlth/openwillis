@@ -6,7 +6,7 @@ It was developed by [Brooklyn Health](https://brooklyn.health/openwillis) to est
 
 It is freely available for non-commercial use ([see license](https://github.com/bklynhlth/openwillis/blob/main/LICENSE.txt)).
 
-The [OpenWillis Wiki](https://brooklynhealth.notion.site/OpenWillis-14983a8fe04781ddb2a2e999aeaaf05a) contains detailed documentation on the following: 
+The [OpenWillis Wiki](http://openwillis.brooklyn.health) contains detailed documentation on the following: 
 1. Function methods and documentation
 2. Release notes
 3. Instructions for getting started
@@ -22,7 +22,7 @@ Please report any issues using the [Issues](https://github.com/bklynhlth/openwil
 If you’d like to contribute to OpenWillis or have general questions, please [get in touch](mailto:openwillis@brooklyn.health).
 
 ### Brief instructions for getting started 
-Certain requirements are required prior to installing OpenWillis. For full details, please see installation instructions [here](https://brooklynhealth.notion.site/Installing-OpenWillis-14983a8fe047814b88ced7d3831791f2).
+Certain requirements are required prior to installing OpenWillis. For full details, please see installation instructions [here](https://openwillis.brooklyn.health/Installing-OpenWillis-14983a8fe047814b88ced7d3831791f2).
 
 OpenWillis can be installed from PyPI using pip: 
 ```
@@ -35,7 +35,7 @@ import openwillis as ow
 
 framewise_loc, framewise_disp, summary = ow.facial_expressivity('data/video.mp4', 'data/baseline.mp4')
 ```
-All OpenWillis functions are listed in the wiki's [List of Functions](https://brooklynhealth.notion.site/15883a8fe04780739400c1d8ad94bb39?v=15883a8fe047806aa291000cb85dceae).
+All OpenWillis functions are listed in the wiki's [List of Functions](https://openwillis.brooklyn.health/15883a8fe04780739400c1d8ad94bb39?v=15883a8fe047806aa291000cb85dceae).
 
 Each function has a document that details its use, methods utilized, input and output parameters, primary outcome measures, and any additional information relevant for the use of the function.
 
