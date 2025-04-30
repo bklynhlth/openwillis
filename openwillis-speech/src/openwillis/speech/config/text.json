@@ -17,6 +17,8 @@
   "speech_mattr_100": "mattr_100",
   "brunet_index": "brunet_index",
   "honore_statistic": "honore_statistic",
+  "yngve_score": "yngve_score",
+  "frazier_score": "frazier_score",
   "rate_of_speech": "rate_of_speech",
   "pause_meandur": "mean_pause_length",
   "pause_var": "pause_variability",

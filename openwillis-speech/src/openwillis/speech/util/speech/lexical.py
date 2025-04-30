@@ -1,20 +1,27 @@
 # author:    Georgios Efstathiadis
 # website:   http://www.bklynhlth.com
 
+# import the required packages
+
 import logging
 import string
+import unicodedata
 from collections import Counter
 
+import benepar
 import nltk
 import numpy as np
-# import the required packages
 import pandas as pd
 import spacy
 from lexicalrichness import LexicalRichness
+from nltk.tree import ParentedTree
+from spacy.tokens import Span
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger()
+
+
 
 # NLTK Tag list
 TAG_DICT = {"PRP": "Pronoun", "PRP$": "Pronoun", "VB": "Verb", "VBD": "Verb", "VBG": "Verb", "VBN": "Verb", "VBP": "Verb", 
@@ -152,6 +159,178 @@ def get_honore_statistic(text, lemmatizer):
         return np.nan
 
     return 100 * (np.log(N) / (1 - (V1 / V)))
+
+def get_parented_tree(span):
+    """
+    Converts a Benepar-generated parse string into an NLTK ParentedTree object.
+
+    Parameters:
+    -----------
+    span : spacy.tokens.Span
+        A spaCy span with a Benepar parse string in the ._.parse_string extension.
+
+    Returns:
+    --------
+    nltk.tree.ParentedTree
+        The corresponding ParentedTree object for syntactic traversal.
+    """
+    
+    return ParentedTree.fromstring('(' + span._.parse_string + ')')
+
+def yngve_score(tree):
+    """
+    Computes the Yngve score for a parse tree.
+    
+    The Yngve score quantifies syntactic complexity by increasing depth based on 
+    the number of right siblings — capturing left-branching load.
+
+    Parameters:
+    -----------
+    tree : nltk.tree.ParentedTree
+        A syntactic parse tree.
+
+    Returns:
+    --------
+    int
+        Total Yngve score for the tree.
+    """
+
+    def compute(node, depth=0):
+        if isinstance(node, str):
+            return [depth]
+        scores = []
+        for i, child in enumerate(node):
+            branch_depth = depth + (len(node) - i - 1)
+            scores += compute(child, branch_depth)
+        return scores
+    return sum(compute(tree))
+
+def frazier_score(tree):
+    """
+    Computes the Frazier score for a parse tree.
+
+    The Frazier score quantifies memory load by increasing depth for right-branching nodes — 
+    capturing processing complexity during sentence parsing.
+
+    Parameters:
+    -----------
+    tree : nltk.tree.ParentedTree
+        A syntactic parse tree.
+
+    Returns:
+    --------
+    int
+        Total Frazier score for the tree.
+    """
+
+    def compute(node, depth=0):
+        if isinstance(node, str):
+            return [depth]
+        scores = []
+        for i, child in enumerate(node):
+            new_depth = depth if i == 0 else depth + 1
+            scores += compute(child, new_depth)
+        return scores
+    return sum(compute(tree))
+
+def clean_text(text):
+    """
+    Normalizes and replaces typographic characters for parsing compatibility.
+
+    Parameters:
+    -----------
+    text : str
+        The input text to clean.
+
+    Returns:
+    --------
+    str
+        Cleaned text with standard quotes, dashes, and apostrophes.
+    """
+    text = unicodedata.normalize("NFKD", text)
+    text = text.replace('—', '-').replace('–', '-')
+    text = text.replace('“', '"').replace('”', '"')
+    text = text.replace('’', "'").replace('‘', "'")
+    return text
+
+def score_excerpt(text):
+    
+    """
+    Computes Yngve and Frazier syntactic complexity scores for a text excerpt.
+
+    The function segments the excerpt into sentences, parses each sentence using Benepar, 
+    and averages syntactic complexity scores across parse trees. Skips sentences that are 
+    too long or unparseable.
+
+    Parameters:
+    -----------
+    text : str
+        The full excerpt to analyze.
+
+    Returns:
+    --------
+    pandas.Series
+        A series containing average Yngve and Frazier scores:
+        {
+            'yngve_score': float or NaN,
+            'frazier_score': float or NaN
+        }
+    """
+
+    nlp_splitter = spacy.load("en_core_web_sm")
+    nlp_parser = spacy.load("en_core_web_sm")
+
+    if "benepar" not in nlp_parser.pipe_names:
+        nlp_parser.add_pipe("benepar", config={"model": "benepar_en3"})
+    
+    if not Span.has_extension("parse_tree"):
+        Span.set_extension("parse_tree", getter=get_parented_tree)
+
+    try:
+        text = clean_text(text)
+
+        if len(text.split()) < 8:
+            # Too short to be meaningful
+            return pd.Series({"yngve_score": np.nan, "frazier_score": np.nan})
+
+        doc = nlp_splitter(text)  # Sentence segmentation only
+
+        yngve_scores = []
+        frazier_scores = []
+
+        for sent in doc.sents:
+            if len(sent) > 60:
+                continue  # Skip very long sentences (too hard to parse reliably)
+
+            try:
+                # Parse the sentence with Benepar-enabled pipeline
+                sent_doc = nlp_parser(sent.text)
+                sents_parsed = list(sent_doc.sents)
+
+                if not sents_parsed:
+                    continue  # Sentence was not parsed properly
+
+                tree = sents_parsed[0]._.parse_tree
+                yngve_scores.append(yngve_score(tree))
+                frazier_scores.append(frazier_score(tree))
+
+            except Exception:
+                # Skip this sentence on error (do not raise)
+                continue
+
+        if not yngve_scores:
+            # No valid parses were obtained
+            return pd.Series({"yngve_score": np.nan, "frazier_score": np.nan})
+
+        return pd.Series({
+            "yngve_score": np.mean(yngve_scores),
+            "frazier_score": np.mean(frazier_scores)
+        })
+
+    except Exception:
+        # If the entire excerpt fails (e.g. tokenizer error, encoding)
+        return pd.Series({"yngve_score": np.nan, "frazier_score": np.nan})
+
 
 
 def get_tag(word_df, word_list, measures):
@@ -393,6 +572,8 @@ def get_sentiment(df_list, text_list, measures):
 
     This function calculates the sentiment scores of the input text using
      VADER, and adds them to the output dataframe summ_df.
+    It also calculates measures of lexical diversity: the MATTR, Brunet's Index, Honoré's Statistic,
+    and syntactic complexity: the Yngve and Frazier scores.
 
     Parameters:
     ...........
@@ -416,7 +597,12 @@ def get_sentiment(df_list, text_list, measures):
         lemmatizer = spacy.load('en_core_web_sm')
 
         sentiment = SentimentIntensityAnalyzer()
-        cols = [measures["neg"], measures["neu"], measures["pos"], measures["compound"], measures["speech_mattr_5"], measures["speech_mattr_10"], measures["speech_mattr_25"], measures["speech_mattr_50"], measures["speech_mattr_100"], measures["brunet_index"], measures["honore_statistic"]]
+
+        cols = [measures["neg"], measures["neu"], measures["pos"], measures["compound"], 
+                measures["speech_mattr_5"], measures["speech_mattr_10"], measures["speech_mattr_25"], 
+                measures["speech_mattr_50"], measures["speech_mattr_100"], 
+                measures["brunet_index"], measures["honore_statistic"], 
+                measures["yngve_score"], measures["frazier_score"]]
 
         for idx, u in enumerate(turn_list):
             try:
@@ -425,7 +611,11 @@ def get_sentiment(df_list, text_list, measures):
                 mattrs = [get_mattr(u, lemmatizer, window_size=ws) for ws in [5, 10, 25, 50, 100]]
                 brunet = get_brunet_index(u, lemmatizer)
                 honore = get_honore_statistic(u, lemmatizer)
-                turn_df.loc[idx, cols] = list(sentiment_dict.values()) + mattrs + [brunet, honore]
+                syntax_scores = score_excerpt(u)
+                yngve = syntax_scores["yngve_score"]
+                frazier = syntax_scores["frazier_score"]
+
+                turn_df.loc[idx, cols] = list(sentiment_dict.values()) + mattrs + [brunet, honore, yngve, frazier]
 
             except Exception as e:
                 logger.info(f"Error in sentiment analysis: {e}")
@@ -435,8 +625,11 @@ def get_sentiment(df_list, text_list, measures):
         mattrs = [get_mattr(full_text, lemmatizer, window_size=ws) for ws in [5, 10, 25, 50, 100]]
         brunet = get_brunet_index(full_text, lemmatizer)
         honore = get_honore_statistic(full_text, lemmatizer)
+        syntax_scores = score_excerpt(full_text)
+        yngve = syntax_scores["yngve_score"]
+        frazier = syntax_scores["frazier_score"]
 
-        summ_df.loc[0, cols] = list(sentiment_dict.values()) + mattrs + [brunet, honore]
+        summ_df.loc[0, cols] = list(sentiment_dict.values()) + mattrs + [brunet, honore, yngve, frazier]
 
         df_list = [word_df, turn_df, summ_df]
     except Exception as e:
