@@ -575,8 +575,6 @@ def get_sentiment(df_list, text_list, measures):
     It also calculates measures of lexical diversity: the MATTR, Brunet's Index, Honoré's Statistic,
     and syntactic complexity: the Yngve and Frazier scores.
 
-    The function has evolved so we could consider renaming it?
-
     Parameters:
     ...........
     df_list: list
