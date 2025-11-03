@@ -78,7 +78,7 @@ def filter_labels_aws(data):
     """
     if 'results' in data:
         speaker_labels = data['results'].get('speaker_labels', {})
-        if type(speaker_labels) == dict:
+        if isinstance(speaker_labels, dict):
             segments = speaker_labels.get('segments', [])
 
             for segment in segments:
