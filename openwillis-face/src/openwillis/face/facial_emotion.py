@@ -115,7 +115,7 @@ def detect_emotions(detector, frame, emo_cols, threshold=.95):
         landmarks
     )
 
-    emotions = emotions[0][0] * 100  # convert from 0-1 to 0-100
+    emotions = emotions[0][0]
     aus = aus[0][0]
     landmarks = landmarks[0][0]
 
@@ -185,7 +185,7 @@ def crop_and_detect_emotions(
 
     return df_emo
 
-def run_pyfeat(path, skip_frames=5, bbox_list=[]):
+def run_pyfeat(path, frames_per_second=3, bbox_list=[]):
     """
     ------------------------------------------------------------------------------------------------------
     This function takes an image path and measures config object as input, and uses the py-feat package to
@@ -196,8 +196,11 @@ def run_pyfeat(path, skip_frames=5, bbox_list=[]):
     ..........
     path: str
         The path of the image file
-    measures: dict
-        A configuration object containing keys for different facial emotion measures
+    frames_per_second: float, optional
+        The number of frames to sample per second of video. Default is 3.
+        This determines the temporal resolution of the analysis.
+    bbox_list: list of dicts, optional
+        A list of bounding box dictionaries for each frame in the video.
 
     Returns:
     ..........
@@ -215,11 +218,13 @@ def run_pyfeat(path, skip_frames=5, bbox_list=[]):
         cap = cv2.VideoCapture(path)
         num_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         len_bbox_list = len(bbox_list)
-        fps = cap.get(cv2.CAP_PROP_FPS)
+        video_fps = cap.get(cv2.CAP_PROP_FPS)
+        
+        skip_interval = max(0, int(video_fps / frames_per_second))
 
         df_list = []
         frame = 0
-        n_frames_skipped = skip_frames
+        n_frames_skipped = skip_interval
 
         bbox_list_passed = len_bbox_list > 0
 
@@ -227,52 +232,44 @@ def run_pyfeat(path, skip_frames=5, bbox_list=[]):
             raise ValueError('Number of frames in video and number of bounding boxes do not match')
 
         while True:
-
             try:
-
                 ret_type, img = cap.read()
+                
                 if ret_type is not True:
                     break
 
-                if n_frames_skipped < skip_frames:
-
+                if n_frames_skipped < skip_interval:
                     n_frames_skipped += 1
-                    df_emotion = get_undected_emotion(frame, emo_cols, fps)
+                    df_emotion = get_undected_emotion(frame, emo_cols, video_fps)
 
-                elif n_frames_skipped == skip_frames:
+                elif n_frames_skipped == skip_interval:
                     n_frames_skipped = 0
-                    df_common = pd.DataFrame([[frame, frame/fps]], columns=['frame', 'time'])
-                    # if there is a bounding box list crop the frame (or return a black frame)
-
+                    df_common = pd.DataFrame([[frame, frame/video_fps]], columns=['frame', 'time'])
+                  
                     if bbox_list_passed:
-
                         bbox = bbox_list[frame]
                         df_emotion = crop_and_detect_emotions(
                             img,
                             bbox,
                             detector,
                             emo_cols,
-                            fps,
+                            video_fps,
                             frame,
                             df_common
                         )
-
                     else:
-
                         df_emo = detect_emotions(
                             detector,
                             img,
                             emo_cols
                         )
-
                         df_emotion = pd.concat([df_common, df_emo], axis=1)
 
             except Exception as e:
                 logger.info(f'error processing frame: {frame} in file: {path} & Error: {e}')
-                df_emotion = get_undected_emotion(frame, emo_cols, fps)
+                df_emotion = get_undected_emotion(frame, emo_cols, video_fps)
 
             df_list.append(df_emotion)
-
             frame += 1
 
     except Exception as e:
@@ -282,7 +279,6 @@ def run_pyfeat(path, skip_frames=5, bbox_list=[]):
         # Empty dataframe in case of insufficient datapoints
         if len(df_list) == 0:
             df_emotion = pd.DataFrame(columns=emo_cols)
-
             df_list.append(df_emotion)
             logger.info(f'Face not detected by pyfeat in: {path}')
 
@@ -315,7 +311,7 @@ def get_undected_emotion(frame, cols, fps):
     df_emotion = pd.concat([df_common, df], axis=1)
     return df_emotion
 
-def get_emotion(path, skip_frames=5, bbox_list=[]):
+def get_emotion(path, frames_per_second=3, bbox_list=[]):
     """
     ------------------------------------------------------------------------------------------------------
     This function fetches facial emotion data for each frame of the input video. It calls the run_pyfeat()
@@ -326,10 +322,11 @@ def get_emotion(path, skip_frames=5, bbox_list=[]):
     ..........
     path: str
         The path of the input video file
-    skip_frames: int
-        number of frames to skip between samples
-    bbox_list: list of dicts
-        a list of dicts as long as the video that contain bounding box information
+    frames_per_second: float, optional
+        The number of frames to sample per second of video. Default is 3.
+        This determines the temporal resolution of the analysis.
+    bbox_list: list of dicts, optional
+        A list of dicts as long as the video that contain bounding box information
 
     Returns:
     ..........
@@ -341,7 +338,7 @@ def get_emotion(path, skip_frames=5, bbox_list=[]):
     emotion_list = run_pyfeat(
         path,
         bbox_list=bbox_list,
-        skip_frames=skip_frames
+        frames_per_second=frames_per_second
     )
 
     if len(emotion_list) > 0:
@@ -355,7 +352,7 @@ def baseline(
     df,
     base_path,
     base_bbox_list=[],
-    skip_frames=5
+    frames_per_second=3
 ):
     """
     ------------------------------------------------------------------------------------------------------
@@ -370,10 +367,11 @@ def baseline(
         The input dataframe containing facial emotion data
     base_path: str
         The path to the baseline video
-    measures: dict
-        A configuration object containing keys for different facial emotion measures.
-    skip_frames: int
-        number of frames to skip between frames processed
+    base_bbox_list: list of dicts, optional
+        A list of bounding box dictionaries for each frame in the baseline video.
+    frames_per_second: float, optional
+        The number of frames to sample per second of video. Default is 3.
+        This determines the temporal resolution of the analysis.
 
     Returns:
     ..........
@@ -393,7 +391,7 @@ def baseline(
     base_emo = get_emotion(
         base_path,
         bbox_list=base_bbox_list,
-        skip_frames=skip_frames
+        frames_per_second=frames_per_second
     )
 
     base_mean = base_emo.drop(
@@ -415,7 +413,7 @@ def emotional_expressivity(
     baseline_filepath='',
     bbox_list=[],
     base_bbox_list=[],
-    skip_frames=5,
+    frames_per_second=3,
     split_by_speaking=False,
     rolling_std_seconds=3
 ):
@@ -442,8 +440,9 @@ def emotional_expressivity(
     base_bbox_list : list of dicts, optional
         list of bounding box dictionaries for each frame in the baseline video. (default is 0, meaning
         pyfeat will be used to detect faces in each frame).
-    skip_frames : int, optional
-        number of frames to skip between samples (default is 5).
+    frames_per_second : float, optional
+        The number of frames to sample per second of video. Default is 3.
+        This determines the temporal resolution of the analysis.
     split_by_speaking : bool, optional
         split the output by speaking probability (default is False).
     rolling_std_seconds : int, optional
@@ -465,18 +464,17 @@ def emotional_expressivity(
     ------------------------------------------------------------------------------------------------------
     """
     try:
-
         df_emotion = get_emotion(
             filepath,
             bbox_list=bbox_list,
-            skip_frames=skip_frames
+            frames_per_second=frames_per_second
         )
 
         df_norm_emo = baseline(
             df_emotion,
             baseline_filepath,
             base_bbox_list=base_bbox_list,
-            skip_frames=skip_frames
+            frames_per_second=frames_per_second
         )
 
         if split_by_speaking:
