@@ -78,28 +78,29 @@ def filter_labels_aws(data):
     """
     if 'results' in data:
         speaker_labels = data['results'].get('speaker_labels', {})
-        segments = speaker_labels.get('segments', [])
+        if isinstance(speaker_labels, dict):
+            segments = speaker_labels.get('segments', [])
 
-        for segment in segments:
-            seg_speaker_label = segment.get('speaker_label', '')
-            
-            if 'spk_' in seg_speaker_label:
-                segment['speaker_label'] = seg_speaker_label.replace("spk_", "speaker")
-            
-            seg_items = segment.get('items', [])
-            for seg_item in seg_items:
+            for segment in segments:
+                seg_speaker_label = segment.get('speaker_label', '')
                 
-                seg_item_speaker_label = seg_item.get('speaker_label', '')
-                if 'spk_' in seg_item_speaker_label:
+                if 'spk_' in seg_speaker_label:
+                    segment['speaker_label'] = seg_speaker_label.replace("spk_", "speaker")
+                
+                seg_items = segment.get('items', [])
+                for seg_item in seg_items:
                     
-                    seg_item['speaker_label'] = seg_item_speaker_label.replace("spk_", "speaker")
-        items = data['results'].get('items', [])
-        
-        for item in items:
-            item_speaker_label = item.get('speaker_label', '')
+                    seg_item_speaker_label = seg_item.get('speaker_label', '')
+                    if 'spk_' in seg_item_speaker_label:
+                        
+                        seg_item['speaker_label'] = seg_item_speaker_label.replace("spk_", "speaker")
+            items = data['results'].get('items', [])
             
-            if 'spk_' in item_speaker_label:
-                item['speaker_label'] = item_speaker_label.replace("spk_", "speaker")
+            for item in items:
+                item_speaker_label = item.get('speaker_label', '')
+                
+                if 'spk_' in item_speaker_label:
+                    item['speaker_label'] = item_speaker_label.replace("spk_", "speaker")
 
     return data
 
