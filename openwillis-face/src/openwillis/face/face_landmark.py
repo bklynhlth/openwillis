@@ -1,4 +1,4 @@
-# author:    Vijay Yadav
+# author:    Vijay Yadav/Kieran McVeigh
 # website:   http://www.bklynhlth.com
 
 # import the required packages
@@ -215,7 +215,7 @@ def crop_and_process_face_mesh(
     return df_landmark
 
 
-def run_facemesh(path, bbox_list=[]):
+def run_facemesh(path, frames_per_second=3, bbox_list=[]):
     """
     ---------------------------------------------------------------------------------------------------
 
@@ -226,7 +226,10 @@ def run_facemesh(path, bbox_list=[]):
     ............
     path : str
         Path to image file
-    bbox_list : list
+    frames_per_second : float, optional
+        The number of frames to sample per second of video. Default is 3.
+        This determines the temporal resolution of the analysis.
+    bbox_list : list, optional
         List of bounding boxes for each frame in the video
 
     Returns:
@@ -241,59 +244,76 @@ def run_facemesh(path, bbox_list=[]):
     frame = 0
 
     try:
-
         cap = cv2.VideoCapture(path)
         num_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-        fps = int(cap.get(cv2.CAP_PROP_FPS))
+        video_fps = cap.get(cv2.CAP_PROP_FPS)
         len_bbox_list = len(bbox_list)
-        print(num_frames, len_bbox_list)
-
-        if (len_bbox_list>0) & (num_frames != len_bbox_list):
-            print(num_frames, len_bbox_list)
-            raise ValueError('Number of frames in video and number of bounding boxes do not match')
+        
+        # Calculate skip interval to get desired frames per second
+        if frames_per_second >= video_fps:
+            skip_interval = 0
+        else:
+            skip_interval = max(0, int(video_fps / frames_per_second))
         
         face_mesh = init_facemesh()
+        bbox_list_passed = len_bbox_list > 0
+
+        if bbox_list_passed & (num_frames != len_bbox_list):
+            raise ValueError('Number of frames in video and number of bounding boxes do not match')
+
+        n_frames_skipped = skip_interval
 
         while True:
             try:
-
                 ret_type, img = cap.read()
+                
                 if ret_type is not True:
                     break
-                df_common = pd.DataFrame([[frame, frame/fps]], columns=['frame','time'])
-                img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
-                if len_bbox_list==0:
+                if n_frames_skipped < skip_interval:
+                    n_frames_skipped += 1
+                    df_landmark = get_undected_markers(frame, video_fps)
 
-                    df_landmark = process_and_format_face_mesh(
-                        img_rgb,
-                        face_mesh,
-                        df_common
-                    )
+                elif n_frames_skipped == skip_interval:
+                    n_frames_skipped = 0
+                    img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+                    df_common = pd.DataFrame([[frame, frame/video_fps]], columns=['frame', 'time'])
                     
-                else:
-                    
-                    bbox = bbox_list[frame]
-                    df_landmark = crop_and_process_face_mesh(
-                        img_rgb,
-                        face_mesh,
-                        df_common,
-                        bbox,
-                        frame,
-                        fps
-                    )
+                    if bbox_list_passed:
+                        bbox = bbox_list[frame]
+                        df_landmark = crop_and_process_face_mesh(
+                            img_rgb,
+                            face_mesh,
+                            df_common,
+                            bbox,
+                            frame,
+                            video_fps
+                        )
+                    else:
+                        df_landmark = process_and_format_face_mesh(
+                            img_rgb,
+                            face_mesh,
+                            df_common
+                        )
 
             except Exception as e:
-                print(e,frame)
-                df_landmark = get_undected_markers(frame,fps)
+                logger.info(f'error processing frame: {frame} in file: {path} & Error: {e}')
+                df_landmark = get_undected_markers(frame, video_fps)
 
             df_list.append(df_landmark)
-            frame +=1
+            frame += 1
 
     except Exception as e:
-        logger.info(f'Face not detected by mediapipe file: {path} & Error: {e}')
+        logger.info(f'Face error process file in facemesh for file:{path} & Error: {e}')
 
-    return df_list
+    finally:
+        # Empty dataframe in case of insufficient datapoints
+        if len(df_list) == 0:
+            df_landmark = get_empty_dataframe()
+            df_list.append(df_landmark)
+            logger.info(f'Face not detected by facemesh in: {path}')
+
+    return df_list, skip_interval
 
 def get_undected_markers(frame,fps):
     """
@@ -330,43 +350,43 @@ def get_undected_markers(frame,fps):
     df_landmark = pd.concat([df_common, df_coord], axis=1)
     return df_landmark
 
-def get_landmarks(path, bbox_list=[]):
-
+def get_landmarks(path, frames_per_second=3, bbox_list=[]):
     """
     ---------------------------------------------------------------------------------------------------
 
-    This function takes a path to an image file and an error location string as input, and returns a Pandas
+    This function takes a path to an image file as input, runs Facemesh on the image, and returns a
     dataframe containing the landmark coordinates for each frame of the video.
 
     Parameters:
     ............
     path : str
         Path to image file
-    error_info : str
-        Error location string
-    bbox_list : list
+    frames_per_second : float, optional
+        The number of frames to sample per second of video. Default is 3.
+        This determines the temporal resolution of the analysis.
+    bbox_list : list, optional
         List of bounding boxes for each frame in the video
 
     Returns:
     ............
     df_landmark : pandas.DataFrame
-        Dataframe containing the landmark coordinates for each frame of the video
+        Dataframe containing landmark coordinates for each frame of the video
 
     ---------------------------------------------------------------------------------------------------
     """
 
-    landmark_list = run_facemesh(path, bbox_list=bbox_list)
+    landmark_list, skip_interval = run_facemesh(
+        path,
+        bbox_list=bbox_list,
+        frames_per_second=frames_per_second
+    )
 
-
-    if len(landmark_list)>0:
+    if len(landmark_list) > 0:
         df_landmark = pd.concat(landmark_list).reset_index(drop=True)
-
     else:
-        standard_fps = 25
-        df_landmark = get_undected_markers(0,standard_fps)
-        logger.info(f'Face not detected by mediapipe in file {path}')
+        df_landmark = get_empty_dataframe()
 
-    return df_landmark
+    return df_landmark, skip_interval
 
 def get_distance(df):
     """
@@ -397,7 +417,7 @@ def get_distance(df):
         df_dist = pd.DataFrame(dist, columns=['lmk' + str(col+1).zfill(3)])
         disp_list.append(df_dist)
 
-    displacement_df = pd.concat(disp_list, axis=1).reset_index(drop=True)
+    displacement_df = pd.concat(disp_list, axis=1)
     return displacement_df
 
 def get_mouth_height(df, measures):
@@ -513,23 +533,27 @@ def get_mouth_openness(df, measures):
 
     return mouth_openness
 
-def baseline(base_path, bbox_list=[], normalize=True, align=False):
+def baseline(base_path, frames_per_second=3, bbox_list=[], normalize=True, align=False):
     """
     ---------------------------------------------------------------------------------------------------
 
-    This function takes a path to a baseline input file and returns a normalized Pandas dataframe of
-    landmark coordinates.
+    This function takes a path to a baseline video file as input, runs Facemesh on the video, and returns a
+    dataframe containing the landmark coordinates for each frame of the video. The function can also normalize
+    and align the landmarks if specified.
 
     Parameters:
     ............
     base_path : str
-        Path to baseline input file
-    bbox_list : list
+        Path to baseline video file
+    frames_per_second : float, optional
+        The number of frames to sample per second of video. Default is 3.
+        This determines the temporal resolution of the analysis.
+    bbox_list : list, optional
         List of bounding boxes for each frame in the video
     normalize : bool, optional
-        Whether to normalize the facial landmarks to a common reference point (default is True)
+        Whether to normalize the landmarks. Default is True.
     align : bool, optional
-        Whether to align the facial landmarks based on the position of the eyes (default is False)
+        Whether to align the landmarks. Default is False.
 
     Returns:
     ............
@@ -538,13 +562,20 @@ def baseline(base_path, bbox_list=[], normalize=True, align=False):
 
     ---------------------------------------------------------------------------------------------------
     """
+    config = get_config(os.path.abspath(__file__), "facial.json")
 
-    base_landmark = get_landmarks(base_path, bbox_list=bbox_list)
-
-
+    base_landmark, skip_interval = get_landmarks(
+        base_path, 
+        frames_per_second=frames_per_second,
+        bbox_list=bbox_list
+    )
+    
     if normalize:
-        base_df = normalize_face_landmarks(base_landmark, align=align)
-        
+        base_landmark = normalize_face_landmarks(base_landmark, align=align)
+
+     
+    base_landmark = base_landmark.iloc[::(skip_interval+1), :]
+
     disp_base_df = get_distance(base_landmark)
 
     disp_base_df['overall'] = pd.DataFrame(disp_base_df.mean(axis=1))
@@ -618,6 +649,7 @@ def get_displacement(
     displacement_df = get_empty_dataframe()
 
     try:
+
         df_meta = lmk_df[['frame','time']]
 
         if len(lmk_df)>1:
@@ -641,7 +673,7 @@ def get_displacement(
                     disp_actual_df = disp_actual_df - 1
 
             disp_actual_df = calculate_areas_displacement(disp_actual_df, measures)
-            displacement_df = pd.concat([df_meta, disp_actual_df], axis=1).reset_index(drop=True)
+            displacement_df = pd.concat([df_meta, disp_actual_df], axis=1)
     except Exception as e:
 
         logger.info(f'Error in displacement calculation is {e}')
@@ -867,11 +899,44 @@ def normalize_face_landmarks(
 
     return norm_df
 
+def adjust_summary_stats(df_summ, skip_interval):
+        """
+        ---------------------------------------------------------------------------------------------------
+        Adjusts the mean and standard deviation columns in the summary dataframe based on the skip interval.
+
+        Parameters:
+        ............
+        df_summ : pandas.DataFrame
+        Summary statistics dataframe.
+        skip_interval : int
+        The number of frames skipped during landmark extraction.
+
+        Returns:
+        ............
+        pandas.DataFrame
+        Adjusted summary statistics dataframe.
+        ---------------------------------------------------------------------------------------------------
+        """
+        if skip_interval < 0:
+            raise ValueError('skip_interval must be greater than or equal to 0')
+        
+        scale = skip_interval + 1
+        mean_cols = [col for col in df_summ.columns if 'mean' in col]
+        mean_cols = [col for col in mean_cols if 'mouth_openness_mean' not in col]
+        std_cols = [col for col in df_summ.columns if 'std' in col]
+        std_cols = [col for col in std_cols if 'mouth_openness_std' not in col]
+
+        df_summ[mean_cols] = df_summ[mean_cols] / (scale)
+        df_summ[std_cols] = df_summ[std_cols] / np.sqrt(scale)
+
+        return df_summ
+
 def facial_expressivity(
     filepath,
     baseline_filepath='',
     bbox_list=[],
     base_bbox_list=[],
+    frames_per_second=10,
     normalize=True,
     align=False,
     rolling_std_seconds=3,
@@ -880,55 +945,41 @@ def facial_expressivity(
     """
     ---------------------------------------------------------------------------------------------------
 
-    Uses mediapipe's facemesh solution to quantify the framewise 3D positioning of 468 facial landmarks.
-    Calculates the framewise displacement of those landmarks to quantify movement in facial musculature
-    as a proxy measure of overall facial expressivity.
+    Facial landmark detection and analysis
 
-    Parameters:
-        filepath : str
-            path to video
-        baseline_filepath : str, optional
-            optional path to baseline video. see openwillis research guidelines on github wiki to
-            read case for baseline video use, particularly in clinical research contexts.
-            (default is 0, meaning no baseline correction will be conducted).
-        bbox_list : list, optional
-            list of bounding boxes for each frame in the video. each bounding box is a dictionary
-            with keys 'x', 'y', 'width', and 'height', representing the bounding box coordinates.
-            (default is [], meaning no bounding boxes will be used).
-        base_bbox_list : list, optional
-            list of bounding boxes for each frame in the baseline video. each bounding box is a dictionary
-            with keys 'x', 'y', 'width', and 'height', representing the bounding box coordinates.
-            (default is [], meaning no bounding boxes will be used).
-        normalize : bool, optional
-            whether to normalize the facial landmarks to a common reference point (default is True).
-        align : bool, optional
-            whether to align the facial landmarks based on the position of the eyes (default is False).
-        rolling_std_seconds : int, optional
-            number of seconds over which to calculate the rolling standard deviation for speaking probability
-        split_by_speaking : bool, optional
-            whether to split the output by speaking probability (default is False).
+    This function uses MediaPipe Face Mesh to detect and analyze facial landmarks in a video.
+    It can optionally normalize the landmarks using a baseline video and split the analysis
+    by speaking probability.
 
-    Returns:
-        framewise_loc : pandas.DataFrame
-            dataframe with framewise output of facial landmark 3D positioning. rows are frames in the input
-            video. first column is frame number, second column is time in seconds, and all subsequent columns
-            are landmark position variables, with each landmark numbered and further split into its x, y, and
-            z coordinates. all coordinate values are between 0 and 1, relative to position in frame, as
-            outputted by mediapipe.
+    Parameters
+    ..........
+    filepath : str
+        Path to the input video file
+    baseline_filepath : str, optional
+        Path to a baseline video for normalization. Default is empty string.
+    bbox_list : list of dicts, optional
+        List of bounding box dictionaries for each frame in the video.
+    base_bbox_list : list of dicts, optional
+        List of bounding box dictionaries for each frame in the baseline video.
+    frames_per_second : float, optional
+        The number of frames to sample per second of video. Default is 3.
+        This determines the temporal resolution of the analysis.
+    normalize : bool, optional
+        Whether to normalize the landmarks. Default is True.
+    align : bool, optional
+        Whether to align the landmarks. Default is False.
+    rolling_std_seconds : int, optional
+        Window size in seconds for calculating rolling standard deviation of speaking probability.
+        Default is 3.
+    split_by_speaking : bool, optional
+        Whether to split the analysis by speaking probability. Default is False.
 
-        framewise_disp : pandas.DataFrame
-            dataframe with framewise euclidean displacement of each facial landmark. rows are frames in input
-            video (first row values are always zero). first column is frame number, second column is time in
-            seconds, and subsequent columns are framewise displacement values for each facial landmark. last
-            column is the overall framewisedisplacement measurement as a mean of all previous displacement columns.
-
-        summary : pandas.DataFrame
-            dataframe with summary measurements. first column is name of statistic, subsequent columns are all
-            facial landmarks, last column is overall column with composite measures for all landmarks. first
-            row contains sum of framewise displacement values, second row contains mean framewise displacement
-            over the video, and third row has standard deviation of framewise displacement. in case an optional
-            baseline video was provided, all summary measures are relative to baseline values calculated from
-            baseline video.
+    Returns
+    ..........
+    df_landmark : pandas.DataFrame
+        Dataframe containing landmark coordinates for each frame of the video
+    df_summ : pandas.DataFrame
+        Summary statistics of the landmark movements
 
     ---------------------------------------------------------------------------------------------------
     """
@@ -936,12 +987,24 @@ def facial_expressivity(
 
     try:
 
-        df_landmark = get_landmarks(filepath, bbox_list=bbox_list)
-        
+        if frames_per_second < 1:
+            raise ValueError('frames_per_second must be greater than 1')
+
+        df_landmark, skip_interval = get_landmarks(
+            filepath,
+            bbox_list=bbox_list,
+            frames_per_second=frames_per_second
+        )
+
         if normalize:
             df_landmark = normalize_face_landmarks(df_landmark, align=align)
+        
+        sampled_frames = df_landmark.iloc[::(skip_interval+1), :]
+       
+        
+        sampled_frames = sampled_frames.reset_index(drop=True)
         df_disp = get_displacement(
-            df_landmark,
+            sampled_frames,
             baseline_filepath,
             config,
             base_bbox_list=base_bbox_list,
@@ -950,14 +1013,20 @@ def facial_expressivity(
         )
 
         # use mouth height to calculate mouth openness
-        df_disp['mouth_openness'] = get_mouth_openness(df_landmark, config)
+        df_disp['mouth_openness'] = get_mouth_openness(sampled_frames, config)
 
         if split_by_speaking:
-            df_disp['speaking_probability'] = get_speaking_probabilities(df_disp, rolling_std_seconds)
+            df_disp['speaking_probability'] = get_speaking_probabilities(
+                df_disp, 
+                rolling_std_seconds
+            )
+
             df_summ = split_speaking_df(df_disp, 'speaking_probability', 470)
 
         else:
             df_summ = get_summary(df_disp, 470)
+
+        df_summ = adjust_summary_stats(df_summ, skip_interval)
 
         return df_landmark, df_disp, df_summ
 
