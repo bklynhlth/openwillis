@@ -8,3 +8,4 @@ include src/openwillis/voice/util/praat_tremor/procedures/readPitchOb.praat
 include src/openwillis/voice/util/praat_tremor/procedures/tremHNR.praat
 include src/openwillis/voice/util/praat_tremor/procedures/tremIntIndex.praat
 include src/openwillis/voice/util/praat_tremor/procedures/tremProdSum.praat
+include src/openwillis/voice/util/models/BLSTM_model.h5
