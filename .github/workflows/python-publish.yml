@@ -34,7 +34,7 @@ jobs:
           TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
           TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
         run: |
-          python -m twine upload openwillis/dist/*
+          python -m twine upload --skip-existing openwillis/dist/*
 
       - name: Build package openwillis-face
         run: |
@@ -46,7 +46,7 @@ jobs:
           TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
           TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
         run: |
-          python -m twine upload openwillis-face/dist/*
+          python -m twine upload --skip-existing openwillis-face/dist/*
 
       - name: Build package openwillis-gps
         run: |
@@ -58,7 +58,7 @@ jobs:
           TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
           TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
         run: |
-          python -m twine upload openwillis-gps/dist/*
+          python -m twine upload --skip-existing openwillis-gps/dist/*
 
       - name: Build package openwillis-speech
         run: |
@@ -70,7 +70,7 @@ jobs:
           TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
           TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
         run: |
-          python -m twine upload openwillis-speech/dist/*
+          python -m twine upload --skip-existing openwillis-speech/dist/*
 
       - name: Build package openwillis-transcribe
         run: |
@@ -83,7 +83,7 @@ jobs:
           TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
           TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
         run: |
-          python -m twine upload openwillis-transcribe/dist/*
+          python -m twine upload --skip-existing openwillis-transcribe/dist/*
 
       - name: Build package openwillis-voice
         run: |
@@ -96,4 +96,4 @@ jobs:
           TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
           TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
         run: |
-          python -m twine upload openwillis-voice/dist/*
+          python -m twine upload --skip-existing openwillis-voice/dist/*
