@@ -10,3 +10,5 @@ speechbrain==1.0.2
 torch>=2.5.1,<2.6
 torchaudio>=2.5.1,<2.6
 transformers==4.46.3
+tensorflow==2.15.1
+tf-keras==2.15.1
